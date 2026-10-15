@@ -33,6 +33,11 @@ export class BrandController extends StateController<BrandPanelState> {
   }
 
   async load(templateId: string): Promise<void> {
+    if (this.state.templateId === templateId && this.state.specs.length > 0 && !this.state.error) {
+      // Đã nạp phong cách này: giữ nguyên chỉnh sửa chưa lưu, chỉ đảm bảo session có giá trị hiện tại.
+      this.push();
+      return;
+    }
     const token = ++this.loadToken;
     let specs: readonly BrandFieldSpec[];
     try {

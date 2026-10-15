@@ -22,6 +22,7 @@ export function BrandPanel({ studio, templateId }: { studio: Studio; templateId:
             <div className="flex items-center gap-3">
               <input
                 type="file"
+                aria-label={spec.label}
                 accept="image/png,image/jpeg,image/webp"
                 onChange={(e) => {
                   const file = e.target.files?.[0];

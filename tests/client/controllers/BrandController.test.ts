@@ -120,6 +120,15 @@ describe("BrandController", () => {
     expect(session.state.brand.values.channelName).toBe("B");
   });
 
+  it("load lại cùng phong cách giữ chỉnh sửa chưa lưu", async () => {
+    const { ctrl, session } = setup();
+    await ctrl.load("theanh28");
+    ctrl.setValue("channelName", "KÊNH X");
+    await ctrl.load("theanh28");
+    expect(ctrl.state.values.channelName).toBe("KÊNH X");
+    expect(session.state.brand.values.channelName).toBe("KÊNH X");
+  });
+
   it("logo 21 MB nhận thông báo logo, file rỗng vẫn báo File rỗng", async () => {
     const { ctrl } = setup();
     await ctrl.load("theanh28");

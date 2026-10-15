@@ -103,7 +103,9 @@ export function StepNews({ studio }: { studio: Studio }) {
             className="rounded-md bg-neutral-800 px-3 py-2"
             defaultValue={project.sourceCredit}
             maxLength={80}
-            onBlur={(e) => studio.project.updateMetaFromForm({ sourceCredit: e.target.value })}
+            onBlur={(e) => {
+              if (e.target.value !== project.sourceCredit) studio.project.updateMetaFromForm({ sourceCredit: e.target.value });
+            }}
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
@@ -112,7 +114,11 @@ export function StepNews({ studio }: { studio: Studio }) {
             type="date"
             className="rounded-md bg-neutral-800 px-3 py-2"
             defaultValue={toDateInput(project.publishDate)}
-            onChange={(e) => studio.project.updateMetaFromForm({ publishDateText: e.target.value })}
+            onBlur={(e) => {
+              if (e.target.value && e.target.value !== toDateInput(project.publishDate)) {
+                studio.project.updateMetaFromForm({ publishDateText: e.target.value });
+              }
+            }}
           />
         </label>
       </div>
@@ -124,12 +130,13 @@ export function StepNews({ studio }: { studio: Studio }) {
       )}
       <ol className="flex flex-col gap-3">
         {project.scenes.map((scene, index) => (
-          <li key={`${scene.id}:${scene.text}`} className="flex flex-col gap-2 rounded-lg border border-neutral-800 p-3">
+          <li key={scene.id} className="flex flex-col gap-2 rounded-lg border border-neutral-800 p-3">
             <div className="flex items-center justify-between text-xs text-neutral-400">
               <span>{scene.role === "intro" ? "Cảnh mở đầu (tiêu đề)" : `Cảnh ${index}`}</span>
               <span>{scene.text.length} ký tự</span>
             </div>
             <textarea
+              key={scene.text}
               ref={(el) => {
                 textareas.current[scene.id] = el;
               }}
