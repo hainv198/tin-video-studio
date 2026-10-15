@@ -26,19 +26,35 @@ export interface BrandControllerDeps {
 
 /** Bộ thương hiệu của một phong cách: tên kênh, màu, logo. */
 export class BrandController extends StateController<BrandPanelState> {
+  private loadToken = 0;
+
   constructor(private readonly deps: BrandControllerDeps) {
     super({ templateId: "", specs: [], values: {}, logo: null, error: null, saved: false }, deps.onAuthLost);
   }
 
   async load(templateId: string): Promise<void> {
+    const token = ++this.loadToken;
+    let specs: readonly BrandFieldSpec[];
     try {
-      const specs = this.deps.templates.get(templateId).brandFields;
+      specs = this.deps.templates.get(templateId).brandFields;
+    } catch (error) {
+      this.set({ templateId, specs: [], values: {}, logo: null, error: this.report(error), saved: false });
+      this.deps.session.setBrand({ values: {}, logo: null });
+      return;
+    }
+    try {
       const stored = await this.deps.brands.load(templateId);
+      if (token !== this.loadToken) return;
       const defaults = Object.fromEntries(specs.flatMap((s) => (s.defaultValue ? [[s.key, s.defaultValue]] : [])));
       const values = { ...defaults, ...(stored?.values ?? {}) };
       this.set({ templateId, specs, values, logo: stored?.logo ?? null, error: null, saved: stored !== null });
-      this.push();
+      if (!this.push()) {
+        // Giá trị đã lưu sai: panel giữ nguyên để sửa, session dùng mặc định của phong cách này.
+        const kit = BrandKit.create(templateId, specs, {});
+        this.deps.session.setBrand({ values: kit.toJSON().values, logo: null });
+      }
     } catch (error) {
+      if (token !== this.loadToken) return;
       this.patch({ error: this.report(error) });
     }
   }
@@ -50,8 +66,8 @@ export class BrandController extends StateController<BrandPanelState> {
 
   setLogo(file: File): void {
     try {
-      classifyUpload(file, ["image"]);
       if (file.size > MAX_LOGO_BYTES) throw new ValidationError("Logo tối đa 5 MB");
+      classifyUpload(file, ["image"]);
     } catch (error) {
       this.patch({ error: this.report(error) });
       return;
@@ -82,13 +98,15 @@ export class BrandController extends StateController<BrandPanelState> {
   }
 
   /** Đưa giá trị hợp lệ vào session để dựng; giá trị sai chỉ hiện lỗi, session giữ bản hợp lệ gần nhất. */
-  private push(): void {
+  private push(): boolean {
     try {
       const kit = this.validate();
       this.deps.session.setBrand({ values: kit.toJSON().values, logo: this.state.logo });
       this.patch({ error: null });
+      return true;
     } catch (error) {
-      this.patch({ error: this.report(error) });
+      this.patch({ error: this.report(error), saved: false });
+      return false;
     }
   }
 }

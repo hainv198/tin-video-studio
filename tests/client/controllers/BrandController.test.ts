@@ -72,4 +72,70 @@ describe("BrandController", () => {
     expect(ctrl.state.logo).toBeNull();
     expect(session.state.brand.logo).toBeNull();
   });
+
+  it("load: giá trị đã lưu sai quy tắc → panel giữ giá trị và báo lỗi, session nhận mặc định", async () => {
+    const { ctrl, session, brands } = setup();
+    await brands.save("theanh28", { primaryColor: "xanh" }, null);
+    await ctrl.load("theanh28");
+    expect(ctrl.state.error).toBe("Màu chủ đạo phải có dạng #RRGGBB");
+    expect(ctrl.state.values.primaryColor).toBe("xanh");
+    const spec = ctrl.state.specs.find((s) => s.key === "primaryColor");
+    expect(session.state.brand.values.primaryColor).toBe(spec?.defaultValue);
+    expect(session.state.brand.logo).toBeNull();
+  });
+
+  it("load: phong cách không tồn tại → trạng thái rỗng kèm lỗi, session rỗng", async () => {
+    const { ctrl, session } = setup();
+    await ctrl.load("theanh28");
+    await ctrl.load("khong-co");
+    expect(ctrl.state).toEqual({
+      templateId: "khong-co",
+      specs: [],
+      values: {},
+      logo: null,
+      error: "Không có phong cách khong-co",
+      saved: false,
+    });
+    expect(session.state.brand).toEqual({ values: {}, logo: null });
+  });
+
+  it("load chồng nhau: kết quả của lần gọi cũ bị bỏ", async () => {
+    const { session } = makeSession();
+    type Stored = NonNullable<Awaited<ReturnType<BrandRepository["load"]>>>;
+    const stored = (name: string): Stored => ({ values: { channelName: name }, logo: null, updatedAt: "" });
+    let release!: (v: Stored) => void;
+    const slow = new Promise<Stored>((r) => (release = r));
+    let call = 0;
+    const brands = {
+      load: () => (++call === 1 ? slow : Promise.resolve(stored("B"))),
+      save: async () => undefined,
+    };
+    const ctrl = new BrandController({ session, templates: defaultTemplateRegistry(), brands });
+    const first = ctrl.load("theanh28");
+    const second = ctrl.load("theanh28");
+    await second;
+    release(stored("A"));
+    await first;
+    expect(ctrl.state.values.channelName).toBe("B");
+    expect(session.state.brand.values.channelName).toBe("B");
+  });
+
+  it("logo 21 MB nhận thông báo logo, file rỗng vẫn báo File rỗng", async () => {
+    const { ctrl } = setup();
+    await ctrl.load("theanh28");
+    ctrl.setLogo(new File([new Uint8Array(21 * 1024 * 1024)], "l.png", { type: "image/png" }));
+    expect(ctrl.state.error).toBe("Logo tối đa 5 MB");
+    ctrl.setLogo(new File([], "l.png", { type: "image/png" }));
+    expect(ctrl.state.error).toBe("File rỗng");
+  });
+
+  it("saved về false khi giá trị không hợp lệ", async () => {
+    const { ctrl } = setup();
+    await ctrl.load("theanh28");
+    ctrl.setValue("channelName", "A");
+    await ctrl.save();
+    expect(ctrl.state.saved).toBe(true);
+    ctrl.setValue("primaryColor", "xanh");
+    expect(ctrl.state.saved).toBe(false);
+  });
 });
