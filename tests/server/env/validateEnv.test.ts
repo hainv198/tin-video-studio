@@ -74,3 +74,14 @@ describe("validateEnv — Vercel Preview", () => {
     expect(validateEnv({ ...base, VERCEL: "1", VERCEL_ENV: "production", NODE_ENV: "production" }).ok).toBe(false);
   });
 });
+
+describe("validateEnv — Gemini thay Google", () => {
+  it("không fake: chỉ có Gemini + hai key stock là đủ; không có giọng nào thì lỗi", () => {
+    const users = Buffer.from(JSON.stringify([{ username: "hai", passwordHash: "$2b$04$abcdefghijklmnopqrstuuJ0123456789abcdefghijklmnopqrstu", displayName: "Hải" }])).toString("base64");
+    const base = { AUTH_SECRET: "s".repeat(32), APP_USERS: users, PEXELS_API_KEY: "p", PIXABAY_API_KEY: "x" };
+    expect(validateEnv({ ...base, GEMINI_API_KEY: "gm" }).ok).toBe(true);
+    const none = validateEnv(base);
+    expect(none.ok).toBe(false);
+    expect(none.ok ? "" : none.problems.join()).toMatch(/GOOGLE_TTS_API_KEY hoặc GEMINI_API_KEY/);
+  });
+});
