@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { discardDraftIfOffered, expectDraftStored, fillSampleAndSplit, generateVoices, goNext, login, stepButton } from "./helpers";
+import { discardDraftIfOffered, expectDraftSaved, expectDraftStored, fillSampleAndSplit, generateVoices, goNext, login, stepButton } from "./helpers";
 
 test("tải lại trang thì được mời mở lại bản nháp, mở lại giữ giọng", async ({ page }) => {
   await login(page);
@@ -7,7 +7,7 @@ test("tải lại trang thì được mời mở lại bản nháp, mở lại g
   await fillSampleAndSplit(page);
   await goNext(page, "Chọn giọng");
   await generateVoices(page);
-  await expectDraftStored(page, 1); // chờ tự lưu (800 ms)
+  await expectDraftSaved(page, (d) => d.narrations === 6); // chờ tự lưu (800 ms) cả 6 giọng
   await page.reload();
   await expect(page.getByText(/^Có bản nháp/)).toBeVisible();
   await page.getByRole("button", { name: "Mở lại" }).click();
@@ -36,5 +36,7 @@ test("dự án mới xoá bản nháp", async ({ page }) => {
   page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "Dự án mới" }).click();
   await expect(page.getByRole("button", { name: "Chia cảnh" })).toBeVisible();
+  await expectDraftStored(page, 0);
+  await page.waitForTimeout(1200); // chốt chặn âm: tự lưu muộn không được ghi lại bản nháp
   await expectDraftStored(page, 0);
 });

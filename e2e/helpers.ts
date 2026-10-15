@@ -72,26 +72,58 @@ export async function renderAndDownload(page: Page, dir = "test-results", prefix
   return path;
 }
 
-const DRAFT_COUNT_SCRIPT = () =>
-  new Promise<number>((resolve) => {
-    const r = indexedDB.open("tin-video-studio");
+export interface DraftState {
+  /** 1 nếu có bản nháp, 0 nếu không, -1 nếu không đọc được IndexedDB. */
+  count: number;
+  savedAt: string | null;
+  narrations: number;
+}
+
+// Phản chiếu src/client/storage/IdbKeyValueStore.ts: DB "tin-video-studio" v1, store "kv".
+const READ_DRAFT_SCRIPT = () =>
+  new Promise<{ count: number; savedAt: string | null; narrations: number }>((resolve) => {
+    const unreadable = { count: -1, savedAt: null, narrations: 0 };
+    const r = indexedDB.open("tin-video-studio", 1);
+    r.onupgradeneeded = () => {
+      if (!r.result.objectStoreNames.contains("kv")) r.result.createObjectStore("kv");
+    };
+    r.onerror = () => resolve(unreadable);
+    r.onblocked = () => resolve(unreadable);
     r.onsuccess = () => {
       const db = r.result;
-      const tx = db.transaction("kv", "readonly");
-      const g = tx.objectStore("kv").get("draft");
-      g.onsuccess = () => {
-        resolve(g.result ? 1 : 0);
+      if (!db.objectStoreNames.contains("kv")) {
         db.close();
-      };
-      g.onerror = () => {
-        resolve(-1);
+        resolve(unreadable);
+        return;
+      }
+      try {
+        const g = db.transaction("kv", "readonly").objectStore("kv").get("draft");
+        g.onsuccess = () => {
+          const d = g.result as { savedAt?: string; narrations?: unknown[] } | undefined;
+          db.close();
+          resolve(d ? { count: 1, savedAt: d.savedAt ?? null, narrations: d.narrations?.length ?? 0 } : { count: 0, savedAt: null, narrations: 0 });
+        };
+        g.onerror = () => {
+          db.close();
+          resolve(unreadable);
+        };
+      } catch {
         db.close();
-      };
+        resolve(unreadable);
+      }
     };
-    r.onerror = () => resolve(-1);
   });
+
+export async function readDraft(page: Page): Promise<DraftState> {
+  return page.evaluate(READ_DRAFT_SCRIPT);
+}
+
+/** Đợi cho đến khi bản nháp trong IndexedDB thoả điều kiện (tự lưu chậm 800 ms). */
+export async function expectDraftSaved(page: Page, predicate: (d: DraftState) => boolean, timeout = 8000): Promise<void> {
+  await expect.poll(async () => predicate(await readDraft(page)), { timeout }).toBe(true);
+}
 
 /** Đợi bản nháp xuất hiện (1) hoặc biến mất (0) trong IndexedDB. */
 export async function expectDraftStored(page: Page, expected: 0 | 1): Promise<void> {
-  await expect.poll(async () => page.evaluate(DRAFT_COUNT_SCRIPT), { timeout: 5000 }).toBe(expected);
+  await expectDraftSaved(page, (d) => d.count === expected);
 }
