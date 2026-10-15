@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BrandKit } from "@/domain/BrandKit";
 import { DEFAULT_TIMELINE_CONFIG, Timeline } from "@/domain/Timeline";
+import type { BackdropMaker } from "@/client/render/BackdropMaker";
 import { RenderCancelledError } from "@/client/render/errors";
 import { VideoRenderer, type FrameProvider, type RenderScene, type VideoFrameSink } from "@/client/render/VideoRenderer";
 import { VideoTemplate, type DrawableImage, type ProjectFrame, type SceneFrame } from "@/templates/VideoTemplate";
@@ -146,5 +147,63 @@ describe("VideoRenderer", () => {
     await expect(renderer.render()).rejects.toBeInstanceOf(RenderCancelledError);
     expect(introFrames.releases).toBe(1);
     expect(videoFrames.releases).toBe(0);
+  });
+
+  it("tạo nền mờ cho khung thân bài có ảnh, không tạo cho cảnh mở đầu", async () => {
+    const made: DrawableImage[] = [];
+    const sentinel: DrawableImage = { source: {} as CanvasImageSource, width: 1, height: 1 };
+    const backdrop: BackdropMaker = {
+      make(image) {
+        made.push(image);
+        return sentinel;
+      },
+    };
+    const timeline = Timeline.build([
+      { sceneId: "a", durationSec: 0.7 },
+      { sceneId: "b", durationSec: 0.5 },
+    ]);
+    const frames = new CountingFrames();
+    const template = new LogTemplate();
+    const scenes = new Map<string, RenderScene>([
+      ["a", { sceneId: "a", role: "intro", text: "A", playback: { mode: "still" }, frames }],
+      ["b", { sceneId: "b", role: "body", text: "B", playback: { mode: "still" }, frames }],
+    ]);
+    await new VideoRenderer({
+      template,
+      ctx: new RecordingCanvas().asCanvas(),
+      project,
+      timeline,
+      scenes,
+      fps: 10,
+      sink: new Sink(),
+      backdrop,
+    }).render();
+    expect(made).toHaveLength(11);
+    expect(template.frames[0]?.backdrop ?? null).toBeNull();
+    expect(template.frames[14]?.backdrop).toBe(sentinel);
+  });
+
+  it("cảnh không có ảnh thì không tạo nền mờ", async () => {
+    let calls = 0;
+    const timeline = Timeline.build([{ sceneId: "b", durationSec: 0.5 }]);
+    const template = new LogTemplate();
+    await new VideoRenderer({
+      template,
+      ctx: new RecordingCanvas().asCanvas(),
+      project,
+      timeline,
+      scenes: new Map<string, RenderScene>([
+        ["b", { sceneId: "b", role: "body", text: "B", playback: { mode: "none" }, frames: null }],
+      ]),
+      fps: 10,
+      sink: new Sink(),
+      backdrop: {
+        make() {
+          calls++;
+          return { source: {} as CanvasImageSource, width: 1, height: 1 };
+        },
+      },
+    }).render();
+    expect(calls).toBe(0);
   });
 });

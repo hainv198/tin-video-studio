@@ -109,3 +109,22 @@ describe("TheAnh28Template — cảnh thân bài", () => {
     expect(JSON.stringify(a.calls)).toBe(JSON.stringify(b.calls));
   });
 });
+
+describe("TheAnh28Template — nền mờ chuẩn bị sẵn", () => {
+  const backdrop: DrawableImage = { source: { tag: "backdrop" } as unknown as CanvasImageSource, width: 135, height: 240 };
+
+  it("có backdrop: phóng nền nhỏ ra toàn khung với nội suy cao, không dùng ctx.filter", () => {
+    const c = draw(project(), scene({ backdrop }));
+    const calls = c.ops("drawImage");
+    expect(calls[0]?.args.slice(0, 5)).toEqual([backdrop.source, 0, 0, 1080, 1920]);
+    expect(calls[0]?.state.imageSmoothingQuality).toBe("high");
+    expect(c.calls.every((x) => !x.state.filter.startsWith("blur"))).toBe(true);
+    // ảnh rõ trong dải vẫn được vẽ sau nền
+    expect(calls.some((x) => x.args[0] === image.source)).toBe(true);
+  });
+
+  it("không có backdrop: giữ cách cũ (blur 48px) để tương thích", () => {
+    const c = draw(project(), scene());
+    expect(c.ops("drawImage")[0]?.state.filter).toBe("blur(48px)");
+  });
+});

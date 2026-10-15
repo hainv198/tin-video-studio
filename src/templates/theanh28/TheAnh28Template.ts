@@ -69,11 +69,18 @@ export class TheAnh28Template extends VideoTemplate {
     const B = LAYOUT.body;
 
     if (scene.image) {
-      const full = coverRect(scene.image.width, scene.image.height, { x: 0, y: 0, w: width, h: height });
-      const backdrop = kenBurnsRect(full, 1, 1, B.backdropScale);
-      ctx.filter = `blur(${LAYOUT.blurPx}px)`;
-      ctx.drawImage(scene.image.source, backdrop.x, backdrop.y, backdrop.w, backdrop.h);
-      ctx.filter = "none";
+      if (scene.backdrop) {
+        // nền mờ đã được thu nhỏ sẵn: phóng ra toàn khung bằng nội suy
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(scene.backdrop.source, 0, 0, width, height);
+      } else {
+        const full = coverRect(scene.image.width, scene.image.height, { x: 0, y: 0, w: width, h: height });
+        const backdrop = kenBurnsRect(full, 1, 1, B.backdropScale);
+        ctx.filter = `blur(${LAYOUT.blurPx}px)`;
+        ctx.drawImage(scene.image.source, backdrop.x, backdrop.y, backdrop.w, backdrop.h);
+        ctx.filter = "none";
+      }
       ctx.fillStyle = `rgba(0,0,0,${B.backdropShade})`;
       ctx.fillRect(0, 0, width, height);
       this.drawClipped(ctx, scene.image, B.band, this.progress(scene));

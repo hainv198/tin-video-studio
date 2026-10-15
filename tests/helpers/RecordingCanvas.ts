@@ -3,7 +3,7 @@ import type { Canvas2D } from "@/templates/Canvas2D";
 export interface DrawCall {
   op: string;
   args: unknown[];
-  state: { fillStyle: unknown; font: string; globalAlpha: number; filter: string };
+  state: { fillStyle: unknown; font: string; globalAlpha: number; filter: string; imageSmoothingEnabled: boolean; imageSmoothingQuality: string };
 }
 
 /** Context 2D giả: ghi lại mọi lệnh vẽ để test trên Node. measureText = số ký tự × cỡ chữ × 0.5. */
@@ -18,12 +18,21 @@ export class RecordingCanvas {
   filter = "none";
   lineWidth = 1;
   letterSpacing = "0px";
+  imageSmoothingEnabled = true;
+  imageSmoothingQuality: "low" | "medium" | "high" = "low";
 
   private record(op: string, args: unknown[]): void {
     this.calls.push({
       op,
       args,
-      state: { fillStyle: this.fillStyle, font: this.font, globalAlpha: this.globalAlpha, filter: this.filter },
+      state: {
+        fillStyle: this.fillStyle,
+        font: this.font,
+        globalAlpha: this.globalAlpha,
+        filter: this.filter,
+        imageSmoothingEnabled: this.imageSmoothingEnabled,
+        imageSmoothingQuality: this.imageSmoothingQuality,
+      },
     });
   }
 

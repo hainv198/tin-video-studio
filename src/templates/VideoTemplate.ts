@@ -35,6 +35,8 @@ export interface SceneFrame {
   role: SceneRole;
   text: string;
   image: DrawableImage | null;
+  /** Nền mờ đã chuẩn bị sẵn (thu nhỏ); template phóng ra toàn khung. Không có thì template tự làm mờ. */
+  backdrop?: DrawableImage | null;
   /** Giây tính từ đầu cảnh. */
   sceneTime: number;
   sceneDuration: number;

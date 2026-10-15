@@ -22,5 +22,7 @@ export type Canvas2D = Pick<
   | "textBaseline"
   | "globalAlpha"
   | "filter"
+  | "imageSmoothingEnabled"
+  | "imageSmoothingQuality"
   | "lineWidth"
 >;

@@ -4,6 +4,7 @@ import { mixProgram } from "@/client/media/AudioMix";
 import { loadFonts, type FontSink } from "@/client/media/FontLoader";
 import { ImageFrameProvider, VideoFrameProvider } from "@/client/media/MediaFrameProvider";
 import { defaultTemplateRegistry } from "@/templates/registry";
+import { CanvasBackdropMaker } from "./BackdropMaker";
 import { Mp4Encoder } from "./Mp4Encoder";
 import { planRender } from "./RenderPlan";
 import type { FootageInput, RenderJob, WorkerMessage, WorkerRequest } from "./RenderJob";
@@ -75,6 +76,12 @@ async function render(job: RenderJob): Promise<void> {
     const canvas = new OffscreenCanvas(width, height);
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Trình duyệt không cấp được canvas 2D");
+    const backdrop = new CanvasBackdropMaker((w, h) => {
+      const surface = new OffscreenCanvas(w, h);
+      const surfaceCtx = surface.getContext("2d");
+      if (!surfaceCtx) throw new Error("Trình duyệt không cấp được canvas 2D");
+      return { canvas: surface, ctx: surfaceCtx };
+    });
     const enc = new Mp4Encoder({ canvas, fps, videoBitrate: VIDEO_BITRATE, audioBitrate: AUDIO_BITRATE });
     encoder = enc;
     await enc.start();
@@ -92,6 +99,7 @@ async function render(job: RenderJob): Promise<void> {
       scenes,
       fps,
       sink: enc,
+      backdrop,
       onProgress: (p) => scope.postMessage({ type: "progress", stage: "video", frame: p.frame, totalFrames: p.totalFrames }),
     }).render();
 
