@@ -212,4 +212,38 @@ describe("FootageController", () => {
     expect(ctrl.state.added).toEqual([]);
     expect(ctrl.state.error).toBeNull();
   });
+
+  it("ingesting báo đang tải; uploadIds liệt kê id file đã thêm", async () => {
+    const made = makeSessionWithProject(2);
+    const { uploads } = memoryUploads("u");
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const slow: MediaProbe = { ...probe, image: async () => { await gate; return { width: 10, height: 10 }; } };
+    const ctrl = new FootageController({ session: made.session, uploads, probe: slow, ids: sequentialIds("f") });
+    expect(ctrl.ingesting).toBe(false);
+    const run = ctrl.addFiles([img("a.jpg")]);
+    expect(ctrl.ingesting).toBe(true);
+    release();
+    await run;
+    expect(ctrl.ingesting).toBe(false);
+    expect(ctrl.uploadIds()).toEqual(["upload-u1"]);
+  });
+
+  it("reset giữa lúc đang tải: file về muộn bị xoá, kho dự án mới không bị lẫn", async () => {
+    const made = makeSessionWithProject(2);
+    const { uploads, store } = memoryUploads("u");
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const slowUploads = { ...uploads, get: uploads.get.bind(uploads), delete: uploads.delete.bind(uploads), put: async (...a: Parameters<typeof uploads.put>) => { const m = await uploads.put(...a); await gate; return m; } };
+    const ctrl = new FootageController({ session: made.session, uploads: slowUploads, probe, ids: sequentialIds("f") });
+    const run = ctrl.addFiles([img("a.jpg")]);
+    await new Promise((r) => setTimeout(r, 0));
+    ctrl.reset();
+    release();
+    await run;
+    expect(ctrl.state.added).toEqual([]);
+    expect(ctrl.uploadIds()).toEqual([]);
+    expect(made.session.state.footage.sceneIds()).toEqual([]);
+    expect(await store.keys("blob:")).toEqual([]);
+  });
 });

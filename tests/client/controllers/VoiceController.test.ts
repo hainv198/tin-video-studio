@@ -144,6 +144,20 @@ describe("VoiceController", () => {
     expect(calls).toEqual([]);
   });
 
+  it("reset giữa lúc đang đọc: kết quả về muộn bị bỏ, không để lại lỗi", async () => {
+    let release!: () => void;
+    const hold = new Promise<void>((r) => (release = r));
+    const { ctrl, session, failOn } = setup({ hold });
+    for (const s of session.state.project!.scenes) failOn.add(s.text); // lượt cũ về muộn với lỗi
+    const run = ctrl.generate();
+    ctrl.reset();
+    release();
+    await run;
+    expect(session.state.narrations.size).toBe(0);
+    expect(ctrl.state.failed).toEqual({});
+    expect(ctrl.state.generating).toBe(false);
+  });
+
   it("reset xoá lỗi từng câu, lỗi chung và tiến độ của dự án cũ", async () => {
     const { ctrl, session, failOn } = setup();
     failOn.add(session.state.project!.scenes[1]!.text);

@@ -21,6 +21,8 @@ export interface WizardDeps {
   liveUploadIds?: () => Iterable<string>;
   /** Gọi khi bắt đầu dự án mới, trước khi dọn file. */
   onReset?: () => void;
+  /** Trả true khi đang có lần tải file dở: hoãn dọn file để không xoá file vừa lưu. */
+  deferCleanup?: () => boolean;
   onAuthLost?: () => void;
 }
 
@@ -103,6 +105,7 @@ export class WizardController extends StateController<WizardState> {
   /** Xoá file tải lên không còn được cảnh trám hay nhạc đang dùng tham chiếu. Lỗi bỏ qua (dọn dẹp tuỳ chọn). */
   async cleanupUploads(): Promise<void> {
     try {
+      if (this.deps.deferCleanup?.()) return;
       const { footage, music } = this.deps.session.state;
       const used = new Set<string>();
       for (const sceneId of footage.sceneIds()) {

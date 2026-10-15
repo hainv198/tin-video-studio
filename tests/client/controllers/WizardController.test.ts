@@ -132,14 +132,22 @@ describe("WizardController", () => {
 
   it("discard giữ file chỉ nằm trong kho (liveUploadIds)", async () => {
     const { drafts, uploads, session } = setup();
-    const wizard = new WizardController({ session, drafts, uploads, liveUploadIds: () => ["upload-u1"] });
     await fillAll(session);
     const pooled = await uploads.put(new Blob(["p"]), { name: "p.jpg", kind: "image" });
+    const wizard = new WizardController({ session, drafts, uploads, liveUploadIds: () => [pooled.id] });
     const orphan = await uploads.put(new Blob(["o"]), { name: "o.jpg", kind: "image" });
     await wizard.discard();
     const ids = (await uploads.list()).map((m) => m.id);
     expect(ids).toContain(pooled.id);
     expect(ids).not.toContain(orphan.id);
+  });
+
+  it("deferCleanup trả true thì không dọn file nào", async () => {
+    const { drafts, uploads, session } = setup();
+    const wizard = new WizardController({ session, drafts, uploads, deferCleanup: () => true });
+    const orphan = await uploads.put(new Blob(["o"]), { name: "o.jpg", kind: "image" });
+    await wizard.discard();
+    expect((await uploads.list()).map((m) => m.id)).toContain(orphan.id);
   });
 
   it("newProject gọi onReset trước khi dọn file", async () => {

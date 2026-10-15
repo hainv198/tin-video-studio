@@ -17,7 +17,7 @@ export interface FootageState {
 
 export interface FootageControllerDeps {
   session: StudioSession;
-  uploads: Pick<UploadRepository, "put" | "get">;
+  uploads: Pick<UploadRepository, "put" | "get" | "delete">;
   probe: MediaProbe;
   ids: IdGenerator;
   onAuthLost?: () => void;
@@ -27,9 +27,25 @@ export interface FootageControllerDeps {
 export class FootageController extends StateController<FootageState> {
   /** Số lần tải đang chạy song song; `busy` = còn lần nào chưa xong. */
   private inFlight = 0;
+  /** Tăng mỗi lần reset: lần tải bắt đầu ở dự án cũ phải bỏ kết quả. */
+  private epoch = 0;
 
   constructor(private readonly deps: FootageControllerDeps) {
     super({ busy: false, error: null, added: [] }, deps.onAuthLost);
+  }
+
+  /** Còn lần tải nào đang chạy (file có thể đã lưu nhưng chưa vào kho). */
+  get ingesting(): boolean {
+    return this.inFlight > 0;
+  }
+
+  /** Id file tải lên mà kho `added` đang tham chiếu. */
+  uploadIds(): string[] {
+    return this.state.added.flatMap((f) => {
+      const s = f.snapshot();
+      const id = s.kind !== "fallback" ? parseUploadUri(s.source.uri) : null;
+      return id ? [id] : [];
+    });
   }
 
   async addFiles(files: readonly File[]): Promise<void> {
@@ -61,6 +77,7 @@ export class FootageController extends StateController<FootageState> {
 
   /** Dự án mới: bỏ kho file và lỗi của dự án cũ. */
   reset(): void {
+    this.epoch += 1;
     this.patch({ added: [], error: null });
   }
 
@@ -112,6 +129,7 @@ export class FootageController extends StateController<FootageState> {
   }
 
   private async ingest(files: readonly File[]): Promise<{ footages: Footage[]; errors: string[] }> {
+    const epoch = this.epoch;
     this.inFlight += 1;
     this.patch({ busy: true });
     const footages: Footage[] = [];
@@ -129,11 +147,16 @@ export class FootageController extends StateController<FootageState> {
             continue;
           }
           const meta = await this.deps.uploads.put(file, { name: file.name, kind });
+          if (epoch !== this.epoch) {
+            await this.deps.uploads.delete(meta.id).catch(() => {});
+            continue;
+          }
           footages.push(uploadToFootage(this.deps.ids(), meta.id, kind, info));
         } catch (error) {
           errors.push(`${file.name}: ${this.report(error)}`);
         }
       }
+      if (epoch !== this.epoch) return { footages: [], errors };
       if (footages.length > 0) this.patch({ added: [...this.state.added, ...footages] });
     } finally {
       this.inFlight -= 1;

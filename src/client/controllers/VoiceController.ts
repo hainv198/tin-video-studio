@@ -38,6 +38,8 @@ const INITIAL: VoiceState = {
 /** Bước 2: chọn giọng, tốc độ, tạo giọng riêng cho từng câu. */
 export class VoiceController extends StateController<VoiceState> {
   private cancelRequested = false;
+  /** Tăng mỗi lần reset: kết quả của lượt đọc bắt đầu ở dự án cũ bị bỏ. */
+  private epoch = 0;
 
   constructor(private readonly deps: VoiceControllerDeps) {
     super(INITIAL, deps.onAuthLost);
@@ -87,29 +89,31 @@ export class VoiceController extends StateController<VoiceState> {
     }
     const todo = staleSceneIds(this.deps.session.state);
     this.cancelRequested = false;
+    const epoch = this.epoch;
     this.patch({ generating: true, error: null, failed: {}, progress: { done: 0, total: todo.length } });
     try {
       let done = 0;
       for (const sceneId of todo) {
         if (this.cancelRequested) break;
-        const stop = await this.runScene(sceneId);
+        const stop = await this.runScene(sceneId, epoch);
         done += 1;
         this.patch({ progress: { done, total: todo.length } });
         if (stop) break;
       }
     } finally {
-      this.patch({ generating: false, progress: null });
+      this.patch(epoch === this.epoch ? { generating: false, progress: null } : { generating: false, progress: null, failed: {} });
     }
   }
 
   async retry(sceneId: string): Promise<void> {
     if (this.state.generating) return;
     this.cancelRequested = false;
+    const epoch = this.epoch;
     this.patch({ generating: true, error: null });
     try {
-      await this.runScene(sceneId);
+      await this.runScene(sceneId, epoch);
     } finally {
-      this.patch({ generating: false });
+      this.patch(epoch === this.epoch ? { generating: false } : { generating: false, failed: {} });
     }
   }
 
@@ -119,6 +123,7 @@ export class VoiceController extends StateController<VoiceState> {
 
   /** Dự án mới: dừng lượt đang chạy và bỏ lỗi, tiến độ của dự án cũ. */
   reset(): void {
+    this.epoch += 1;
     this.cancel();
     this.patch({ error: null, failed: {}, progress: null });
   }
@@ -142,7 +147,7 @@ export class VoiceController extends StateController<VoiceState> {
   }
 
   /** Tạo giọng một cảnh. Trả true nếu phải dừng cả lượt (hết phiên). */
-  private async runScene(sceneId: string): Promise<boolean> {
+  private async runScene(sceneId: string, epoch: number): Promise<boolean> {
     const start = this.deps.session.state;
     const scene = start.project?.scenes.find((s) => s.id === sceneId);
     const voice = start.voice;
@@ -151,7 +156,7 @@ export class VoiceController extends StateController<VoiceState> {
       const bytes = await this.deps.tts.synthesize(scene.text, voice.voiceName, voice.speakingRate);
       // decode làm hỏng (detach) bộ đệm đầu vào nên đưa bản sao; bản gốc đem lưu.
       const decoded = await this.deps.decoder.decode(bytes.slice(0));
-      if (this.cancelRequested) return false;
+      if (this.cancelRequested || epoch !== this.epoch) return false;
       const narration = Narration.create({
         sceneId,
         text: scene.text,
@@ -168,6 +173,7 @@ export class VoiceController extends StateController<VoiceState> {
       this.patch({ failed: rest });
       return false;
     } catch (error) {
+      if (epoch !== this.epoch) return false;
       this.patch({ failed: { ...this.state.failed, [sceneId]: this.report(error) } });
       return isSessionExpired(error);
     }

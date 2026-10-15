@@ -47,6 +47,30 @@ describe("createStudio", () => {
     studio.dispose();
   });
 
+  it("discard khi đang tải nhiều file không xoá file đã lưu của lượt tải", async () => {
+    const services = createClientServices(env());
+    let calls = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    (services.probe as unknown as { image: () => Promise<unknown> }).image = async () => {
+      calls += 1;
+      if (calls === 2) await gate;
+      return { width: 10, height: 10 };
+    };
+    const studio = createStudio(services, { schedule: () => () => {} });
+    studio.project.createFrom({ ...SAMPLE_NEWS, templateId: "theanh28" });
+    const file = (n: string) => new File([new Uint8Array(10)], n, { type: "image/jpeg" });
+    const run = studio.footage.addFiles([file("a.jpg"), file("b.jpg")]);
+    while (calls < 2) await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 10));
+    expect((await services.uploads.list()).length).toBe(1);
+    await studio.wizard.discard();
+    expect((await services.uploads.list()).length).toBe(1);
+    release();
+    await run;
+    studio.dispose();
+  });
+
   it("newProject làm sạch kho file và dựng lại của dự án cũ", async () => {
     const studio = createStudio(createClientServices(env()), { schedule: () => () => {} });
     studio.project.createFrom({ ...SAMPLE_NEWS, templateId: "theanh28" });

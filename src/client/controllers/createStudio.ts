@@ -1,6 +1,5 @@
 import type { ClientServices } from "@/client/container";
 import { defaultKeywordSuggester } from "@/client/services/KeywordSuggester";
-import { parseUploadUri } from "@/client/media/footageFactory";
 import { randomIds, type IdGenerator } from "@/domain/ids";
 import { BrandController } from "./BrandController";
 import { FootageController } from "./FootageController";
@@ -94,12 +93,8 @@ export function createStudio(services: ClientServices, options: StudioOptions = 
     session,
     drafts: services.drafts,
     uploads: services.uploads,
-    liveUploadIds: () =>
-      footage.pool().flatMap((f) => {
-        const s = f.snapshot();
-        const id = s.kind !== "fallback" ? parseUploadUri(s.source.uri) : null;
-        return id ? [id] : [];
-      }),
+    liveUploadIds: () => footage.uploadIds(),
+    deferCleanup: () => footage.ingesting,
     onReset: () => {
       footage.reset();
       search.reset();
