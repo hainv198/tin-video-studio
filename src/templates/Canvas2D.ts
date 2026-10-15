@@ -1,0 +1,26 @@
+/** Tập con của context 2D mà các phong cách được dùng. OffscreenCanvasRenderingContext2D thoả mãn kiểu này. */
+export type Canvas2D = Pick<
+  OffscreenCanvasRenderingContext2D,
+  | "save"
+  | "restore"
+  | "fillRect"
+  | "drawImage"
+  | "fillText"
+  | "measureText"
+  | "beginPath"
+  | "rect"
+  | "roundRect"
+  | "arc"
+  | "fill"
+  | "stroke"
+  | "clip"
+  | "createLinearGradient"
+  | "fillStyle"
+  | "strokeStyle"
+  | "font"
+  | "textAlign"
+  | "textBaseline"
+  | "globalAlpha"
+  | "filter"
+  | "lineWidth"
+>;
