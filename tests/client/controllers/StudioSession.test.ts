@@ -81,6 +81,36 @@ describe("StudioSession", () => {
     expect(sched.pending()).toBe(0);
   });
 
+  it("setBrand giống hệt bộ hiện tại thì không báo và giữ nguyên state", () => {
+    const { session } = makeSession();
+    session.setBrand({ values: { channelName: "KÊNH" }, logo: null });
+    const before = session.state;
+    const listener = vi.fn();
+    session.subscribe(listener);
+    session.setBrand({ values: { channelName: "KÊNH" }, logo: null });
+    expect(listener).not.toHaveBeenCalled();
+    expect(session.state).toBe(before);
+  });
+
+  it("setBrand đổi giá trị thì báo", () => {
+    const { session } = makeSession();
+    session.setBrand({ values: { channelName: "A" }, logo: null });
+    const listener = vi.fn();
+    session.subscribe(listener);
+    session.setBrand({ values: { channelName: "B" }, logo: null });
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(session.state.brand.values).toEqual({ channelName: "B" });
+  });
+
+  it("setBrand đổi logo (Blob khác) thì báo", () => {
+    const { session } = makeSession();
+    session.setBrand({ values: {}, logo: new Blob(["a"]) });
+    const listener = vi.fn();
+    session.subscribe(listener);
+    session.setBrand({ values: {}, logo: new Blob(["a"]) });
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
   it("flush lưu ngay và huỷ hẹn", async () => {
     const { session, saves, sched } = makeSessionWithProject(1);
     await session.flush();

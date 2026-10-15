@@ -52,6 +52,13 @@ function prune(data: StudioData): StudioData {
   return narrations === data.narrations && footage === data.footage ? data : { ...data, narrations, footage };
 }
 
+/** Cùng logo (tham chiếu) và cùng giá trị từng khoá. */
+function sameBrand(a: BrandData, b: BrandData): boolean {
+  if (a.logo !== b.logo) return false;
+  const keys = Object.keys(a.values);
+  return keys.length === Object.keys(b.values).length && keys.every((k) => a.values[k] === b.values[k]);
+}
+
 /** Dữ liệu đang làm việc của trình 5 bước; tự lưu bản nháp sau mỗi thay đổi (có trễ). */
 export class StudioSession {
   private current: StudioData = EMPTY_STUDIO;
@@ -83,6 +90,7 @@ export class StudioSession {
 
   /** Bộ thương hiệu lưu ở BrandRepository, không vào bản nháp. */
   setBrand(brand: BrandData): void {
+    if (sameBrand(this.current.brand, brand)) return;
     this.current = { ...this.current, brand };
     this.notify();
   }
