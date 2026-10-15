@@ -56,27 +56,39 @@ export class RenderClient {
     });
   }
 
-  probe(): Promise<string[]> {
+  probe(timeoutMs = 8000): Promise<string[]> {
     return new Promise((resolve, reject) => {
       const worker = this.createWorker();
+      const timer = setTimeout(() => {
+        worker.terminate();
+        reject(new Error("Bộ dựng không phản hồi"));
+      }, timeoutMs);
+      const end = () => {
+        clearTimeout(timer);
+        worker.terminate();
+      };
       worker.onmessage = (e) => {
         const m = e.data;
         if (m.type === "probe-result") {
-          worker.terminate();
+          end();
           resolve(m.missing);
         } else if (m.type === "error") {
-          worker.terminate();
+          end();
           reject(new Error(m.message));
         }
       };
       worker.onerror = (e) => {
-        worker.terminate();
+        end();
         reject(new Error(`Lỗi bộ dựng: ${e.message ?? "không rõ"}`));
+      };
+      worker.onmessageerror = () => {
+        end();
+        reject(new Error("Bộ dựng nhận dữ liệu lỗi"));
       };
       try {
         worker.postMessage({ type: "probe" });
       } catch {
-        worker.terminate();
+        end();
         reject(new Error("Không gửi được dữ liệu cho bộ dựng"));
       }
     });

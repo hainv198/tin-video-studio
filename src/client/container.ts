@@ -2,6 +2,7 @@ import { AudioDecodeService } from "@/client/media/AudioDecodeService";
 import { BrowserMediaProbe, type MediaProbe } from "@/client/media/MediaProbe";
 import { browserSupport, type SupportReport } from "@/client/render/BrowserSupport";
 import { RenderClient } from "@/client/render/RenderClient";
+import { networkSafeFetch } from "@/client/services/apiError";
 import { defaultKeywordSuggester, type KeywordSuggester } from "@/client/services/KeywordSuggester";
 import { MusicLibrary } from "@/client/services/MusicLibrary";
 import { StockClient, type StockApi } from "@/client/services/StockClient";
@@ -61,7 +62,7 @@ export function createClientServices(env: ClientEnv): ClientServices {
 /** Môi trường thật của trình duyệt. Chỉ gọi ở phía client (dùng window). */
 export function browserEnv(): ClientEnv {
   return {
-    fetch: (...args) => fetch(...args),
+    fetch: networkSafeFetch((...args) => fetch(...args)),
     indexedDB: window.indexedDB,
     origin: window.location.origin,
     createUrl: (blob) => URL.createObjectURL(blob),
