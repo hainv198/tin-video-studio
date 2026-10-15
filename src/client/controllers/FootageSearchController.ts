@@ -37,6 +37,7 @@ export interface FootageSearchDeps {
 
 const MAX_CANDIDATES = 8;
 const MAX_PHRASES = 3;
+const PARTIAL_SOURCE_WARNING = "Một nguồn cảnh trám đang lỗi, chỉ dùng nguồn còn lại";
 
 /** Gộp xen kẽ ảnh và video (ảnh trước), bỏ trùng, tối đa `limit`. */
 export function interleave(images: StockItemDto[], videos: StockItemDto[], limit = MAX_CANDIDATES): StockItemDto[] {
@@ -61,7 +62,11 @@ async function runPool<T>(items: readonly T[], limit: number, fn: (t: T) => Prom
   const workers = Array.from({ length: Math.min(Math.max(limit, 1), items.length) }, async () => {
     while (next < items.length) {
       const index = next++;
-      await fn(items[index] as T);
+      try {
+        await fn(items[index] as T);
+      } catch {
+        // lỗi từng phần tử đã được báo theo cảnh; pool không bao giờ ném
+      }
     }
   });
   await Promise.all(workers);
@@ -79,7 +84,8 @@ function uriOf(footage: Footage | undefined): string | null {
 export class FootageSearchController extends StateController<FootageSearchState> {
   private readonly inflight = new Map<string, AbortController>();
   private readonly suggesters = new Map<string, KeywordSource>();
-  private cancelled = false;
+  private run = 0;
+  private authLost = false;
 
   constructor(private readonly deps: FootageSearchDeps) {
     super({ byScene: {}, autoRunning: false, warnings: [] }, deps.onAuthLost);
@@ -87,20 +93,21 @@ export class FootageSearchController extends StateController<FootageSearchState>
 
   async autoFill(): Promise<void> {
     if (this.state.autoRunning) return;
-    this.cancelled = false;
+    const run = ++this.run;
+    this.authLost = false;
     const { project, footage } = this.deps.session.state;
     if (!project) return;
     const todo = footage.unassignedSceneIds(project.scenes.map((s) => s.id));
     this.patch({ autoRunning: true, warnings: [] });
     try {
-      await runPool(todo, this.deps.concurrency ?? 3, (sceneId) => this.fillScene(sceneId));
+      await runPool(todo, this.deps.concurrency ?? 3, (sceneId) => this.fillScene(sceneId, run));
     } finally {
       this.patch({ autoRunning: false });
     }
   }
 
   async search(sceneId: string, query: string): Promise<void> {
-    this.cancelled = false;
+    this.authLost = false;
     const text = query.trim();
     if (!text) {
       this.setScene(sceneId, { query: "", loading: false, items: [], error: "Hãy nhập từ khoá", empty: false });
@@ -110,9 +117,12 @@ export class FootageSearchController extends StateController<FootageSearchState>
     this.setScene(sceneId, { query: text, loading: true, items: [], error: null, empty: false });
     try {
       const items = await this.query(text, signal);
+      if (!this.owns(sceneId, signal)) return;
       this.setScene(sceneId, { query: text, loading: false, items, error: null, empty: items.length === 0 });
     } catch (error) {
-      this.failScene(sceneId, text, error);
+      this.failScene(sceneId, signal, text, error);
+    } finally {
+      this.release(sceneId, signal);
     }
   }
 
@@ -128,24 +138,39 @@ export class FootageSearchController extends StateController<FootageSearchState>
 
   /** Dừng cả lượt: huỷ yêu cầu đang bay và không nhận thêm cảnh mới. */
   cancel(): void {
-    this.cancelled = true;
+    this.run++;
+    const pending = [...this.inflight.keys()];
     for (const controller of this.inflight.values()) controller.abort();
     this.inflight.clear();
+    const byScene = { ...this.state.byScene };
+    let changed = false;
+    for (const id of pending) {
+      const current = byScene[id];
+      if (current?.loading) {
+        byScene[id] = { ...current, loading: false };
+        changed = true;
+      }
+    }
+    if (changed) this.patch({ byScene });
   }
 
-  private async fillScene(sceneId: string): Promise<void> {
-    if (this.cancelled) return;
+  private async fillScene(sceneId: string, run: number): Promise<void> {
+    if (run !== this.run) return;
     const { project } = this.deps.session.state;
     const scene = project?.scenes.find((s) => s.id === sceneId);
     if (!project || !scene) return;
-    const fallback = this.deps.templates.get(project.templateId).defaults.fallbackKeyword;
-    const phrases = this.suggester(fallback).suggest(scene.text, MAX_PHRASES);
-    const first = phrases[0] ?? fallback;
     const signal = this.begin(sceneId);
-    this.setScene(sceneId, { query: first, loading: true, items: [], error: null, empty: false });
+    let current = "";
     try {
+      const fallback = this.deps.templates.get(project.templateId).defaults.fallbackKeyword;
+      const phrases = this.suggester(fallback).suggest(scene.text, MAX_PHRASES);
+      const first = phrases[0] ?? fallback;
+      current = first;
+      this.setScene(sceneId, { query: first, loading: true, items: [], error: null, empty: false });
       for (const phrase of phrases) {
+        current = phrase;
         const items = await this.query(phrase, signal);
+        if (!this.owns(sceneId, signal)) return;
         if (items.length > 0) {
           this.setScene(sceneId, { query: phrase, loading: false, items, error: null, empty: false });
           this.pickFirstUnused(sceneId, items);
@@ -154,7 +179,9 @@ export class FootageSearchController extends StateController<FootageSearchState>
       }
       this.setScene(sceneId, { query: first, loading: false, items: [], error: null, empty: true });
     } catch (error) {
-      this.failScene(sceneId, first, error);
+      this.failScene(sceneId, signal, current, error);
+    } finally {
+      this.release(sceneId, signal);
     }
   }
 
@@ -169,7 +196,13 @@ export class FootageSearchController extends StateController<FootageSearchState>
     if (warnings.length > 0) this.addWarnings(warnings);
     const imageItems = images.status === "fulfilled" ? images.value.items : [];
     const videoItems = videos.status === "fulfilled" ? videos.value.items : [];
-    return interleave(imageItems, videoItems);
+    const merged = interleave(imageItems, videoItems);
+    const failed = images.status === "rejected" ? images : videos.status === "rejected" ? videos : null;
+    if (failed) {
+      if (merged.length === 0) throw failed.reason;
+      if (!isAbort(failed.reason)) this.addWarnings([PARTIAL_SOURCE_WARNING]);
+    }
+    return merged;
   }
 
   private pickFirstUnused(sceneId: string, items: StockItemDto[]): void {
@@ -196,12 +229,28 @@ export class FootageSearchController extends StateController<FootageSearchState>
     return controller.signal;
   }
 
-  private failScene(sceneId: string, query: string, error: unknown): void {
+  private owns(sceneId: string, signal: AbortSignal): boolean {
+    return this.inflight.get(sceneId)?.signal === signal;
+  }
+
+  private release(sceneId: string, signal: AbortSignal): void {
+    if (this.owns(sceneId, signal)) this.inflight.delete(sceneId);
+  }
+
+  private failScene(sceneId: string, signal: AbortSignal, query: string, error: unknown): void {
+    if (!this.owns(sceneId, signal)) return; // yêu cầu cũ đã bị thay thế hoặc huỷ
     if (isAbort(error)) {
       this.patchScene(sceneId, { loading: false });
       return;
     }
-    if (isSessionExpired(error)) this.cancel();
+    if (isSessionExpired(error)) {
+      if (this.authLost) return;
+      this.authLost = true;
+      const message = this.report(error);
+      this.cancel();
+      this.setScene(sceneId, { query, loading: false, items: [], error: message, empty: false });
+      return;
+    }
     this.setScene(sceneId, { query, loading: false, items: [], error: this.report(error), empty: false });
   }
 
