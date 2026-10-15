@@ -20,7 +20,8 @@ export default defineConfig({
     headless: process.env.PW_HEADED !== "1",
     viewport: { width: 1100, height: 1000 },
     locale: "vi-VN",
-    trace: "retain-on-failure",
+    // Chạy trên bản deploy (tài khoản thật) thì không ghi trace để mật khẩu không nằm trong test-results
+    trace: external ? "off" : "retain-on-failure",
     video: "off",
   },
   webServer: external

@@ -12,6 +12,8 @@ export function ensureE2eEnv(): void {
   // Next nạp .env.local nhưng biến đã có trong process.env được ưu tiên; đặt chuỗi rỗng (≠ "1") để tắt giọng Edge dev dù .env.local có bật.
   process.env.EDGE_TTS_DEV = "";
   process.env.EDGE_TTS_BIN = "";
+  // Chặn luôn giọng clone MiniMax và key thật trong .env.local: e2e chỉ dùng nhà cung cấp giả, không tốn hạn mức.
+  for (const key of ["MINIMAX_API_KEY", "MINIMAX_VOICES", "GOOGLE_TTS_API_KEY", "PEXELS_API_KEY", "PIXABAY_API_KEY"]) process.env[key] = "";
   if (process.env.APP_USERS && process.env.E2E_PASSWORD) return; // worker thừa hưởng env từ tiến trình chính
   const password = process.env.E2E_PASSWORD ?? `e2e-${randomBytes(9).toString("base64url")}`;
   const passwordHash = bcrypt.hashSync(password, 4);

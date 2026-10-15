@@ -55,3 +55,12 @@ describe("validateEnv", () => {
     expect(bad.ok).toBe(false);
   });
 });
+
+describe("validateEnv — Vercel Preview", () => {
+  it("Preview được dùng nhà cung cấp giả; production thì không (khớp server/container.ts)", () => {
+    const users = Buffer.from(JSON.stringify([{ username: "hai", passwordHash: "$2b$04$abcdefghijklmnopqrstuuJ0123456789abcdefghijklmnopqrstu", displayName: "Hải" }])).toString("base64");
+    const base = { AUTH_SECRET: "s".repeat(32), APP_USERS: users, FAKE_PROVIDERS: "1" };
+    expect(validateEnv({ ...base, VERCEL: "1", VERCEL_ENV: "preview", NODE_ENV: "production" }).ok).toBe(true);
+    expect(validateEnv({ ...base, VERCEL: "1", VERCEL_ENV: "production", NODE_ENV: "production" }).ok).toBe(false);
+  });
+});

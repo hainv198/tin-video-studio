@@ -9,7 +9,8 @@ const set = (v: string | undefined) => (v && v.trim() ? "đã đặt" : "trống
 export function validateEnv(env: Record<string, string | undefined>): EnvCheck {
   const problems: string[] = [];
   const summary: string[] = [];
-  const deployed = env.VERCEL_ENV === "production" || (Boolean(env.VERCEL) && env.NODE_ENV === "production");
+  // Chỉ production thật mới cấm nhà cung cấp giả (khớp server/container.ts); Preview của Vercel vẫn được dùng giả.
+  const deployed = env.VERCEL_ENV === "production";
   const fake = env.FAKE_PROVIDERS === "1";
 
   if (!env.AUTH_SECRET || env.AUTH_SECRET.length < 32) problems.push("AUTH_SECRET phải có và dài ít nhất 32 ký tự");

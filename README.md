@@ -93,7 +93,7 @@ Chỉ Hải chạy các lệnh git và thao tác trên GitHub/Vercel.
    git push -u origin main
    ```
 2. Vercel → Add New Project → import repo. Framework: Next.js. Node.js Version: 22.x (Settings → General → Node.js Version).
-3. Settings → Environment Variables (Production), đặt: `APP_USERS`, `AUTH_SECRET`, `GOOGLE_TTS_API_KEY`, `PEXELS_API_KEY`, `PIXABAY_API_KEY`; tuỳ chọn `MINIMAX_API_KEY`, `MINIMAX_VOICES`. **Không** đặt `FAKE_PROVIDERS` và `EDGE_TTS_DEV`.
+3. Settings → Environment Variables (tick cả Production và Preview, vì mỗi lần push nhánh Vercel cũng build Preview và `check-env` sẽ chặn nếu thiếu), đặt: `APP_USERS`, `AUTH_SECRET`, `GOOGLE_TTS_API_KEY`, `PEXELS_API_KEY`, `PIXABAY_API_KEY`; tuỳ chọn `MINIMAX_API_KEY`, `MINIMAX_VOICES`. **Không** đặt `FAKE_PROVIDERS` và `EDGE_TTS_DEV`.
 4. Deploy. Build chạy `check-env` trước và dừng nếu thiếu hoặc sai biến.
 5. Mở `https://<app>.vercel.app/dang-nhap`, đăng nhập, dựng thử một video.
 6. Thêm người dùng: tạo lại `APP_USERS` bằng `npm run user:encode`, sửa biến trên Vercel rồi Redeploy.
