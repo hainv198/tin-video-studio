@@ -19,6 +19,7 @@ export class TheAnh28Template extends VideoTemplate {
     { key: "channelName", label: "Tên kênh", type: "text", required: true, defaultValue: "TIN NHANH", maxLength: 24 },
     { key: "primaryColor", label: "Màu chủ đạo", type: "color", required: true, defaultValue: DEFAULT_COLOR },
     { key: "logo", label: "Logo", type: "image", required: false },
+    { key: "titleFontPx", label: "Cỡ chữ tiêu đề mở đầu (px, 44–80)", type: "number", required: false, defaultValue: "64", min: 44, max: 80 },
   ];
 
   readonly defaults: TemplateDefaults = {
@@ -55,12 +56,14 @@ export class TheAnh28Template extends VideoTemplate {
     this.drawChip(ctx, project);
     this.drawDateTag(ctx, project.publishDateText, L.dateTag.x, L.dateTag.y);
 
-    ctx.font = font(800, L.title.fontPx);
+    const fontPx = Number(project.brand.get("titleFontPx") ?? L.title.fontPx);
+    const lineHeight = Math.round(fontPx * (L.title.lineHeight / L.title.fontPx));
+    ctx.font = font(800, fontPx);
     ctx.fillStyle = WHITE;
     ctx.textBaseline = "top";
     ctx.textAlign = "left";
     const lines = wrapText(upper(project.displayTitle), L.title.maxWidth, (s) => ctx.measureText(s).width, L.title.maxLines);
-    lines.forEach((line, i) => ctx.fillText(line, L.title.x, L.title.y + i * L.title.lineHeight));
+    lines.forEach((line, i) => ctx.fillText(line, L.title.x, L.title.y + i * lineHeight));
   }
 
   protected drawBody(ctx: Canvas2D, project: ProjectFrame, scene: SceneFrame): void {
