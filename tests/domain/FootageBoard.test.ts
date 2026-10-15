@@ -75,3 +75,13 @@ describe("FootageBoard restore: dữ liệu hỏng không rõ kiểu", () => {
     expect(run({ assignments: [["s1", null]] })).toThrow(ValidationError);
   });
 });
+
+describe("FootageBoard.sceneIds", () => {
+  it("liệt kê id cảnh đã gán, theo thứ tự gán", () => {
+    const board = FootageBoard.empty()
+      .assign("s2", new FallbackFootage("f2"))
+      .assign("s1", new FallbackFootage("f1"));
+    expect(board.sceneIds()).toEqual(["s2", "s1"]);
+    expect(FootageBoard.empty().sceneIds()).toEqual([]);
+  });
+});

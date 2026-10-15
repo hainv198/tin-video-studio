@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MusicTrack } from "@/domain/MusicTrack";
+import { assertSameSession } from "./apiError";
 
 const ManifestSchema = z.array(
   z.object({
@@ -21,6 +22,7 @@ export class MusicLibrary {
   async list(): Promise<MusicTrack[]> {
     if (this.cached) return this.cached;
     const response = await this.fetchImpl(this.url);
+    assertSameSession(response);
     if (!response.ok) throw new Error("Không tải được kho nhạc");
     const parsed = ManifestSchema.safeParse(await response.json().catch(() => null));
     if (!parsed.success) throw new Error("Kho nhạc sai định dạng");

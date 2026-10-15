@@ -1,4 +1,4 @@
-import { readApiError } from "./apiError";
+import { assertSameSession, readApiError, readJson } from "./apiError";
 
 export interface VoiceInfo {
   name: string;
@@ -17,7 +17,7 @@ export class TtsClient implements TtsApi {
   async voices(): Promise<VoiceInfo[]> {
     const response = await this.fetchImpl("/api/tts/voices");
     if (!response.ok) throw await readApiError(response);
-    return ((await response.json()) as { voices: VoiceInfo[] }).voices;
+    return (await readJson<{ voices: VoiceInfo[] }>(response)).voices;
   }
 
   async synthesize(text: string, voiceName: string, speakingRate: number): Promise<ArrayBuffer> {
@@ -27,6 +27,7 @@ export class TtsClient implements TtsApi {
       body: JSON.stringify({ text, voiceName, speakingRate }),
     });
     if (!response.ok) throw await readApiError(response);
+    assertSameSession(response);
     return response.arrayBuffer();
   }
 }

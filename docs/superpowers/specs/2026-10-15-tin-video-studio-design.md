@@ -312,3 +312,11 @@ Chặng 2 làm xong và dựng thử thật được. Chỗ code đã khác sơ 
 - **Âm:** đoạn có tiếng −17,06 dB RMS, đỉnh 0,723 (trần 0,89), 48 kHz.
 - **Hình:** nền mờ thu nhỏ trông mượt, không vỡ ô; dòng nguồn tin không chạm logo góc phải.
 - **Hủy và dựng lại** chạy đúng. **Chưa kiểm trên trình duyệt thật:** `RenderClient.probe()` (3C gọi từ giao diện thì kiểm) và bộ giới hạn đỉnh với giọng Google/MiniMax thật.
+
+### Kết quả chạy thật chặng 3C (2026-10-15, trình 5 bước ở /studio, Chromium nhúng, giọng Edge, ảnh giả PNG)
+
+- **Đi trọn 5 bước** từ tin mẫu tới MP4: 6 cảnh, tạo giọng 6 câu ~25 s, tự tìm cảnh trám 1,5 s (8 gợi ý/cảnh), tải lên ảnh + video thật (xem trước đúng kích thước), nhạc kho và nhạc tải lên, dựng và tải về `phu-tho-…_20261014.mp4`.
+- **Dựng:** chuẩn bị 1,25 s (giải mã + cắt lặng + nạp nhạc), dựng hình 17,6 s cho video 34,5 s (0,51× thời lượng), tệp 8,7 MB. Cắt lặng rút ≈ 5,3 s so với giọng gốc + khoảng nghỉ (39,9 s).
+- **Âm:** đoạn có tiếng −16,96 dB RMS, đỉnh 0,743 (trần 0,89).
+- **Đã kiểm thật:** probe worker (~1,5 s), BrowserMediaProbe (ảnh/video/nhạc), PNG giả qua createImageBitmap, bản nháp IndexedDB thật (giọng, file tải lên, nhạc còn sau tải lại trang), huỷ/dựng lại, cờ "kết quả cũ" khi sửa dự án, hết phiên → /dang-nhap và bản nháp còn.
+- **Chưa kiểm:** giọng Google/MiniMax thật, Pexels/Pixabay thật, chọn file bằng chuột thật. Chi tiết: `.superpowers/sdd/task-13-report.md` (git-ignored) và `docs/superpowers/plans/2026-10-15-00-lo-trinh.md`.

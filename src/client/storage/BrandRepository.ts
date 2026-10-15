@@ -1,7 +1,7 @@
 import { ValidationError } from "@/domain/errors";
 import type { KeyValueStore } from "./KeyValueStore";
 
-const MAX_LOGO_BYTES = 5 * 1024 * 1024;
+export const MAX_LOGO_BYTES = 5 * 1024 * 1024;
 
 export interface StoredBrand {
   values: Record<string, string>;
