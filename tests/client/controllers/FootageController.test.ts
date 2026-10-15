@@ -111,6 +111,82 @@ describe("FootageController", () => {
     expect(ctrl.state.error).toBe("Chưa có dự án");
   });
 
+  it("busy giữ true cho tới khi mọi lần tải chồng nhau xong", async () => {
+    const made = makeSessionWithProject(3);
+    const { uploads } = memoryUploads("u");
+    const gates: Array<() => void> = [];
+    const slow: MediaProbe = {
+      ...probe,
+      image: () => new Promise((resolve) => gates.push(() => resolve({ width: 10, height: 10 }))),
+    };
+    const ctrl = new FootageController({ session: made.session, uploads, probe: slow, ids: sequentialIds("f") });
+    const first = ctrl.addFiles([img("a.jpg")]);
+    const second = ctrl.addFiles([img("b.jpg")]);
+    expect(ctrl.state.busy).toBe(true);
+    gates[0]!();
+    await first;
+    expect(ctrl.state.busy).toBe(true);
+    gates[1]!();
+    await second;
+    expect(ctrl.state.busy).toBe(false);
+  });
+
+  it("lần tải xong không lỗi không xoá lỗi đang hiện khi còn lần khác đang chạy", async () => {
+    const made = makeSessionWithProject(3);
+    const { uploads } = memoryUploads("u");
+    const gates: Array<() => void> = [];
+    const slow: MediaProbe = {
+      ...probe,
+      image: () => new Promise((resolve) => gates.push(() => resolve({ width: 10, height: 10 }))),
+    };
+    const ctrl = new FootageController({ session: made.session, uploads, probe: slow, ids: sequentialIds("f") });
+    const b = ctrl.addFiles([img("b.jpg")]);
+    const c = ctrl.addFiles([img("c.jpg")]);
+    await ctrl.addFiles([new File(["x"], "bad.gif", { type: "image/gif" })]);
+    expect(ctrl.state.error).toBe("bad.gif: Định dạng không được hỗ trợ: gif");
+    gates[0]!();
+    await b;
+    expect(ctrl.state.busy).toBe(true);
+    expect(ctrl.state.error).toBe("bad.gif: Định dạng không được hỗ trợ: gif");
+    gates[1]!();
+    await c;
+    expect(ctrl.state.error).toBeNull();
+  });
+
+  it("cảnh bị tách trong lúc đọc file vẫn được gán file", async () => {
+    const made = makeSessionWithProject(1); // s1, s2
+    const { uploads } = memoryUploads("u");
+    let release: () => void = () => {};
+    const slow: MediaProbe = {
+      ...probe,
+      image: () => new Promise((resolve) => (release = () => resolve({ width: 10, height: 10 }))),
+    };
+    const ctrl = new FootageController({ session: made.session, uploads, probe: slow, ids: sequentialIds("f") });
+    const pending = ctrl.addFiles([img("a.jpg"), img("b.jpg"), img("c.jpg")]);
+    const body = made.session.state.project!.scenes[1]!;
+    made.session.update((d) => ({ ...d, project: d.project!.splitScene(body.id, body.text.indexOf(" của")) }));
+    // ba file: probe được gọi lần lượt, mở khoá từng cái
+    for (let i = 0; i < 3; i++) {
+      await Promise.resolve();
+      await new Promise((r) => setTimeout(r, 0));
+      release();
+    }
+    await pending;
+    expect(made.session.state.project!.scenes).toHaveLength(3);
+    expect(made.session.state.footage.sceneIds()).toHaveLength(3);
+  });
+
+  it("file hỏng (DOMException khi đọc) báo thông điệp cụ thể và không lưu", async () => {
+    const made = makeSessionWithProject(1);
+    const { uploads, store } = memoryUploads("u");
+    const broken: MediaProbe = { ...probe, image: async () => Promise.reject(new DOMException("decode", "EncodingError")) };
+    const ctrl = new FootageController({ session: made.session, uploads, probe: broken, ids: sequentialIds("f") });
+    await ctrl.addFiles([img("bad.jpg")]);
+    expect(ctrl.state.error).toBe("bad.jpg: Không đọc được file (hỏng hoặc không đúng định dạng)");
+    expect(await store.keys("blob:")).toEqual([]);
+    expect(made.session.state.footage.sceneIds()).toEqual([]);
+  });
+
   it("previewSource: URL cho stock, Blob cho file tải lên, null cho nền mặc định hoặc file đã mất", async () => {
     const { ctrl, session } = setup(1);
     await ctrl.addFiles([img("a.jpg")]);

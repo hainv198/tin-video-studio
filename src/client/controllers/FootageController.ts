@@ -2,7 +2,7 @@ import { classifyUpload } from "@/client/media/UploadValidator";
 import { parseUploadUri, uploadToFootage } from "@/client/media/footageFactory";
 import type { MediaProbe } from "@/client/media/MediaProbe";
 import type { UploadRepository } from "@/client/storage/UploadRepository";
-import { ValidationError } from "@/domain/errors";
+import { userMessage } from "@/client/errors/userMessage";
 import type { Footage } from "@/domain/Footage";
 import type { IdGenerator } from "@/domain/ids";
 import { StateController } from "./StateController";
@@ -25,22 +25,27 @@ export interface FootageControllerDeps {
 
 /** Bước 3 (phần tải lên): file của người dùng, gán lần lượt, thay thế, hoán đổi. */
 export class FootageController extends StateController<FootageState> {
+  /** Số lần tải đang chạy song song; `busy` = còn lần nào chưa xong. */
+  private inFlight = 0;
+
   constructor(private readonly deps: FootageControllerDeps) {
     super({ busy: false, error: null, added: [] }, deps.onAuthLost);
   }
 
   async addFiles(files: readonly File[]): Promise<void> {
-    const project = this.deps.session.state.project;
-    if (!project) {
+    if (!this.deps.session.state.project) {
       this.patch({ error: "Chưa có dự án" });
       return;
     }
     const { footages, errors } = await this.ingest(files);
     if (footages.length > 0) {
-      const sceneIds = project.scenes.map((s) => s.id);
-      this.deps.session.update((d) => ({ ...d, footage: d.footage.fillInOrder(sceneIds, footages) }));
+      // Đọc danh sách cảnh lúc ghi (không phải lúc bắt đầu) để tôn trọng cảnh tách/gộp trong lúc đọc file.
+      this.deps.session.update((d) => ({
+        ...d,
+        footage: d.footage.fillInOrder(d.project?.scenes.map((s) => s.id) ?? [], footages),
+      }));
     }
-    this.patch({ error: errors.length ? errors.join("; ") : null });
+    this.finishWith(errors);
   }
 
   async replaceWithFile(sceneId: string, file: File): Promise<void> {
@@ -51,7 +56,13 @@ export class FootageController extends StateController<FootageState> {
     const { footages, errors } = await this.ingest([file]);
     const footage = footages[0];
     if (footage) this.deps.session.update((d) => ({ ...d, footage: d.footage.assign(sceneId, footage) }));
-    this.patch({ error: errors.length ? errors.join("; ") : null });
+    this.finishWith(errors);
+  }
+
+  /** Có lỗi thì hiện; không lỗi thì chỉ xoá lỗi cũ khi không còn lần tải nào khác đang chạy. */
+  private finishWith(errors: string[]): void {
+    if (errors.length > 0) this.patch({ error: errors.join("; ") });
+    else if (this.inFlight === 0) this.patch({ error: null });
   }
 
   /** File tải lên đã thêm trong phiên + file tải lên đang nằm trong bảng cảnh trám, không trùng id. */
@@ -96,15 +107,22 @@ export class FootageController extends StateController<FootageState> {
   }
 
   private async ingest(files: readonly File[]): Promise<{ footages: Footage[]; errors: string[] }> {
+    this.inFlight += 1;
     this.patch({ busy: true });
     const footages: Footage[] = [];
     const errors: string[] = [];
     try {
       for (const file of files) {
         try {
-          const kind = classifyUpload(file, ["image", "video"]);
-          if (kind === "audio") throw new ValidationError("Không nhận file nhạc ở đây");
-          const info = kind === "image" ? await this.deps.probe.image(file) : await this.deps.probe.video(file);
+          // Chỉ cho phép ảnh/video nên kết quả không thể là "audio".
+          const kind = classifyUpload(file, ["image", "video"]) as "image" | "video";
+          let info;
+          try {
+            info = kind === "image" ? await this.deps.probe.image(file) : await this.deps.probe.video(file);
+          } catch (error) {
+            errors.push(`${file.name}: ${userMessage(error, "Không đọc được file (hỏng hoặc không đúng định dạng)")}`);
+            continue;
+          }
           const meta = await this.deps.uploads.put(file, { name: file.name, kind });
           footages.push(uploadToFootage(this.deps.ids(), meta.id, kind, info));
         } catch (error) {
@@ -113,7 +131,8 @@ export class FootageController extends StateController<FootageState> {
       }
       if (footages.length > 0) this.patch({ added: [...this.state.added, ...footages] });
     } finally {
-      this.patch({ busy: false });
+      this.inFlight -= 1;
+      this.patch({ busy: this.inFlight > 0 });
     }
     return { footages, errors };
   }
