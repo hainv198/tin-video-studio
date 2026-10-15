@@ -1,4 +1,4 @@
-import { ApiError } from "./AuthClient";
+import { readApiError } from "./apiError";
 
 export interface VoiceInfo {
   name: string;
@@ -11,17 +11,12 @@ export interface TtsApi {
   synthesize(text: string, voiceName: string, speakingRate: number): Promise<ArrayBuffer>;
 }
 
-async function toApiError(response: Response): Promise<ApiError> {
-  const body = (await response.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
-  return new ApiError(response.status, body?.error?.code ?? "INTERNAL", body?.error?.message ?? "Lỗi máy chủ");
-}
-
 export class TtsClient implements TtsApi {
   constructor(private readonly fetchImpl: typeof fetch = (...args) => fetch(...args)) {}
 
   async voices(): Promise<VoiceInfo[]> {
     const response = await this.fetchImpl("/api/tts/voices");
-    if (!response.ok) throw await toApiError(response);
+    if (!response.ok) throw await readApiError(response);
     return ((await response.json()) as { voices: VoiceInfo[] }).voices;
   }
 
@@ -31,7 +26,7 @@ export class TtsClient implements TtsApi {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, voiceName, speakingRate }),
     });
-    if (!response.ok) throw await toApiError(response);
+    if (!response.ok) throw await readApiError(response);
     return response.arrayBuffer();
   }
 }
