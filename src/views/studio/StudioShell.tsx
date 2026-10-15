@@ -4,7 +4,9 @@ import type { Studio } from "@/client/controllers/createStudio";
 import { STEPS, canEnter, type StepId } from "@/client/controllers/readiness";
 import { useController } from "@/views/hooks/useController";
 import { Stepper } from "./Stepper";
+import { StepFootage } from "./steps/StepFootage";
 import { StepNews } from "./steps/StepNews";
+import { StepVoice } from "./steps/StepVoice";
 
 const BLOCKED_HINT: Partial<Record<StepId, string>> = {
   news: "Hãy chia cảnh từ tin của bạn trước.",
@@ -15,6 +17,10 @@ function renderStep(step: StepId, studio: Studio) {
   switch (step) {
     case "news":
       return <StepNews studio={studio} />;
+    case "voice":
+      return <StepVoice studio={studio} />;
+    case "footage":
+      return <StepFootage studio={studio} />;
     default:
       return <p className="text-neutral-400">Bước này sẽ có ở task sau.</p>;
   }
