@@ -1,5 +1,5 @@
 import { ValidationError } from "@/domain/errors";
-import type { SynthesisRequest, SynthesisResult, TtsProvider, TtsVoice } from "./TtsProvider";
+import type { SynthesisRequest, SynthesisResult, TtsProvider, TtsVoice, TtsVoiceList } from "./TtsProvider";
 
 export interface RoutedTtsProvider extends TtsProvider {
   owns(voiceName: string): boolean;
@@ -19,7 +19,7 @@ export class RoutingTtsProvider implements TtsProvider {
     if (providers.length === 0) throw new Error("Chưa cấu hình nhà cung cấp giọng nào");
   }
 
-  async listVoices(languageCode: string): Promise<TtsVoice[]> {
+  async listVoices(languageCode: string): Promise<TtsVoiceList> {
     const settled = await Promise.allSettled(this.providers.map((p) => p.listVoices(languageCode)));
     const voices: TtsVoice[] = [];
     let lastError: unknown;
@@ -34,7 +34,7 @@ export class RoutingTtsProvider implements TtsProvider {
       }
     }
     if (!anyOk) throw lastError;
-    return voices;
+    return lastError === undefined ? voices : Object.assign(voices, { partial: true });
   }
 
   async synthesize(request: SynthesisRequest): Promise<SynthesisResult> {

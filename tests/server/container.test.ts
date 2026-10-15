@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildServerContainer } from "@/server/container";
 
 const HASH = "$2b$04$abcdefghijklmnopqrstuuJ0123456789abcdefghijklmnopqrstu";
@@ -31,7 +31,8 @@ describe("buildServerContainer", () => {
   it("cookie Secure khi NODE_ENV=production", () => {
     expect(buildServerContainer({ ...base, FAKE_PROVIDERS: "1", NODE_ENV: "production" }).secureCookies).toBe(true);
   });
-it("có cấu hình MiniMax: giọng clone đứng đầu, giọng cũ vẫn tạo được", async () => {
+
+  it("có cấu hình MiniMax: giọng clone đứng đầu, giọng cũ vẫn tạo được", async () => {
     const c = buildServerContainer({
       ...base,
       FAKE_PROVIDERS: "1",
@@ -43,13 +44,24 @@ it("có cấu hình MiniMax: giọng clone đứng đầu, giọng cũ vẫn t�
     expect(fake.mimeType).toBe("audio/wav");
   });
 
-  it("cấu hình MiniMax thiếu một nửa hoặc sai thì báo lỗi rõ", () => {
-    expect(() => buildServerContainer({ ...base, FAKE_PROVIDERS: "1", MINIMAX_API_KEY: "mk" })).toThrow(
-      "Cần cả MINIMAX_API_KEY và MINIMAX_VOICES",
-    );
-    expect(() =>
-      buildServerContainer({ ...base, FAKE_PROVIDERS: "1", MINIMAX_API_KEY: "mk", MINIMAX_VOICES: "rác" }),
-    ).toThrow("MINIMAX_VOICES không phải JSON hợp lệ");
+  it("cấu hình MiniMax thiếu một nửa hoặc sai: app chạy như cũ, cảnh báo không lộ key", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const half = buildServerContainer({ ...base, FAKE_PROVIDERS: "1", MINIMAX_API_KEY: "mk-bi-mat" });
+      expect((await half.tts.voices()).map((v) => v.name)).toEqual(["vi-VN-Fake-A", "vi-VN-Fake-B"]);
+      const broken = buildServerContainer({
+        ...base,
+        FAKE_PROVIDERS: "1",
+        MINIMAX_API_KEY: "mk-bi-mat",
+        MINIMAX_VOICES: "rác",
+      });
+      expect((await broken.tts.voices()).map((v) => v.name)).toEqual(["vi-VN-Fake-A", "vi-VN-Fake-B"]);
+      expect(warn).toHaveBeenCalledTimes(2);
+      const logged = warn.mock.calls.flat().join(" ");
+      expect(logged).toContain("Bỏ qua giọng MiniMax");
+      expect(logged).not.toContain("mk-bi-mat");
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
-

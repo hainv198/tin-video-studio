@@ -23,11 +23,18 @@ describe("RoutingTtsProvider", () => {
     expect((await r.listVoices("vi-VN")).map((v) => v.name)).toEqual(["vi-VN-MiniMax-A", "vi-VN-A"]);
   });
 
-  it("một nguồn lỗi vẫn trả nguồn còn lại", async () => {
+  it("một nguồn lỗi vẫn trả nguồn còn lại, đánh dấu danh sách bị thiếu", async () => {
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const r = new RoutingTtsProvider([provider("vi-VN-MiniMax-", { failList: true }).p, provider("vi-VN-").p]);
-    expect((await r.listVoices("vi-VN")).map((v) => v.name)).toEqual(["vi-VN-A"]);
+    const voices = await r.listVoices("vi-VN");
+    expect(voices.map((v) => v.name)).toEqual(["vi-VN-A"]);
+    expect(voices.partial).toBe(true);
     expect(err).toHaveBeenCalled();
+  });
+
+  it("mọi nguồn chạy được thì danh sách không bị đánh dấu thiếu", async () => {
+    const r = new RoutingTtsProvider([provider("vi-VN-MiniMax-").p, provider("vi-VN-").p]);
+    expect((await r.listVoices("vi-VN")).partial).toBeFalsy();
   });
 
   it("mọi nguồn lỗi thì ném lỗi", async () => {

@@ -24,6 +24,17 @@ describe("TtsController", () => {
     expect(p.listVoices).toHaveBeenCalledTimes(2);
   });
 
+  it("không cache danh sách giọng bị thiếu (một nguồn lỗi)", async () => {
+    const p = provider();
+    p.listVoices.mockImplementation(async () =>
+      Object.assign([{ name: "vi-VN-MiniMax-Hai", gender: "MALE" as const, tier: "MiniMax" }], { partial: true }),
+    );
+    const c = new TtsController(p, () => 0);
+    await c.voices();
+    await c.voices();
+    expect(p.listVoices).toHaveBeenCalledTimes(2);
+  });
+
   it("cắt khoảng trắng rồi gọi nhà cung cấp", async () => {
     const p = provider();
     await new TtsController(p).synthesize({ text: "  Câu tin.  ", voiceName: "vi-VN-Neural2-A", speakingRate: 1.07 });

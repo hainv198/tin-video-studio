@@ -50,18 +50,27 @@ export function buildServerContainer(env: Record<string, string | undefined>): S
   };
 }
 
-/** MiniMax là tuỳ chọn: chỉ bật khi có đủ key và danh sách giọng clone; giọng clone đứng đầu danh sách. */
+/** MiniMax là tuỳ chọn: chỉ bật khi có đủ key và danh sách giọng hợp lệ; thiếu hoặc sai thì cảnh báo và chạy như cũ. Giọng clone đứng đầu danh sách. */
 function withMiniMax(base: TtsProvider, env: Record<string, string | undefined>): TtsProvider {
   const apiKey = env.MINIMAX_API_KEY?.trim();
   const rawVoices = env.MINIMAX_VOICES?.trim();
   if (!apiKey && !rawVoices) return base;
-  if (!apiKey || !rawVoices) throw new Error("Cần cả MINIMAX_API_KEY và MINIMAX_VOICES để bật giọng MiniMax");
-  const minimax = new MiniMaxTtsService({
-    apiKey,
-    voices: parseMiniMaxVoices(rawVoices),
-    model: env.MINIMAX_MODEL,
-    baseUrl: env.MINIMAX_BASE_URL,
-  });
+  if (!apiKey || !rawVoices) {
+    console.warn("[MiniMax] Bỏ qua giọng MiniMax: cần cả MINIMAX_API_KEY và MINIMAX_VOICES");
+    return base;
+  }
+  let minimax: MiniMaxTtsService;
+  try {
+    minimax = new MiniMaxTtsService({
+      apiKey,
+      voices: parseMiniMaxVoices(rawVoices),
+      model: env.MINIMAX_MODEL,
+      baseUrl: env.MINIMAX_BASE_URL,
+    });
+  } catch (error) {
+    console.warn(`[MiniMax] Bỏ qua giọng MiniMax: ${error instanceof Error ? error.message : "cấu hình sai"}`);
+    return base;
+  }
   return new RoutingTtsProvider([minimax, routed(base, (voiceName) => !minimax.owns(voiceName))]);
 }
 

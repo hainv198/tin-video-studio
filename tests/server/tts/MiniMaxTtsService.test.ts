@@ -132,6 +132,18 @@ describe("MiniMaxTtsService", () => {
     );
   });
 
+  it("âm thanh hex hỏng thì UpstreamError, không trả file cụt", async () => {
+    const make = (hex: string) =>
+      new MiniMaxTtsService({
+        apiKey: "MK",
+        voices: parseMiniMaxVoices(VOICES),
+        fetchImpl: (async () => ok(hex)) as unknown as typeof fetch,
+      });
+    const req = { text: "a", voiceName: "vi-VN-MiniMax-Hai", speakingRate: 1 };
+    await expect(make("4944zz").synthesize(req)).rejects.toThrow("MiniMax trả về âm thanh hỏng");
+    await expect(make("49443").synthesize(req)).rejects.toThrow("MiniMax trả về âm thanh hỏng");
+  });
+
   it("thiếu key hoặc không có giọng thì báo lỗi cấu hình", () => {
     expect(() => new MiniMaxTtsService({ apiKey: "", voices: parseMiniMaxVoices(VOICES) })).toThrow(
       "MINIMAX_API_KEY chưa được cấu hình",

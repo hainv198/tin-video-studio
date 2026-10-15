@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { QuotaError, UpstreamError, ValidationError } from "@/domain/errors";
 import { fetchJson } from "@/server/http/upstream";
-import { MINIMAX_DEFAULT_MODEL, minimaxUrl, validateVoiceId, type MiniMaxBaseResp } from "./minimaxShared";
+import { MINIMAX_DEFAULT_MODEL, minimaxUrl, validateAlias, validateVoiceId, type MiniMaxBaseResp } from "./minimaxShared";
 import type { SynthesisRequest, SynthesisResult, TtsProvider, TtsVoice, VoiceGender } from "./TtsProvider";
 
 export const MINIMAX_VOICE_PREFIX = "vi-VN-MiniMax-";
@@ -17,7 +17,7 @@ export interface MiniMaxVoice {
 
 const VoicesSchema = z.array(
   z.object({
-    alias: z.string().regex(/^[A-Za-z0-9]{1,32}$/),
+    alias: z.string().refine(validateAlias),
     voiceId: z.string().refine(validateVoiceId),
     gender: z.enum(["MALE", "FEMALE", "NEUTRAL"]),
   }),
@@ -107,6 +107,7 @@ export class MiniMaxTtsService implements TtsProvider {
     }
     const hex = data.data?.audio;
     if (!hex) throw new UpstreamError("MiniMax không trả về âm thanh");
+    if (hex.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(hex)) throw new UpstreamError("MiniMax trả về âm thanh hỏng");
     return { audio: Uint8Array.from(Buffer.from(hex, "hex")), mimeType: "audio/mpeg" };
   }
 }

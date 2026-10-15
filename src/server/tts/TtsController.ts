@@ -25,7 +25,7 @@ export class TtsController {
     const cache = this.voiceCache;
     if (cache && this.now() - cache.at < TtsController.VOICE_CACHE_MS) return cache.voices;
     const voices = await this.provider.listVoices(TtsController.LANGUAGE);
-    this.voiceCache = { at: this.now(), voices };
+    if (!voices.partial) this.voiceCache = { at: this.now(), voices };
     return voices;
   }
 

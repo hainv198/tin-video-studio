@@ -30,11 +30,13 @@ Bỏ `FAKE_PROVIDERS`, điền `GOOGLE_TTS_API_KEY`, `PEXELS_API_KEY`, `PIXABAY_
 2. Thêm `MINIMAX_API_KEY` vào `.env.local`.
 3. Clone:
    ```bash
-   npm run minimax:clone -- giong-hai.mp3 tvsHai001 Hai
+   npm run minimax:clone -- giong-hai.mp3 tvsHai001 Hai MALE
    ```
-   Script in link nghe thử và một dòng JSON.
+   Alias chỉ gồm chữ và số không dấu. Script in link nghe thử và một dòng JSON.
 4. Thêm dòng đó vào `MINIMAX_VOICES` (mảng JSON) trong `.env.local` và trên Vercel. Giọng hiện trong app với tên `vi-VN-MiniMax-Hai`, đứng đầu danh sách.
 5. MiniMax xoá giọng clone nếu 7 ngày không dùng: tạo giọng thật trong app ít nhất một lần sau khi clone.
+
+Thiếu một trong hai biến hoặc `MINIMAX_VOICES` sai định dạng thì app chỉ ghi cảnh báo vào log và chạy như không có MiniMax.
 
 Có cấu hình MiniMax thì giọng clone dùng được cả khi `FAKE_PROVIDERS=1` (giọng Google lúc đó là giọng giả).
 

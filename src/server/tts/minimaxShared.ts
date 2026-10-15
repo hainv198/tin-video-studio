@@ -8,6 +8,13 @@ export function validateVoiceId(voiceId: string): boolean {
   return VOICE_ID.test(voiceId);
 }
 
+/** Alias giọng clone trong app: chữ và số không dấu, 1–32 ký tự (thành tên vi-VN-MiniMax-<Alias>). */
+const ALIAS = /^[A-Za-z0-9]{1,32}$/;
+
+export function validateAlias(alias: string): boolean {
+  return ALIAS.test(alias);
+}
+
 export function minimaxUrl(baseUrl: string | undefined, path: string): string {
   return `${(baseUrl || MINIMAX_DEFAULT_BASE_URL).replace(/\/+$/, "")}${path}`;
 }
