@@ -15,6 +15,7 @@ import { MiniMaxTtsService, parseMiniMaxVoices } from "./tts/MiniMaxTtsService";
 import { routed, RoutingTtsProvider, type RoutedTtsProvider } from "./tts/RoutingTtsProvider";
 import { TtsController } from "./tts/TtsController";
 import type { TtsProvider } from "./tts/TtsProvider";
+import { parseVclipVoices, VclipTtsService } from "./tts/VclipTtsService";
 
 export interface ServerContainer {
   users: UserDirectory;
@@ -69,12 +70,12 @@ function buildStockProviders(env: Record<string, string | undefined>): StockProv
   return providers;
 }
 
-/** MiniMax và Gemini đều tuỳ chọn. Thứ tự danh sách giọng: MiniMax (giọng clone), Gemini, rồi giọng nền (nếu có). */
+/** vclip, MiniMax và Gemini đều tuỳ chọn. Thứ tự danh sách giọng: vclip, MiniMax (giọng clone), Gemini, rồi giọng nền (nếu có). */
 function composeTts(base: TtsProvider | undefined, env: Record<string, string | undefined>): TtsProvider {
-  const candidates: Array<RoutedTtsProvider | undefined> = [buildMiniMax(env), buildGemini(env)];
+  const candidates: Array<RoutedTtsProvider | undefined> = [buildVclip(env), buildMiniMax(env), buildGemini(env)];
   const optional = candidates.filter((p): p is RoutedTtsProvider => p !== undefined);
   if (!base && optional.length === 0) {
-    throw new Error("Cần GOOGLE_TTS_API_KEY hoặc GEMINI_API_KEY (hoặc MiniMax) để tạo giọng đọc");
+    throw new Error("Cần một nguồn giọng: VCLIP_API_KEY + VCLIP_VOICES, GEMINI_API_KEY, GOOGLE_TTS_API_KEY hoặc MiniMax");
   }
   if (!base) return new RoutingTtsProvider(optional);
   if (optional.length === 0) return base;
@@ -99,6 +100,23 @@ function buildMiniMax(env: Record<string, string | undefined>): MiniMaxTtsServic
     });
   } catch (error) {
     console.warn(`[MiniMax] Bỏ qua giọng MiniMax: ${error instanceof Error ? error.message : "cấu hình sai"}`);
+    return undefined;
+  }
+}
+
+/** Giống MiniMax: chỉ bật khi có đủ VCLIP_API_KEY và VCLIP_VOICES hợp lệ. */
+function buildVclip(env: Record<string, string | undefined>): VclipTtsService | undefined {
+  const apiKey = env.VCLIP_API_KEY?.trim();
+  const rawVoices = env.VCLIP_VOICES?.trim();
+  if (!apiKey && !rawVoices) return undefined;
+  if (!apiKey || !rawVoices) {
+    console.warn("[vclip] Bỏ qua giọng vclip: cần cả VCLIP_API_KEY và VCLIP_VOICES");
+    return undefined;
+  }
+  try {
+    return new VclipTtsService({ apiKey, voices: parseVclipVoices(rawVoices) });
+  } catch (error) {
+    console.warn(`[vclip] Bỏ qua giọng vclip: ${error instanceof Error ? error.message : "cấu hình sai"}`);
     return undefined;
   }
 }

@@ -22,7 +22,21 @@ Web app dựng video tin tức dọc 9:16 từ văn bản. Video dựng trên tr
 
 ## Chạy với key thật
 
-Bỏ `FAKE_PROVIDERS`, điền ít nhất một nguồn cảnh trám (`PIXABAY_API_KEY` và/hoặc `PEXELS_API_KEY`; Pexels đang tạm ngừng cấp key mới) và ít nhất một nguồn giọng: `GOOGLE_TTS_API_KEY` (Google Cloud, cần thẻ) hoặc `GEMINI_API_KEY` (AI Studio, không cần thẻ) hoặc MiniMax. Có nhiều nguồn thì danh sách giọng gộp lại: MiniMax, Gemini, rồi Google.
+Bỏ `FAKE_PROVIDERS`, điền ít nhất một nguồn cảnh trám (`PIXABAY_API_KEY` và/hoặc `PEXELS_API_KEY`; Pexels đang tạm ngừng cấp key mới) và ít nhất một nguồn giọng: `GOOGLE_TTS_API_KEY` (Google Cloud, cần thẻ) hoặc `GEMINI_API_KEY` (AI Studio, không cần thẻ) hoặc MiniMax. Có nhiều nguồn thì danh sách giọng gộp lại: vclip, MiniMax, Gemini, rồi Google.
+
+## Giọng vclip.io (tuỳ chọn)
+
+1. Đăng nhập https://tts.vclip.io rồi lấy API key tại https://tts.vclip.io/docs/api-keys.
+2. Lấy voice ID của giọng clone trong mục "Giọng nói của bạn".
+3. Thêm vào `.env.local` (và biến môi trường trên Vercel):
+   ```
+   VCLIP_API_KEY=<key>
+   VCLIP_VOICES=[{"alias":"Hai","voiceId":"<voice ID>","gender":"MALE"}]
+   ```
+   Alias chỉ gồm chữ và số không dấu.
+4. Khởi động lại app: giọng hiện với tên `vi-VN-Vclip-Hai`, đứng đầu danh sách (trước MiniMax, Gemini, Google). Tốc độ đọc hỗ trợ 0,5–2.
+
+Thiếu một trong hai biến thì app chỉ ghi cảnh báo vào log và chạy như không có vclip. Nếu `VCLIP_VOICES` sai định dạng thì kiểm tra khởi động (`check-env`) báo lỗi và dừng; còn app đang chạy chỉ ghi cảnh báo và bỏ qua vclip. Mỗi lần tạo giọng vclip chạy bất đồng bộ (gửi, chờ xong rồi tải), tối đa khoảng 2 phút chờ + thời gian từng yêu cầu.
 
 ## Giọng clone MiniMax (tuỳ chọn)
 
@@ -120,6 +134,7 @@ Lưu ý:
 | `GOOGLE_TTS_API_KEY` | Có (khi không `FAKE_PROVIDERS`) | Google Cloud Console, bật Cloud Text-to-Speech, tạo API key |
 | `PEXELS_API_KEY` | Có (khi không `FAKE_PROVIDERS`) | Đăng ký tại pexels.com/api |
 | `PIXABAY_API_KEY` | Có (khi không `FAKE_PROVIDERS`) | Đăng ký tại pixabay.com/api/docs |
+| `VCLIP_API_KEY`, `VCLIP_VOICES` | Không (phải có đủ cặp) | Xem mục giọng vclip.io |
 | `MINIMAX_API_KEY`, `MINIMAX_VOICES` | Không (phải có đủ cặp) | Xem mục giọng clone MiniMax |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | Không | Xem mục giọng Gemini; model mặc định `gemini-2.5-flash-preview-tts` |
 | `MINIMAX_MODEL`, `MINIMAX_BASE_URL` | Không | Mặc định `speech-2.8-hd` và `https://api.minimax.io` |

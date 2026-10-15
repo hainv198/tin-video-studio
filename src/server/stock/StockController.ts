@@ -31,6 +31,10 @@ export class StockController {
     if (providers.length === 0) throw new Error("Chưa cấu hình nguồn cảnh trám nào");
   }
 
+  providerNames(): string[] {
+    return this.providers.map((p) => p.name);
+  }
+
   async search(input: Record<string, string | undefined>): Promise<StockSearchResult> {
     const parsed = QuerySchema.safeParse(input);
     if (!parsed.success) throw new ValidationError("Từ khoá tìm cảnh trám không hợp lệ");

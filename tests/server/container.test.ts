@@ -17,7 +17,7 @@ describe("buildServerContainer", () => {
   });
 
   it("không bật giả lập thì bắt buộc có đủ key thật", () => {
-    expect(() => buildServerContainer(base)).toThrow("Cần GOOGLE_TTS_API_KEY hoặc GEMINI_API_KEY");
+    expect(() => buildServerContainer(base)).toThrow("Cần một nguồn giọng");
     expect(() => buildServerContainer({ ...base, GOOGLE_TTS_API_KEY: "g" })).toThrow("Cần PEXELS_API_KEY hoặc PIXABAY_API_KEY");
     expect(buildServerContainer({ ...base, ...realKeys }).usingFakes).toBe(false);
   });
@@ -92,6 +92,37 @@ describe("buildServerContainer", () => {
       const logged = warn.mock.calls.flat().join(" ");
       expect(logged).toContain("Bỏ qua giọng MiniMax");
       expect(logged).not.toContain("mk-bi-mat");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("có cấu hình vclip: giọng vclip đứng đầu, trước MiniMax và Gemini", async () => {
+    const c = buildServerContainer({
+      ...base,
+      FAKE_PROVIDERS: "1",
+      VCLIP_API_KEY: "vk",
+      VCLIP_VOICES: JSON.stringify([{ alias: "Hai", voiceId: "voice-hai-1", gender: "MALE" }]),
+      MINIMAX_API_KEY: "mk",
+      MINIMAX_VOICES: JSON.stringify([{ alias: "Hai", voiceId: "tvsHai001", gender: "MALE" }]),
+      GEMINI_API_KEY: "gk",
+    });
+    const names = (await c.tts.voices()).map((v) => v.name);
+    expect(names.slice(0, 3)).toEqual(["vi-VN-Vclip-Hai", "vi-VN-MiniMax-Hai", "vi-VN-Gemini-Kore"]);
+    expect(names.slice(-2)).toEqual(["vi-VN-Fake-A", "vi-VN-Fake-B"]);
+  });
+
+  it("cấu hình vclip thiếu một nửa hoặc sai: chạy như cũ, cảnh báo không lộ key", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const half = buildServerContainer({ ...base, FAKE_PROVIDERS: "1", VCLIP_API_KEY: "vk-bi-mat" });
+      expect((await half.tts.voices()).map((v) => v.name)).toEqual(["vi-VN-Fake-A", "vi-VN-Fake-B"]);
+      const broken = buildServerContainer({ ...base, FAKE_PROVIDERS: "1", VCLIP_API_KEY: "vk-bi-mat", VCLIP_VOICES: "rác" });
+      expect((await broken.tts.voices()).map((v) => v.name)).toEqual(["vi-VN-Fake-A", "vi-VN-Fake-B"]);
+      expect(warn).toHaveBeenCalledTimes(2);
+      const logged = warn.mock.calls.flat().join(" ");
+      expect(logged).toContain("Bỏ qua giọng vclip");
+      expect(logged).not.toContain("vk-bi-mat");
     } finally {
       warn.mockRestore();
     }
