@@ -77,7 +77,7 @@ export function StepRender({ studio }: { studio: Studio }) {
             {render.durationSec.toFixed(1)} giây, {(render.sizeBytes / 1024 / 1024).toFixed(1)} MB
           </p>
           {render.stale && (
-            <p className="text-sm text-amber-400">Kết quả này dựng trước khi bạn sửa dự án, hãy dựng lại để cập nhật.</p>
+            <p className="text-sm text-amber-400">Kết quả này không còn khớp với dự án hoặc lựa chọn hiện tại, hãy dựng lại để cập nhật.</p>
           )}
           {render.warnings.map((w, i) => (
             <p key={`${i}-${w}`} className="text-sm text-amber-400">
