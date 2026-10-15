@@ -304,3 +304,11 @@ Chặng 2 làm xong và dựng thử thật được. Chỗ code đã khác sơ 
 - **Phong cách:** `VideoTemplate` không có `preload`; khai báo `fonts` và worker tự nạp. Hàm vẽ nhận `Canvas2D` (tập con context 2D) để test được trên Node. Cảnh mở đầu dùng hoạ tiết chấm vẽ bằng code thay ảnh bản đồ; chuyển cảnh là cắt thẳng.
 - **Số đo thật** (Chromium, tin 37 s): dựng mất khoảng 100 s (2,7× thời lượng), MP4 27,9 MB (trung bình 6 Mbps, đặt 8 Mbps), giọng giả −16,7 dB. Ngưỡng cho chặng 3: dựng ≤ 1,5× thời lượng trên máy của Hải; cân nhắc hạ bitrate xuống 5 Mbps.
 - **Việc đầu tiên của chặng 3** (từ review toàn nhánh chặng 2): (1) nhả bộ giải mã video của từng cảnh khi hết cảnh; (2) nền mờ chuẩn bị sẵn một lần mỗi cảnh thay vì blur 48 px mỗi khung (đo trước/sau); (3) bộ giới hạn đỉnh mềm có lookahead, đo lại với giọng thật; (4) probe trong worker (`self.fonts`, `ctx.filter`) trước bước tạo giọng; (5) `FakeStockProvider` đổi sang PNG/JPEG; (6) `Narration.durationSec` đo ở client sau khi cắt khoảng lặng đầu/cuối; (7) snapshot/restore cho domain để lưu IndexedDB; (8) tách `DEV_SAMPLE`, tạo `src/client/container.ts`.
+
+### Kết quả đo chặng 3A (2026-10-15, Chromium nhúng, giọng Edge Hoài My)
+
+- **Tốc độ dựng:** tin 39,8 s dựng hình mất 18,1 s (0,45× thời lượng; chặng 2 là 2,7×). Mục tiêu ≤ 1,5× đạt với biên lớn. Tổng từ lúc bấm nút (6 đoạn giọng, nạp, trộn, dựng) là khoảng 32 s.
+- **Tệp:** MP4 28,9 MB (bitrate vẫn 8 Mbps; hạ xuống 5 Mbps là quyết định của Hải).
+- **Âm:** đoạn có tiếng −17,06 dB RMS, đỉnh 0,723 (trần 0,89), 48 kHz.
+- **Hình:** nền mờ thu nhỏ trông mượt, không vỡ ô; dòng nguồn tin không chạm logo góc phải.
+- **Hủy và dựng lại** chạy đúng. **Chưa kiểm trên trình duyệt thật:** `RenderClient.probe()` (3C gọi từ giao diện thì kiểm) và bộ giới hạn đỉnh với giọng Google/MiniMax thật.

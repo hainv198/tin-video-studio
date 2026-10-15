@@ -69,11 +69,18 @@ export class TheAnh28Template extends VideoTemplate {
     const B = LAYOUT.body;
 
     if (scene.image) {
-      const full = coverRect(scene.image.width, scene.image.height, { x: 0, y: 0, w: width, h: height });
-      const backdrop = kenBurnsRect(full, 1, 1, B.backdropScale);
-      ctx.filter = `blur(${LAYOUT.blurPx}px)`;
-      ctx.drawImage(scene.image.source, backdrop.x, backdrop.y, backdrop.w, backdrop.h);
-      ctx.filter = "none";
+      if (scene.backdrop) {
+        // nền mờ đã được thu nhỏ sẵn: phóng ra toàn khung bằng nội suy
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(scene.backdrop.source, 0, 0, width, height);
+      } else {
+        const full = coverRect(scene.image.width, scene.image.height, { x: 0, y: 0, w: width, h: height });
+        const backdrop = kenBurnsRect(full, 1, 1, B.backdropScale);
+        ctx.filter = `blur(${LAYOUT.blurPx}px)`;
+        ctx.drawImage(scene.image.source, backdrop.x, backdrop.y, backdrop.w, backdrop.h);
+        ctx.filter = "none";
+      }
       ctx.fillStyle = `rgba(0,0,0,${B.backdropShade})`;
       ctx.fillRect(0, 0, width, height);
       this.drawClipped(ctx, scene.image, B.band, this.progress(scene));
@@ -89,12 +96,17 @@ export class TheAnh28Template extends VideoTemplate {
 
   protected drawOverlay(ctx: Canvas2D, project: ProjectFrame, scene: SceneFrame): void {
     const C = LAYOUT.credit;
+    // vùng cho phép của dòng nguồn tin: tới mép trái huy hiệu logo (cảnh thân bài) hoặc mép phải khung (cảnh mở đầu)
+    const limit =
+      (scene.role === "body" ? this.cornerLogoBox(ctx, project).badgeX - C.gapToLogo : LAYOUT.frame.width - C.rightMargin) -
+      C.x;
     ctx.font = font(600, C.fontPx);
     ctx.fillStyle = WHITE;
     ctx.textBaseline = "top";
     ctx.textAlign = "left";
+    const measure = (s: string) => ctx.measureText(s).width;
     const lines = project.sourceCredit ? [`THEO: ${upper(project.sourceCredit)}`, "ẢNH: TỔNG HỢP"] : ["ẢNH: TỔNG HỢP"];
-    lines.forEach((line, i) => ctx.fillText(line, C.x, C.y + i * C.lineHeight));
+    lines.forEach((line, i) => ctx.fillText(wrapText(line, limit, measure, 1)[0] ?? "", C.x, C.y + i * C.lineHeight));
     if (scene.role === "body") this.drawCornerLogo(ctx, project);
   }
 
@@ -190,13 +202,19 @@ export class TheAnh28Template extends VideoTemplate {
     ctx.fillText(text, x + D.padX, y + D.h / 2);
   }
 
-  private drawCornerLogo(ctx: Canvas2D, project: ProjectFrame): void {
+  /** Vị trí huy hiệu logo và chữ tên kênh ở góc trên phải (cảnh thân bài). Đặt font của ctx về font tên kênh. */
+  private cornerLogoBox(ctx: Canvas2D, project: ProjectFrame): { name: string; textX: number; badgeX: number } {
     const G = LAYOUT.logo;
     const name = this.channelName(project);
     ctx.font = font(800, G.fontPx);
-    const textW = ctx.measureText(name).width;
-    const textX = LAYOUT.frame.width - G.right - textW;
-    this.drawLogoBadge(ctx, project, textX - G.gap - G.size, G.y, G.size);
+    const textX = LAYOUT.frame.width - G.right - ctx.measureText(name).width;
+    return { name, textX, badgeX: textX - G.gap - G.size };
+  }
+
+  private drawCornerLogo(ctx: Canvas2D, project: ProjectFrame): void {
+    const G = LAYOUT.logo;
+    const { name, textX, badgeX } = this.cornerLogoBox(ctx, project);
+    this.drawLogoBadge(ctx, project, badgeX, G.y, G.size);
     ctx.font = font(800, G.fontPx);
     ctx.fillStyle = WHITE;
     ctx.textAlign = "left";
