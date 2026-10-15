@@ -17,9 +17,16 @@ describe("buildServerContainer", () => {
   });
 
   it("không bật giả lập thì bắt buộc có đủ key thật", () => {
-    expect(() => buildServerContainer(base)).toThrow("GOOGLE_TTS_API_KEY chưa được cấu hình");
+    expect(() => buildServerContainer(base)).toThrow("Cần GOOGLE_TTS_API_KEY hoặc GEMINI_API_KEY");
     expect(() => buildServerContainer({ ...base, GOOGLE_TTS_API_KEY: "g" })).toThrow("PEXELS_API_KEY chưa được cấu hình");
     expect(buildServerContainer({ ...base, ...realKeys }).usingFakes).toBe(false);
+  });
+
+  it("không có Google nhưng có Gemini thì Gemini đứng một mình", async () => {
+    const c = buildServerContainer({ ...base, PEXELS_API_KEY: "p", PIXABAY_API_KEY: "x", GEMINI_API_KEY: "gm" });
+    const names = (await c.tts.voices()).map((v) => v.name);
+    expect(names[0]).toBe("vi-VN-Gemini-Kore");
+    expect(names.every((n: string) => n.startsWith("vi-VN-Gemini-"))).toBe(true);
   });
 
   it("cấm giả lập trên production của Vercel", () => {

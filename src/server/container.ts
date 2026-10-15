@@ -38,11 +38,14 @@ export function buildServerContainer(env: Record<string, string | undefined>): S
   const sessions = new SessionService(env.AUTH_SECRET ?? "");
   const auth = new AuthController(users, new BcryptPasswordHasher(), sessions);
 
-  const baseTts: TtsProvider = usingFakes
+  // Giọng nền: giả lập khi dev; Google Cloud khi có key. Không có Google thì Gemini/MiniMax đứng một mình được.
+  const baseTts: TtsProvider | undefined = usingFakes
     ? env.EDGE_TTS_DEV === "1"
       ? new EdgeCliTtsProvider({ bin: env.EDGE_TTS_BIN })
       : new FakeTtsProvider()
-    : new GoogleTtsService(env.GOOGLE_TTS_API_KEY ?? "");
+    : env.GOOGLE_TTS_API_KEY?.trim()
+      ? new GoogleTtsService(env.GOOGLE_TTS_API_KEY.trim())
+      : undefined;
   const ttsProvider = composeTts(baseTts, env);
   const stockProviders: StockProvider[] = usingFakes
     ? [new FakeStockProvider()]
@@ -59,10 +62,14 @@ export function buildServerContainer(env: Record<string, string | undefined>): S
   };
 }
 
-/** MiniMax và Gemini đều tuỳ chọn. Thứ tự danh sách giọng: MiniMax (giọng clone), Gemini, rồi giọng nền. */
-function composeTts(base: TtsProvider, env: Record<string, string | undefined>): TtsProvider {
+/** MiniMax và Gemini đều tuỳ chọn. Thứ tự danh sách giọng: MiniMax (giọng clone), Gemini, rồi giọng nền (nếu có). */
+function composeTts(base: TtsProvider | undefined, env: Record<string, string | undefined>): TtsProvider {
   const candidates: Array<RoutedTtsProvider | undefined> = [buildMiniMax(env), buildGemini(env)];
   const optional = candidates.filter((p): p is RoutedTtsProvider => p !== undefined);
+  if (!base && optional.length === 0) {
+    throw new Error("Cần GOOGLE_TTS_API_KEY hoặc GEMINI_API_KEY (hoặc MiniMax) để tạo giọng đọc");
+  }
+  if (!base) return new RoutingTtsProvider(optional);
   if (optional.length === 0) return base;
   return new RoutingTtsProvider([...optional, routed(base, (voiceName) => !optional.some((p) => p.owns(voiceName)))]);
 }

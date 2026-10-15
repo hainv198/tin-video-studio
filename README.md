@@ -22,7 +22,7 @@ Web app dựng video tin tức dọc 9:16 từ văn bản. Video dựng trên tr
 
 ## Chạy với key thật
 
-Bỏ `FAKE_PROVIDERS`, điền `GOOGLE_TTS_API_KEY`, `PEXELS_API_KEY`, `PIXABAY_API_KEY`.
+Bỏ `FAKE_PROVIDERS`, điền `PEXELS_API_KEY`, `PIXABAY_API_KEY` và ít nhất một nguồn giọng: `GOOGLE_TTS_API_KEY` (Google Cloud, cần thẻ) hoặc `GEMINI_API_KEY` (AI Studio, không cần thẻ) hoặc MiniMax. Có nhiều nguồn thì danh sách giọng gộp lại: MiniMax, Gemini, rồi Google.
 
 ## Giọng clone MiniMax (tuỳ chọn)
 

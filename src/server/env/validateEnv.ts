@@ -30,9 +30,11 @@ export function validateEnv(env: Record<string, string | undefined>): EnvCheck {
     if (deployed) problems.push("FAKE_PROVIDERS=1 không được bật trên production (Vercel)");
     else summary.push("Nhà cung cấp: GIẢ LẬP (chỉ để phát triển)");
   } else {
-    for (const key of ["GOOGLE_TTS_API_KEY", "PEXELS_API_KEY", "PIXABAY_API_KEY"] as const) {
+    for (const key of ["PEXELS_API_KEY", "PIXABAY_API_KEY"] as const) {
       if (!env[key] || !env[key]!.trim()) problems.push(`${key} trống (bỏ FAKE_PROVIDERS thì phải có key thật)`);
     }
+    const hasTts = Boolean(env.GOOGLE_TTS_API_KEY?.trim() || env.GEMINI_API_KEY?.trim() || (env.MINIMAX_API_KEY?.trim() && env.MINIMAX_VOICES?.trim()));
+    if (!hasTts) problems.push("Cần GOOGLE_TTS_API_KEY hoặc GEMINI_API_KEY để tạo giọng đọc (bỏ FAKE_PROVIDERS thì phải có ít nhất một)");
     summary.push(`Google TTS: ${set(env.GOOGLE_TTS_API_KEY)}; Pexels: ${set(env.PEXELS_API_KEY)}; Pixabay: ${set(env.PIXABAY_API_KEY)}`);
   }
 
