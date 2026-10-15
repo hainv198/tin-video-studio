@@ -215,4 +215,12 @@ describe("DevRenderController", () => {
     await check;
     expect(c.state.status).toBe("working");
   });
+
+  it("tần số mẫu giải mã khác 48 kHz thì báo lỗi, không dựng", async () => {
+    const d = deps({ decode: async () => ({ channels: [new Float32Array(44100)], durationSec: 1, sampleRate: 44100 }) });
+    const c = new DevRenderController(d);
+    await c.render("vi-VN-Fake-A");
+    expect(c.state).toEqual({ status: "error", message: "Âm thanh giải mã sai tần số mẫu (44100 Hz thay vì 48000 Hz)" });
+    expect(d.jobs).toHaveLength(0);
+  });
 });

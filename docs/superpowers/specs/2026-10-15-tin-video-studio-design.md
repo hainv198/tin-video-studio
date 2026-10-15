@@ -294,3 +294,13 @@ Chạy trong trình duyệt từ origin `http://localhost:3100`: `fetch(url, { m
 curl kèm `Origin`: cả hai CDN trả `Access-Control-Allow-Origin: *` cho GET (Pixabay không trả header này cho HEAD).
 
 **Kết luận:** trình duyệt tải thẳng từ CDN, **không cần route proxy** trên Vercel, không vướng giới hạn 4,5 MB. Cách đọc media ở chặng 2: luôn `fetch` thành blob trước (canvas không bị khoá), không gán thẳng URL CDN vào `<img>`/`<video>`. Video Pixabay trả 200 cho yêu cầu Range (không trả 206) nên phải tải nguyên file; chặng 2 chọn bản ≤ 1920 cạnh dài như đã làm ở `PixabayService`.
+
+## 12. Cập nhật theo code chặng 2 (2026-10-15)
+
+Chặng 2 làm xong và dựng thử thật được. Chỗ code đã khác sơ đồ ở mục 4.2 và 5; chặng 3 đi theo code, không theo sơ đồ cũ:
+
+- **Trộn âm** là hàm thuần `mixProgram` (`src/client/media/AudioMix.ts`), chạy trong worker; không dùng `OfflineAudioContext` để trộn. `OfflineAudioContext` chỉ dùng ở luồng chính để giải mã giọng/nhạc về 48 kHz (`AudioDecodeService`). Mức đo: giọng −16,5 dB RMS có cổng −45 dB (không dùng LUFS −14).
+- **Dựng hình:** `VideoRenderer` (vòng lặp thuần) + `Mp4Encoder` (mediabunny) + `render.worker.ts` + `RenderClient` (thay cho `FrameRenderer`, `VideoEncoderService`, `workers/render.worker.ts` trong sơ đồ).
+- **Phong cách:** `VideoTemplate` không có `preload`; khai báo `fonts` và worker tự nạp. Hàm vẽ nhận `Canvas2D` (tập con context 2D) để test được trên Node. Cảnh mở đầu dùng hoạ tiết chấm vẽ bằng code thay ảnh bản đồ; chuyển cảnh là cắt thẳng.
+- **Số đo thật** (Chromium, tin 37 s): dựng mất khoảng 100 s (2,7× thời lượng), MP4 27,9 MB (trung bình 6 Mbps, đặt 8 Mbps), giọng giả −16,7 dB. Ngưỡng cho chặng 3: dựng ≤ 1,5× thời lượng trên máy của Hải; cân nhắc hạ bitrate xuống 5 Mbps.
+- **Việc đầu tiên của chặng 3** (từ review toàn nhánh chặng 2): (1) nhả bộ giải mã video của từng cảnh khi hết cảnh; (2) nền mờ chuẩn bị sẵn một lần mỗi cảnh thay vì blur 48 px mỗi khung (đo trước/sau); (3) bộ giới hạn đỉnh mềm có lookahead, đo lại với giọng thật; (4) probe trong worker (`self.fonts`, `ctx.filter`) trước bước tạo giọng; (5) `FakeStockProvider` đổi sang PNG/JPEG; (6) `Narration.durationSec` đo ở client sau khi cắt khoảng lặng đầu/cuối; (7) snapshot/restore cho domain để lưu IndexedDB; (8) tách `DEV_SAMPLE`, tạo `src/client/container.ts`.

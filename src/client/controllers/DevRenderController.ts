@@ -56,6 +56,14 @@ export type DevRenderState =
   | { status: "error"; message: string };
 
 const SAMPLE_RATE = 48000;
+
+/** Giọng và nhạc phải cùng tần số mẫu với bản trộn; lệch sẽ sai cao độ và nhịp mà không báo lỗi. */
+function checkRate(decoded: DecodedAudio): DecodedAudio {
+  if (decoded.sampleRate !== SAMPLE_RATE) {
+    throw new Error(`Âm thanh giải mã sai tần số mẫu (${decoded.sampleRate} Hz thay vì ${SAMPLE_RATE} Hz)`);
+  }
+  return decoded;
+}
 const STAGE_LABEL: Record<Progress["stage"], string> = {
   loading: "Nạp font và cảnh trám",
   audio: "Trộn âm thanh",
@@ -104,13 +112,15 @@ export class DevRenderController {
       const narrations: RenderJob["narrations"] = [];
       for (const [i, scene] of project.scenes.entries()) {
         this.set({ status: "working", label: `Tạo giọng ${i + 1}/${project.scenes.length}`, percent: (i / project.scenes.length) * 20 });
-        const decoded = await this.deps.decode(await this.deps.tts.synthesize(scene.text, voice.voiceName, voice.speakingRate));
+        const decoded = checkRate(
+          await this.deps.decode(await this.deps.tts.synthesize(scene.text, voice.voiceName, voice.speakingRate)),
+        );
         this.throwIfCancelled();
         narrations.push({ sceneId: scene.id, durationSec: decoded.durationSec, samples: AudioDecodeService.toMono(decoded.channels) });
       }
 
       this.set({ status: "working", label: "Nạp nhạc nền", percent: 20 });
-      const music = await this.deps.decode(await this.deps.fetchBytes(DEV_SAMPLE.musicUrl));
+      const music = checkRate(await this.deps.decode(await this.deps.fetchBytes(DEV_SAMPLE.musicUrl)));
       this.throwIfCancelled();
       const track = MusicTrack.create({ id: "ban-tin-mac-dinh", title: "Bản tin", origin: "library", uri: DEV_SAMPLE.musicUrl });
 
