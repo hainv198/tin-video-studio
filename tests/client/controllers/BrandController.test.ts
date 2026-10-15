@@ -18,7 +18,7 @@ describe("BrandController", () => {
     const { ctrl, session } = setup();
     await ctrl.load("theanh28");
     expect(ctrl.state.values.channelName).toBe("TIN NHANH");
-    expect(ctrl.state.specs.map((s) => s.key)).toEqual(["channelName", "primaryColor", "logo"]);
+    expect(ctrl.state.specs.map((s) => s.key)).toEqual(["channelName", "primaryColor", "logo", "titleFontPx"]);
     expect(session.state.brand.values.channelName).toBe("TIN NHANH");
     expect(session.state.brand.logo).toBeNull();
   });

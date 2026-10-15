@@ -31,7 +31,7 @@ const draw = (p: ProjectFrame, s: SceneFrame) => {
 describe("TheAnh28Template — khai báo", () => {
   it("id, trường thương hiệu, mặc định, font", () => {
     expect(t.id).toBe("theanh28");
-    expect(t.brandFields.map((f) => f.key)).toEqual(["channelName", "primaryColor", "logo"]);
+    expect(t.brandFields.map((f) => f.key)).toEqual(["channelName", "primaryColor", "logo", "titleFontPx"]);
     expect(t.defaults).toMatchObject({ width: 1080, height: 1920, fps: 30, fallbackKeyword: "news" });
     expect(t.fonts.map((f) => f.url)).toEqual([
       "/templates/theanh28/fonts/BarlowCondensed-SemiBold.ttf",
@@ -66,6 +66,26 @@ describe("TheAnh28Template — cảnh mở đầu", () => {
   it("vẽ ảnh vào nửa trên và có dải chuyển màu chủ đạo", () => {
     expect(c.ops("drawImage").some((x) => x.args[0] === image.source)).toBe(true);
     expect(c.ops("createLinearGradient")).toHaveLength(1);
+  });
+});
+
+describe("TheAnh28Template — cỡ chữ tiêu đề mở đầu", () => {
+  const title = "Khởi tố nguyên Chủ tịch UBND xã vì lạm quyền, tự ý bán trụ sở";
+  const titleLines = (px: string | undefined) => {
+    const brand = BrandKit.create("theanh28", t.brandFields, { channelName: "28 News", titleFontPx: px });
+    const c = draw(project({ displayTitle: title, brand }), scene({ role: "intro" }));
+    const font = `800 ${px ?? "64"}px`;
+    return c.ops("fillText").filter((x) => x.state.font.startsWith(font));
+  };
+
+  it("mặc định 64px ngắt 3 dòng", () => {
+    expect(titleLines(undefined)).toHaveLength(3);
+  });
+
+  it("52px ngắt 2 dòng, dùng đúng cỡ chữ và giãn dòng theo tỉ lệ", () => {
+    const calls = titleLines("52");
+    expect(calls).toHaveLength(2);
+    expect((calls[1]!.args[2] as number) - (calls[0]!.args[2] as number)).toBe(Math.round(52 * (78 / 64)));
   });
 });
 

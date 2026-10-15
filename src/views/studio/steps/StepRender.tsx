@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import type { Studio } from "@/client/controllers/createStudio";
+import { VIDEO_BITRATE_CHOICES, VIDEO_QUALITY_LABELS, type VideoQuality } from "@/client/render/encodingDefaults";
 import { useController } from "@/views/hooks/useController";
 
 export function StepRender({ studio }: { studio: Studio }) {
@@ -28,6 +29,21 @@ export function StepRender({ studio }: { studio: Studio }) {
           Hãy dùng Chrome hoặc Edge bản mới. Thiếu: {render.missing.join(", ")}
         </p>
       )}
+      <fieldset className="flex flex-col gap-2 text-sm" disabled={working}>
+        <legend className="mb-1 font-medium">Chất lượng video</legend>
+        {(Object.keys(VIDEO_BITRATE_CHOICES) as VideoQuality[]).map((q) => (
+          <label key={q} className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="chat-luong-video"
+              value={q}
+              checked={render.quality === q}
+              onChange={() => studio.render.setQuality(q)}
+            />
+            {VIDEO_QUALITY_LABELS[q]}
+          </label>
+        ))}
+      </fieldset>
       <div className="flex gap-3">
         <button
           type="button"
@@ -61,7 +77,7 @@ export function StepRender({ studio }: { studio: Studio }) {
             {render.durationSec.toFixed(1)} giây, {(render.sizeBytes / 1024 / 1024).toFixed(1)} MB
           </p>
           {render.stale && (
-            <p className="text-sm text-amber-400">Kết quả này dựng trước khi bạn sửa dự án, hãy dựng lại để cập nhật.</p>
+            <p className="text-sm text-amber-400">Kết quả này không còn khớp với dự án hoặc lựa chọn hiện tại, hãy dựng lại để cập nhật.</p>
           )}
           {render.warnings.map((w, i) => (
             <p key={`${i}-${w}`} className="text-sm text-amber-400">

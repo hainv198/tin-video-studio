@@ -41,8 +41,11 @@ export function BrandPanel({ studio, templateId }: { studio: Studio; templateId:
           <label key={spec.key} className="flex flex-col gap-1 text-sm">
             {spec.label}
             <input
-              type={spec.type === "color" ? "color" : "text"}
+              type={spec.type === "color" ? "color" : spec.type === "number" ? "number" : "text"}
               maxLength={spec.maxLength}
+              min={spec.min}
+              max={spec.max}
+              step={spec.type === "number" ? 1 : undefined}
               className="rounded-md bg-neutral-800 px-3 py-2"
               value={brand.values[spec.key] ?? ""}
               onChange={(e) => studio.brand.setValue(spec.key, e.target.value)}

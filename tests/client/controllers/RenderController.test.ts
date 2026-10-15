@@ -8,7 +8,7 @@ import { makeSessionWithProject } from "../../helpers/studioFixtures";
 const job = { templateId: "theanh28" } as unknown as RenderJob;
 
 function setup(opts: {
-  build?: () => Promise<{ job: RenderJob; warnings: string[] }>;
+  build?: (data: unknown, onProgress?: unknown, isCancelled?: unknown, options?: unknown) => Promise<{ job: RenderJob; warnings: string[] }>;
   render?: RenderControllerRender;
   support?: () => Promise<{ ok: boolean; missing: string[] }>;
   probeWorker?: () => Promise<string[]>;
@@ -50,6 +50,7 @@ describe("RenderController", () => {
       fileName: "tieu-de-ban-tin_20261014.mp4",
       warnings: ["Cảnh báo thử"],
       stale: false,
+      quality: "standard",
     });
   });
 
@@ -92,7 +93,7 @@ describe("RenderController", () => {
   it("lỗi thì báo thông điệp tiếng Việt; hết phiên thì onAuthLost", async () => {
     const failing = setup({ build: async () => { throw new Error("Lỗi bộ dựng: không rõ"); } });
     await failing.ctrl.start();
-    expect(failing.ctrl.state).toEqual({ status: "error", message: "Lỗi bộ dựng: không rõ" });
+    expect(failing.ctrl.state).toEqual({ status: "error", message: "Lỗi bộ dựng: không rõ", quality: "standard" });
 
     const expired = setup({ build: async () => { throw new ApiError(401, "AUTH", "Hết phiên đăng nhập, hãy đăng nhập lại"); } });
     await expired.ctrl.start();
@@ -107,7 +108,7 @@ describe("RenderController", () => {
       },
     });
     await ctrl.start();
-    expect(ctrl.state).toEqual({ status: "idle" });
+    expect(ctrl.state).toEqual({ status: "idle", quality: "standard" });
     ctrl.cancel();
     expect(cancelRender).toHaveBeenCalled();
   });
@@ -124,7 +125,7 @@ describe("RenderController", () => {
   it("trình duyệt thiếu khả năng thì khoá bước dựng", async () => {
     const { ctrl } = setup({ support: async () => ({ ok: false, missing: ["VideoEncoder"] }) });
     await ctrl.checkSupport();
-    expect(ctrl.state).toEqual({ status: "unsupported", missing: ["VideoEncoder"] });
+    expect(ctrl.state).toEqual({ status: "unsupported", missing: ["VideoEncoder"], quality: "standard" });
     await ctrl.start();
     expect(ctrl.state.status).toBe("unsupported");
   });
@@ -132,11 +133,11 @@ describe("RenderController", () => {
   it("worker thiếu khả năng hoặc không phản hồi cũng khoá bước dựng", async () => {
     const missing = setup({ probeWorker: async () => ["Canvas 2D trong worker"] });
     await missing.ctrl.checkSupport();
-    expect(missing.ctrl.state).toEqual({ status: "unsupported", missing: ["Canvas 2D trong worker"] });
+    expect(missing.ctrl.state).toEqual({ status: "unsupported", missing: ["Canvas 2D trong worker"], quality: "standard" });
 
     const silent = setup({ probeWorker: async () => { throw new Error("Bộ dựng không phản hồi"); } });
     await silent.ctrl.checkSupport();
-    expect(silent.ctrl.state).toEqual({ status: "unsupported", missing: ["Bộ dựng không phản hồi"] });
+    expect(silent.ctrl.state).toEqual({ status: "unsupported", missing: ["Bộ dựng không phản hồi"], quality: "standard" });
   });
 
   it("reset thu hồi url bản đã dựng và về idle; giữ unsupported", async () => {
@@ -144,11 +145,11 @@ describe("RenderController", () => {
     await a.ctrl.start();
     a.ctrl.reset();
     expect(a.revoked).toEqual(["blob:0"]);
-    expect(a.ctrl.state).toEqual({ status: "idle" });
+    expect(a.ctrl.state).toEqual({ status: "idle", quality: "standard" });
     const b = setup({ support: async () => ({ ok: false, missing: ["VideoEncoder"] }) });
     await b.ctrl.checkSupport();
     b.ctrl.reset();
-    expect(b.ctrl.state).toEqual({ status: "unsupported", missing: ["VideoEncoder"] });
+    expect(b.ctrl.state).toEqual({ status: "unsupported", missing: ["VideoEncoder"], quality: "standard" });
   });
 
   function gate() {
@@ -187,7 +188,7 @@ describe("RenderController", () => {
     ok.ctrl.reset();
     g.release();
     await run;
-    expect(ok.ctrl.state).toEqual({ status: "idle" });
+    expect(ok.ctrl.state).toEqual({ status: "idle", quality: "standard" });
     expect(ok.urls).toEqual([]);
 
     const g2 = gate();
@@ -202,7 +203,7 @@ describe("RenderController", () => {
     bad.ctrl.reset();
     g2.release();
     await run2;
-    expect(bad.ctrl.state).toEqual({ status: "idle" });
+    expect(bad.ctrl.state).toEqual({ status: "idle", quality: "standard" });
   });
 
   it("checkSupport: kết quả không hỗ trợ về muộn không đè lên trạng thái đang dùng", async () => {
@@ -230,7 +231,7 @@ describe("RenderController", () => {
     });
     ctrlRef = made.ctrl;
     await made.ctrl.start();
-    expect(made.ctrl.state).toEqual({ status: "idle" });
+    expect(made.ctrl.state).toEqual({ status: "idle", quality: "standard" });
     expect(made.urls).toEqual([]);
   });
 
@@ -239,6 +240,46 @@ describe("RenderController", () => {
     await ctrl.start();
     expect(ctrl.state.status).toBe("error");
     ctrl.reset();
-    expect(ctrl.state).toEqual({ status: "idle" });
+    expect(ctrl.state).toEqual({ status: "idle", quality: "standard" });
+  });
+
+  it("setQuality(light): lượt dựng sau truyền bitrate 5 Mbps cho bộ dựng; mặc định 8 Mbps", async () => {
+    const calls: unknown[] = [];
+    const build = vi.fn(async (_d: unknown, _p: unknown, _c: unknown, options?: unknown) => {
+      calls.push(options);
+      return { job, warnings: [] };
+    });
+    const { ctrl } = setup({ build });
+    await ctrl.start();
+    ctrl.setQuality("light");
+    expect(ctrl.state.quality).toBe("light");
+    await ctrl.start();
+    expect(calls).toEqual([{ videoBitrate: 8_000_000 }, { videoBitrate: 5_000_000 }]);
+    expect(ctrl.state).toMatchObject({ status: "done", quality: "light" });
+  });
+
+  it("setQuality khi đã dựng xong: giữ video nhưng đánh dấu cũ; reset giữ lựa chọn", async () => {
+    const { ctrl } = setup();
+    await ctrl.start();
+    ctrl.setQuality("light");
+    expect(ctrl.state).toMatchObject({ status: "done", stale: true, quality: "light" });
+    ctrl.reset();
+    expect(ctrl.state).toEqual({ status: "idle", quality: "light" });
+  });
+
+  it("setQuality khi đang dựng thì bị bỏ qua", async () => {
+    const g = gate();
+    const { ctrl } = setup({
+      render: async () => {
+        await g.promise;
+        return { blob: new Blob(["mp4"]), durationSec: 1 };
+      },
+    });
+    const run = ctrl.start();
+    ctrl.setQuality("light");
+    expect(ctrl.state.quality).toBe("standard");
+    g.release();
+    await run;
+    expect(ctrl.state).toMatchObject({ status: "done", quality: "standard", stale: false });
   });
 });

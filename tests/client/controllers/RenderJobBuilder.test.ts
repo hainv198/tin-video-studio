@@ -144,4 +144,20 @@ describe("RenderJobBuilder — bitrate", () => {
     });
     expect((await light.build(data)).job.videoBitrate).toBe(5_000_000);
   });
+
+  it("tuỳ chọn của lượt dựng ghi đè bitrate mặc định của deps", async () => {
+    const { builder, data } = setup();
+    expect((await builder.build(data, undefined, undefined, { videoBitrate: 5_000_000 })).job.videoBitrate).toBe(5_000_000);
+    expect((await builder.build(data, undefined, undefined, {})).job.videoBitrate).toBeUndefined();
+    const heavy = new RenderJobBuilder({
+      templates: defaultTemplateRegistry(),
+      uploads: memoryUploads("u").uploads,
+      tracks: { bytes: async () => new ArrayBuffer(0) },
+      decoder: { decode: async () => ({ channels: [new Float32Array(48000)], sampleRate: 48000, durationSec: 1 }) },
+      origin: "http://localhost:3100",
+      videoBitrate: 8_000_000,
+    });
+    expect((await heavy.build(data, undefined, undefined, { videoBitrate: 5_000_000 })).job.videoBitrate).toBe(5_000_000);
+    expect((await heavy.build(data)).job.videoBitrate).toBe(8_000_000);
+  });
 });
