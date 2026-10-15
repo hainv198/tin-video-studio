@@ -41,6 +41,8 @@ describe("validateEnv", () => {
     expect(p).toMatch(/PEXELS_API_KEY/);
     expect(p).toMatch(/PIXABAY_API_KEY/);
     expect(p).not.toMatch(/GOOGLE_TTS_API_KEY/);
+    // Pexels đang tạm ngừng cấp key mới: chỉ Pixabay cũng đủ
+    expect(validateEnv({ ...base, GOOGLE_TTS_API_KEY: "g", PIXABAY_API_KEY: "x" }).ok).toBe(true);
   });
 
   it("EDGE_TTS_DEV khi deploy là lỗi", () => {

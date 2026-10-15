@@ -18,8 +18,13 @@ describe("buildServerContainer", () => {
 
   it("không bật giả lập thì bắt buộc có đủ key thật", () => {
     expect(() => buildServerContainer(base)).toThrow("Cần GOOGLE_TTS_API_KEY hoặc GEMINI_API_KEY");
-    expect(() => buildServerContainer({ ...base, GOOGLE_TTS_API_KEY: "g" })).toThrow("PEXELS_API_KEY chưa được cấu hình");
+    expect(() => buildServerContainer({ ...base, GOOGLE_TTS_API_KEY: "g" })).toThrow("Cần PEXELS_API_KEY hoặc PIXABAY_API_KEY");
     expect(buildServerContainer({ ...base, ...realKeys }).usingFakes).toBe(false);
+  });
+
+  it("chỉ có Pixabay (không Pexels) vẫn dựng được container", () => {
+    const c = buildServerContainer({ ...base, GEMINI_API_KEY: "gm", PIXABAY_API_KEY: "x" });
+    expect(c.usingFakes).toBe(false);
   });
 
   it("không có Google nhưng có Gemini thì Gemini đứng một mình", async () => {

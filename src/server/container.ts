@@ -47,9 +47,8 @@ export function buildServerContainer(env: Record<string, string | undefined>): S
       ? new GoogleTtsService(env.GOOGLE_TTS_API_KEY.trim())
       : undefined;
   const ttsProvider = composeTts(baseTts, env);
-  const stockProviders: StockProvider[] = usingFakes
-    ? [new FakeStockProvider()]
-    : [new PexelsService(env.PEXELS_API_KEY ?? ""), new PixabayService(env.PIXABAY_API_KEY ?? "")];
+  // Cảnh trám: dùng nguồn nào có key (Pexels đang tạm ngừng cấp key mới, nên chỉ Pixabay cũng chạy được).
+  const stockProviders: StockProvider[] = usingFakes ? [new FakeStockProvider()] : buildStockProviders(env);
 
   return {
     users,
@@ -60,6 +59,14 @@ export function buildServerContainer(env: Record<string, string | undefined>): S
     tts: new TtsController(ttsProvider),
     stock: new StockController(stockProviders),
   };
+}
+
+function buildStockProviders(env: Record<string, string | undefined>): StockProvider[] {
+  const providers: StockProvider[] = [];
+  if (env.PEXELS_API_KEY?.trim()) providers.push(new PexelsService(env.PEXELS_API_KEY.trim()));
+  if (env.PIXABAY_API_KEY?.trim()) providers.push(new PixabayService(env.PIXABAY_API_KEY.trim()));
+  if (providers.length === 0) throw new Error("Cần PEXELS_API_KEY hoặc PIXABAY_API_KEY để tìm cảnh trám");
+  return providers;
 }
 
 /** MiniMax và Gemini đều tuỳ chọn. Thứ tự danh sách giọng: MiniMax (giọng clone), Gemini, rồi giọng nền (nếu có). */
