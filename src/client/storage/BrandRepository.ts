@@ -29,6 +29,12 @@ export class BrandRepository {
     if (typeof value !== "object" || value === null) return null;
     const brand = value as Partial<StoredBrand>;
     if (typeof brand.values !== "object" || brand.values === null) return null;
-    return { values: brand.values, logo: brand.logo instanceof Blob ? brand.logo : null, updatedAt: String(brand.updatedAt ?? "") };
+    const values: Record<string, string> = {};
+    for (const [key, v] of Object.entries(brand.values)) if (typeof v === "string") values[key] = v;
+    return {
+      values,
+      logo: brand.logo instanceof Blob ? brand.logo : null,
+      updatedAt: typeof brand.updatedAt === "string" ? brand.updatedAt : "",
+    };
   }
 }

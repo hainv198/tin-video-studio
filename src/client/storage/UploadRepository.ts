@@ -16,6 +16,23 @@ export interface StoredUpload extends UploadMeta {
   blob: Blob;
 }
 
+const KINDS: readonly string[] = ["image", "video", "audio"];
+
+function isStoredUpload(v: unknown): v is StoredUpload {
+  if (typeof v !== "object" || v === null) return false;
+  const r = v as Record<string, unknown>;
+  return (
+    typeof r.id === "string" &&
+    typeof r.name === "string" &&
+    typeof r.kind === "string" &&
+    KINDS.includes(r.kind) &&
+    typeof r.size === "number" &&
+    Number.isFinite(r.size) &&
+    typeof r.addedAt === "string" &&
+    r.blob instanceof Blob
+  );
+}
+
 export class UploadRepository {
   constructor(
     private readonly store: KeyValueStore,
@@ -37,7 +54,8 @@ export class UploadRepository {
   }
 
   async get(id: string): Promise<StoredUpload | null> {
-    return (await this.store.get<StoredUpload>(`${PREFIX}${id}`)) ?? null;
+    const value = await this.store.get<unknown>(`${PREFIX}${id}`);
+    return isStoredUpload(value) ? value : null;
   }
 
   async delete(id: string): Promise<void> {
@@ -47,8 +65,8 @@ export class UploadRepository {
   async list(): Promise<UploadMeta[]> {
     const metas: UploadMeta[] = [];
     for (const key of await this.store.keys(PREFIX)) {
-      const stored = await this.store.get<StoredUpload>(key);
-      if (stored) metas.push({ id: stored.id, name: stored.name, kind: stored.kind, size: stored.size, addedAt: stored.addedAt });
+      const stored = await this.store.get<unknown>(key);
+      if (isStoredUpload(stored)) metas.push({ id: stored.id, name: stored.name, kind: stored.kind, size: stored.size, addedAt: stored.addedAt });
     }
     return metas.sort((a, b) => a.addedAt.localeCompare(b.addedAt) || a.id.localeCompare(b.id));
   }

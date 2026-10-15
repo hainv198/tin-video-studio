@@ -38,4 +38,12 @@ describe("BrandRepository", () => {
     await store.set("brand:t", "rác");
     expect(await new BrandRepository(store).load("t")).toBeNull();
   });
+
+  it("load lọc values về chuỗi và updatedAt luôn là chuỗi", async () => {
+    const store = new MemoryKeyValueStore();
+    await store.set("brand:t", { values: { a: "x", b: 5, c: null }, logo: null, updatedAt: 123 });
+    const brand = await new BrandRepository(store).load("t");
+    expect(brand?.values).toEqual({ a: "x" });
+    expect(brand?.updatedAt).toBe("");
+  });
 });

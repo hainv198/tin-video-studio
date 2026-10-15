@@ -1,4 +1,5 @@
 import { FootageBoard, type FootageBoardSnapshot } from "@/domain/FootageBoard";
+import { ValidationError } from "@/domain/errors";
 import type { IdGenerator } from "@/domain/ids";
 import { MusicTrack, type MusicTrackSnapshot } from "@/domain/MusicTrack";
 import { Narration, type NarrationSnapshot } from "@/domain/Narration";
@@ -40,6 +41,11 @@ export function buildDraftBody(parts: DraftParts): DraftBody {
 
 /** Dựng lại các đối tượng domain; mọi phần hỏng ném ValidationError. */
 export function restoreDraft(draft: DraftBody, nextId: IdGenerator): DraftParts {
+  const isObject = (v: unknown) => typeof v === "object" && v !== null;
+  if (!Array.isArray(draft.narrations)) throw new ValidationError("Bản nháp hỏng: thiếu danh sách giọng đọc");
+  if (!isObject(draft.footage)) throw new ValidationError("Bản nháp hỏng: dữ liệu bảng cảnh trám không hợp lệ");
+  if (draft.voice != null && !isObject(draft.voice)) throw new ValidationError("Bản nháp hỏng: dữ liệu giọng đọc không hợp lệ");
+  if (draft.music != null && !isObject(draft.music)) throw new ValidationError("Bản nháp hỏng: dữ liệu nhạc nền không hợp lệ");
   return {
     project: NewsProject.restore(draft.project, nextId),
     voice: draft.voice ? VoiceSettings.restore(draft.voice) : null,

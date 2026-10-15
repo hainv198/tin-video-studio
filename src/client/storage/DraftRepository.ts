@@ -10,7 +10,7 @@ export class DraftRepository {
   ) {}
 
   async save(body: DraftBody): Promise<void> {
-    const draft: ProjectDraft = { version: DRAFT_VERSION, savedAt: this.now().toISOString(), ...body };
+    const draft: ProjectDraft = { ...body, version: DRAFT_VERSION, savedAt: this.now().toISOString() };
     await this.store.set(KEY, draft);
   }
 

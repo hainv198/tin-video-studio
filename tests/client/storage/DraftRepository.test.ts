@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { DraftRepository } from "@/client/storage/DraftRepository";
 import { MemoryKeyValueStore } from "@/client/storage/KeyValueStore";
-import type { DraftBody } from "@/client/storage/ProjectDraft";
+import { restoreDraft, type DraftBody } from "@/client/storage/ProjectDraft";
+import { sequentialIds } from "@/domain/ids";
+import { Narration } from "@/domain/Narration";
+import { VoiceSettings } from "@/domain/VoiceSettings";
 
 const body: DraftBody = {
   project: {
@@ -49,5 +52,33 @@ describe("DraftRepository", () => {
     expect(await repo.load()).toBeNull();
     await store.set("draft", { version: 1 });
     expect(await repo.load()).toBeNull();
+  });
+
+  it("save ghi đè dấu version/savedAt cũ lẫn trong body đã load", async () => {
+    const repo = new DraftRepository(new MemoryKeyValueStore(), () => new Date("2026-10-15T09:00:00.000Z"));
+    const stale = { ...body, version: 7, savedAt: "2020-01-01T00:00:00.000Z" } as unknown as DraftBody;
+    await repo.save(stale);
+    const loaded = await repo.load();
+    expect(loaded?.version).toBe(1);
+    expect(loaded?.savedAt).toBe("2026-10-15T09:00:00.000Z");
+  });
+
+  it("round trip thật: Narration có audio Uint8Array qua repository và restoreDraft", async () => {
+    const voice = VoiceSettings.create("vi-VN-HoaiMyNeural", 1);
+    const narration = Narration.create({
+      sceneId: "s1",
+      text: "T.",
+      audio: new Uint8Array([9, 8, 7]),
+      mimeType: "audio/mpeg",
+      durationSec: 1.5,
+      voice,
+    });
+    const repo = new DraftRepository(new MemoryKeyValueStore());
+    await repo.save({ ...body, voice: voice.snapshot(), narrations: [narration.snapshot()] });
+    const loaded = await repo.load();
+    const restored = restoreDraft(loaded!, sequentialIds("n"));
+    const audio = restored.narrations[0]!.snapshot().audio;
+    expect(audio).toBeInstanceOf(Uint8Array);
+    expect(audio).toEqual(new Uint8Array([9, 8, 7]));
   });
 });

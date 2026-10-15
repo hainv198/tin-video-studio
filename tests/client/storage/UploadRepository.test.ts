@@ -45,4 +45,17 @@ describe("UploadRepository", () => {
     await repo.put(new Blob(["z"]), { name: "z", kind: "image" });
     expect((await repo.list()).map((m) => m.name)).toEqual(["z"]);
   });
+
+  it("bản ghi blob: hỏng bị bỏ qua khi list/totalBytes và get trả null", async () => {
+    const store = new MemoryKeyValueStore();
+    const repo = new UploadRepository(store, sequentialIds("u"));
+    await repo.put(new Blob(["abc"]), { name: "ok", kind: "image" });
+    await store.set("blob:rac", "rác");
+    await store.set("blob:thieu", { id: "x", name: "n", kind: "image", size: "5", addedAt: "t" });
+    await store.set("blob:kind", { id: "k", name: "n", kind: "gif", size: 5, addedAt: "t" });
+    expect((await repo.list()).map((m) => m.name)).toEqual(["ok"]);
+    expect(await repo.totalBytes()).toBe(3);
+    expect(await repo.get("rac")).toBeNull();
+    expect(await repo.get("thieu")).toBeNull();
+  });
 });

@@ -76,4 +76,20 @@ describe("buildDraftBody / restoreDraft", () => {
       restoreDraft({ ...body, footage: { assignments: [["s2", { kind: "gif", id: "x" } as never]] } }, sequentialIds("n")),
     ).toThrow(ValidationError);
   });
+
+  it("thiếu narrations hoặc sai kiểu container thì ném ValidationError tiếng Việt, không phải TypeError", () => {
+    const body = buildDraftBody(parts());
+    const { narrations: _omit, ...noNarrations } = body;
+    void _omit;
+    expect(() => restoreDraft(noNarrations as never, sequentialIds("n"))).toThrow(ValidationError);
+    expect(() => restoreDraft(noNarrations as never, sequentialIds("n"))).toThrow(/^Bản nháp hỏng/);
+    expect(() => restoreDraft({ ...body, footage: "rác" as never }, sequentialIds("n"))).toThrow(ValidationError);
+    expect(() => restoreDraft({ ...body, music: "rác" as never }, sequentialIds("n"))).toThrow(ValidationError);
+  });
+
+  it("giọng đọc có audio không phải Uint8Array thì ném ValidationError", () => {
+    const body = buildDraftBody(parts());
+    const bad = { ...body.narrations[0]!, audio: [1, 2, 3] as never };
+    expect(() => restoreDraft({ ...body, narrations: [bad] }, sequentialIds("n"))).toThrow(ValidationError);
+  });
 });
