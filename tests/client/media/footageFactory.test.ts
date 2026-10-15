@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stockItemToFootage, uploadToFootage } from "@/client/media/footageFactory";
+import { parseUploadUri, stockItemToFootage, uploadToFootage, uploadUri } from "@/client/media/footageFactory";
 import type { StockItemDto } from "@/client/services/StockClient";
 import { ValidationError } from "@/domain/errors";
 
@@ -48,5 +48,23 @@ describe("uploadToFootage", () => {
   it("video tải lên cần độ dài", () => {
     expect(uploadToFootage("f2", "upload-u2", "video", { width: 1080, height: 1920, durationSec: 7 }).kind).toBe("video");
     expect(() => uploadToFootage("f2", "upload-u2", "video", { width: 1, height: 1 })).toThrow("Video thiếu độ dài");
+  });
+});
+
+describe("uploadUri / parseUploadUri", () => {
+  it("uploadUri ghép tiền tố upload:", () => {
+    expect(uploadUri("upload-u1")).toBe("upload:upload-u1");
+  });
+
+  it("parseUploadUri trả id cho uri hợp lệ, null cho phần còn lại", () => {
+    expect(parseUploadUri("upload:upload-u1")).toBe("upload-u1");
+    expect(parseUploadUri(uploadUri("abc"))).toBe("abc");
+    expect(parseUploadUri("upload:")).toBeNull();
+    expect(parseUploadUri("https://f.jpg")).toBeNull();
+    expect(parseUploadUri("")).toBeNull();
+  });
+
+  it("uploadToFootage ném ValidationError khi uploadId rỗng", () => {
+    expect(() => uploadToFootage("f1", "", "image", { width: 1, height: 1 })).toThrow(ValidationError);
   });
 });

@@ -209,7 +209,14 @@ export class NewsProject {
     const structureOk =
       scenes.length >= 2 && scenes[0]?.role === "intro" && scenes.slice(1).every((s) => s.role === "body");
     if (!structureOk) throw new ValidationError("Bản nháp hỏng: cấu trúc cảnh không hợp lệ");
-    return new NewsProject(raw.title, credit, publishDate, raw.templateId, scenes, nextId);
+    const taken = new Set(scenes.map((s) => s.id));
+    const freshId: IdGenerator = () => {
+      let id = nextId();
+      while (taken.has(id)) id = nextId();
+      taken.add(id);
+      return id;
+    };
+    return new NewsProject(raw.title, credit, publishDate, raw.templateId, scenes, freshId);
   }
 
   private indexOf(id: string): number {

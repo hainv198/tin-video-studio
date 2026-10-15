@@ -221,3 +221,12 @@ describe("NewsProject restore: dữ liệu hỏng không rõ kiểu", () => {
     expect(p.formattedPublishDate()).toBe("14/10/2026");
   });
 });
+
+describe("NewsProject restore: bộ sinh id không đụng id đã có", () => {
+  it("splitScene sau restore với sequentialIds cùng tiền tố cho id duy nhất", () => {
+    const restored = NewsProject.restore(structuredClone(make().snapshot()), sequentialIds("s"));
+    const ids = restored.splitScene("s3", 5).scenes.map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toHaveLength(4);
+  });
+});

@@ -1,4 +1,13 @@
-import { ApiError } from "./AuthClient";
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
 
 export async function readApiError(response: Response): Promise<ApiError> {
   const body = (await response.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;

@@ -2,6 +2,9 @@
   "name": "tin-video-studio",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.2"
+  },
   "scripts": {
     "dev": "next dev -p 3100",
     "build": "next build",
