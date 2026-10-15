@@ -23,7 +23,7 @@ describe("GET /api/stock/search", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.items).toHaveLength(4);
-    expect(body.items[0].fullUrl.startsWith("data:image/svg+xml")).toBe(true);
+    expect(body.items[0].fullUrl.startsWith("data:image/png;base64,")).toBe(true);
     expect(body.warnings).toEqual([]);
   });
 

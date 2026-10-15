@@ -4,9 +4,12 @@ export interface DecodedAudio {
   sampleRate: number;
 }
 
+/** Tần số mẫu duy nhất của bản trộn: giọng, nhạc và bộ giải mã đều phải dùng giá trị này. */
+export const RENDER_SAMPLE_RATE = 48000;
+
 /** Giải mã MP3/WAV/M4A thành mẫu Float32 ở sampleRate cố định. Chỉ chạy ở luồng chính (cần Web Audio). */
 export class AudioDecodeService {
-  constructor(private readonly sampleRate = 48000) {}
+  constructor(private readonly sampleRate = RENDER_SAMPLE_RATE) {}
 
   async decode(bytes: ArrayBuffer): Promise<DecodedAudio> {
     // decodeAudioData tự lấy mẫu lại (resample) về tần số của context, nên tạo context ở sampleRate đích

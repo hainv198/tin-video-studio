@@ -1,4 +1,9 @@
-import { FallbackFootage, type Footage } from "./Footage";
+import { ValidationError } from "./errors";
+import { FallbackFootage, footageFromSnapshot, type Footage, type FootageSnapshot } from "./Footage";
+
+export interface FootageBoardSnapshot {
+  assignments: Array<[string, FootageSnapshot]>;
+}
 
 export class FootageBoard {
   private constructor(private readonly bySceneId: ReadonlyMap<string, Footage>) {}
@@ -52,5 +57,23 @@ export class FootageBoard {
 
   unassignedSceneIds(sceneIds: readonly string[]): string[] {
     return sceneIds.filter((id) => !this.bySceneId.has(id));
+  }
+
+  snapshot(): FootageBoardSnapshot {
+    return { assignments: [...this.bySceneId.entries()].map(([sceneId, footage]) => [sceneId, footage.snapshot()]) };
+  }
+
+  static restore(s: FootageBoardSnapshot): FootageBoard {
+    const raw = s as unknown as Record<string, unknown> | null;
+    if (typeof raw !== "object" || raw === null || !Array.isArray(raw.assignments)) {
+      throw new ValidationError("Bản nháp hỏng: dữ liệu bảng cảnh trám không hợp lệ");
+    }
+    const entries = raw.assignments.map((entry: unknown) => {
+      if (!Array.isArray(entry) || typeof entry[0] !== "string") {
+        throw new ValidationError("Bản nháp hỏng: gán cảnh trám không hợp lệ");
+      }
+      return [entry[0], footageFromSnapshot(entry[1] as FootageSnapshot)] as const;
+    });
+    return new FootageBoard(new Map(entries));
   }
 }

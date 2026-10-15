@@ -28,3 +28,29 @@ describe("VoiceSettings", () => {
     expect(b.equals(VoiceSettings.create("vi-VN-Neural2-A", 1.1))).toBe(true);
   });
 });
+
+describe("VoiceSettings snapshot / restore", () => {
+  it("round trip qua structuredClone", () => {
+    const v = VoiceSettings.create("vi-VN-Neural2-A", 1.1);
+    const s = v.snapshot();
+    expect(s).toEqual({ voiceName: "vi-VN-Neural2-A", speakingRate: 1.1 });
+    expect(VoiceSettings.restore(structuredClone(s)).equals(v)).toBe(true);
+  });
+
+  it("snapshot hỏng thì ném ValidationError", () => {
+    expect(() => VoiceSettings.restore({ voiceName: "x", speakingRate: 1 })).toThrow(ValidationError);
+    expect(() => VoiceSettings.restore({ voiceName: "vi-VN-Neural2-A", speakingRate: 5 })).toThrow(ValidationError);
+  });
+});
+
+describe("VoiceSettings restore: dữ liệu hỏng không rõ kiểu", () => {
+  const run = (v: unknown) => () => VoiceSettings.restore(v as never);
+
+  it("ném ValidationError thay vì TypeError", () => {
+    expect(run(null)).toThrow("Bản nháp hỏng");
+    expect(run(undefined)).toThrow(ValidationError);
+    expect(run({ voiceName: 5, speakingRate: 1 })).toThrow("Bản nháp hỏng");
+    expect(run({ speakingRate: 1 })).toThrow(ValidationError);
+    expect(run({ voiceName: "vi-VN-Neural2-A", speakingRate: "1" })).toThrow(ValidationError);
+  });
+});

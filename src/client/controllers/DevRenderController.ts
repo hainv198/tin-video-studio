@@ -3,7 +3,7 @@ import { NewsProject } from "@/domain/NewsProject";
 import { SentenceSplitter } from "@/domain/SentenceSplitter";
 import { VoiceSettings } from "@/domain/VoiceSettings";
 import { sequentialIds } from "@/domain/ids";
-import { AudioDecodeService, type DecodedAudio } from "@/client/media/AudioDecodeService";
+import { AudioDecodeService, RENDER_SAMPLE_RATE, type DecodedAudio } from "@/client/media/AudioDecodeService";
 import type { SupportReport } from "@/client/render/BrowserSupport";
 import { RenderCancelledError } from "@/client/render/errors";
 import type { FootageInput, RenderJob, WorkerMessage } from "@/client/render/RenderJob";
@@ -55,7 +55,7 @@ export type DevRenderState =
   | { status: "done"; url: string; durationSec: number; sizeBytes: number }
   | { status: "error"; message: string };
 
-const SAMPLE_RATE = 48000;
+const SAMPLE_RATE = RENDER_SAMPLE_RATE;
 
 /** Giọng và nhạc phải cùng tần số mẫu với bản trộn; lệch sẽ sai cao độ và nhịp mà không báo lỗi. */
 function checkRate(decoded: DecodedAudio): DecodedAudio {
