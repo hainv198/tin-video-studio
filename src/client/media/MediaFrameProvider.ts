@@ -21,6 +21,8 @@ export class ImageFrameProvider implements FrameProvider {
     return { source: this.bitmap, width: this.bitmap.width, height: this.bitmap.height };
   }
 
+  release(): void {}
+
   dispose(): void {
     this.bitmap.close();
   }
@@ -78,8 +80,17 @@ export class VideoFrameProvider implements FrameProvider {
     return frame ? { source: frame.canvas, width: frame.canvas.width, height: frame.canvas.height } : null;
   }
 
-  dispose(): void {
+  /** Nhả bộ giải mã và canvas giữ trong bộ đệm; `frameAt` sau đó tự mở lại bộ đọc. */
+  release(): void {
     void this.iterator?.return();
+    this.iterator = null;
+    this.current = null;
+    this.upcoming = null;
+    this.lastTime = -1;
+  }
+
+  dispose(): void {
+    this.release();
     this.input.dispose();
   }
 }

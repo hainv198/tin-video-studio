@@ -23,19 +23,25 @@ class LogTemplate extends VideoTemplate {
 
 class CountingFrames implements FrameProvider {
   readonly asked: number[] = [];
+  releases = 0;
   readonly image: DrawableImage = { source: {} as CanvasImageSource, width: 10, height: 10 };
   async frameAt(t: number) {
     this.asked.push(t);
     return this.image;
+  }
+  release(): void {
+    this.releases++;
   }
   dispose(): void {}
 }
 
 class Sink implements VideoFrameSink {
   readonly stamps: number[] = [];
+  constructor(private readonly onAdd?: (count: number) => void) {}
   async add(ts: number, dur: number) {
     this.stamps.push(ts);
     expect(dur).toBeCloseTo(1 / 10, 9);
+    this.onAdd?.(this.stamps.length);
   }
 }
 
@@ -47,19 +53,20 @@ const project: ProjectFrame = {
   logo: null,
 };
 
-function setup(signal?: AbortSignal) {
+function setup(opts: { signal?: AbortSignal; onAdd?: (count: number) => void } = {}) {
   // a: 0 → 0.3+0.7+0.35 = 1.35 ; b: 1.35 → 1.35+0.5+0.6 = 2.45  ⇒ 25 khung ở 10 fps
   const timeline = Timeline.build([
     { sceneId: "a", durationSec: 0.7 },
     { sceneId: "b", durationSec: 0.5 },
   ]);
+  const introFrames = new CountingFrames();
   const videoFrames = new CountingFrames();
   const scenes = new Map<string, RenderScene>([
-    ["a", { sceneId: "a", role: "intro", text: "A", playback: { mode: "still" }, frames: new CountingFrames() }],
+    ["a", { sceneId: "a", role: "intro", text: "A", playback: { mode: "still" }, frames: introFrames }],
     ["b", { sceneId: "b", role: "body", text: "B", playback: { mode: "loop", sourceDurationSec: 0.4 }, frames: videoFrames }],
   ]);
   const template = new LogTemplate();
-  const sink = new Sink();
+  const sink = new Sink(opts.onAdd);
   const progress: number[] = [];
   const renderer = new VideoRenderer({
     template,
@@ -70,9 +77,9 @@ function setup(signal?: AbortSignal) {
     fps: 10,
     sink,
     onProgress: (p) => progress.push(p.frame),
-    signal,
+    signal: opts.signal,
   });
-  return { renderer, template, sink, progress, videoFrames };
+  return { renderer, template, sink, progress, introFrames, videoFrames };
 }
 
 describe("VideoRenderer", () => {
@@ -105,7 +112,39 @@ describe("VideoRenderer", () => {
   it("huỷ giữa chừng ném RenderCancelledError", async () => {
     const controller = new AbortController();
     controller.abort();
-    const { renderer } = setup(controller.signal);
+    const { renderer } = setup({ signal: controller.signal });
     await expect(renderer.render()).rejects.toBeInstanceOf(RenderCancelledError);
+  });
+
+  it("nhả bộ giải mã của mỗi cảnh đúng một lần khi hết cảnh", async () => {
+    const { renderer, introFrames, videoFrames } = setup();
+    await renderer.render();
+    expect(introFrames.releases).toBe(1);
+    expect(videoFrames.releases).toBe(1);
+  });
+
+  it("cảnh trước được nhả TRƯỚC khi cảnh sau lấy khung đầu tiên", async () => {
+    const { renderer, introFrames, videoFrames } = setup();
+    let releasesWhenSecondSceneStarted = -1;
+    const original = videoFrames.frameAt.bind(videoFrames);
+    videoFrames.frameAt = async (t: number) => {
+      if (videoFrames.asked.length === 0) releasesWhenSecondSceneStarted = introFrames.releases;
+      return original(t);
+    };
+    await renderer.render();
+    expect(releasesWhenSecondSceneStarted).toBe(1);
+  });
+
+  it("huỷ giữa cảnh đầu vẫn nhả cảnh đang chạy, không đụng cảnh chưa tới", async () => {
+    const controller = new AbortController();
+    const { renderer, introFrames, videoFrames } = setup({
+      signal: controller.signal,
+      onAdd: (count) => {
+        if (count === 3) controller.abort();
+      },
+    });
+    await expect(renderer.render()).rejects.toBeInstanceOf(RenderCancelledError);
+    expect(introFrames.releases).toBe(1);
+    expect(videoFrames.releases).toBe(0);
   });
 });
