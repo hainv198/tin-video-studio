@@ -1,6 +1,6 @@
 import { NotFoundError, ValidationError } from "./errors";
 import type { IdGenerator } from "./ids";
-import { Scene } from "./Scene";
+import { Scene, type SceneRole } from "./Scene";
 import type { SentenceSplitter } from "./SentenceSplitter";
 
 export interface NewsProjectInput {
@@ -17,6 +17,47 @@ interface NewsProjectMeta {
   templateId?: string;
 }
 
+const MAX_CREDIT_CHARS = 80;
+
+function checkedCredit(raw: string): string {
+  const credit = raw.trim();
+  if (credit.length > MAX_CREDIT_CHARS) throw new ValidationError(`Nguồn tin tối đa ${MAX_CREDIT_CHARS} ký tự`);
+  return credit;
+}
+
+function checkedDate(date: Date): Date {
+  if (Number.isNaN(date.getTime())) throw new ValidationError("Ngày đăng không hợp lệ");
+  return date;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+function toLocalDateString(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function parseLocalDate(text: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (!m) throw new ValidationError("Ngày đăng không hợp lệ");
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const date = new Date(y, mo - 1, d);
+  if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) {
+    throw new ValidationError("Ngày đăng không hợp lệ");
+  }
+  return date;
+}
+
+export interface NewsProjectSnapshot {
+  title: string;
+  sourceCredit: string;
+  /** yyyy-mm-dd theo giờ địa phương (không dùng ISO để khỏi lệch múi giờ). */
+  publishDate: string;
+  templateId: string;
+  scenes: Array<{ id: string; text: string; role: SceneRole }>;
+}
+
 const comparable = (s: string) =>
   s
     .replace(/[.!?…\s]+$/u, "")
@@ -25,6 +66,8 @@ const comparable = (s: string) =>
     .toLocaleLowerCase("vi");
 
 export class NewsProject {
+  static readonly MAX_CREDIT_CHARS = MAX_CREDIT_CHARS;
+
   private constructor(
     readonly title: string,
     readonly sourceCredit: string,
@@ -36,6 +79,8 @@ export class NewsProject {
 
   static fromText(input: NewsProjectInput, splitter: SentenceSplitter, nextId: IdGenerator): NewsProject {
     if (!input.templateId) throw new ValidationError("Chưa chọn phong cách video");
+    const credit = checkedCredit(input.sourceCredit);
+    const publishDate = checkedDate(input.publishDate);
     const sentences = splitter.split(input.text);
     const typedTitle = input.title?.replace(/\s+/g, " ").trim();
     const firstSentence = sentences[0];
@@ -47,7 +92,7 @@ export class NewsProject {
     if (body.length === 0) throw new ValidationError("Tin cần ít nhất một câu ngoài tiêu đề");
 
     const scenes = [Scene.create(nextId(), title, "intro"), ...body.map((s) => Scene.create(nextId(), s, "body"))];
-    return new NewsProject(title, input.sourceCredit.trim(), input.publishDate, input.templateId, scenes, nextId);
+    return new NewsProject(title, credit, publishDate, input.templateId, scenes, nextId);
   }
 
   get introScene(): Scene {
@@ -116,12 +161,33 @@ export class NewsProject {
     if (meta.templateId !== undefined && !meta.templateId) throw new ValidationError("Chưa chọn phong cách video");
     return new NewsProject(
       this.title,
-      meta.sourceCredit !== undefined ? meta.sourceCredit.trim() : this.sourceCredit,
-      meta.publishDate ?? this.publishDate,
+      meta.sourceCredit !== undefined ? checkedCredit(meta.sourceCredit) : this.sourceCredit,
+      meta.publishDate !== undefined ? checkedDate(meta.publishDate) : this.publishDate,
       meta.templateId ?? this.templateId,
       this.scenes,
       this.nextId,
     );
+  }
+
+  snapshot(): NewsProjectSnapshot {
+    return {
+      title: this.title,
+      sourceCredit: this.sourceCredit,
+      publishDate: toLocalDateString(this.publishDate),
+      templateId: this.templateId,
+      scenes: this.scenes.map((s) => ({ id: s.id, text: s.text, role: s.role })),
+    };
+  }
+
+  static restore(snapshot: NewsProjectSnapshot, nextId: IdGenerator): NewsProject {
+    if (!snapshot.templateId) throw new ValidationError("Chưa chọn phong cách video");
+    const credit = checkedCredit(snapshot.sourceCredit);
+    const publishDate = parseLocalDate(snapshot.publishDate);
+    const scenes = snapshot.scenes.map((s) => Scene.create(s.id, s.text, s.role));
+    const structureOk =
+      scenes.length >= 2 && scenes[0]?.role === "intro" && scenes.slice(1).every((s) => s.role === "body");
+    if (!structureOk) throw new ValidationError("Bản nháp hỏng: cấu trúc cảnh không hợp lệ");
+    return new NewsProject(snapshot.title, credit, publishDate, snapshot.templateId, scenes, nextId);
   }
 
   private indexOf(id: string): number {

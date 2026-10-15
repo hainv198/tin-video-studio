@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NewsProject, type NewsProjectInput } from "@/domain/NewsProject";
+import { NewsProject, type NewsProjectInput, type NewsProjectSnapshot } from "@/domain/NewsProject";
 import { SentenceSplitter } from "@/domain/SentenceSplitter";
 import { sequentialIds } from "@/domain/ids";
 import { NotFoundError, ValidationError } from "@/domain/errors";
@@ -116,5 +116,57 @@ describe("NewsProject chỉnh sửa", () => {
   it("totalChars cộng độ dài mọi cảnh", () => {
     const p = make();
     expect(p.totalChars).toBe(p.scenes.reduce((n, s) => n + s.text.length, 0));
+  });
+});
+
+describe("NewsProject kiểm dữ liệu vào", () => {
+  it("chặn ngày đăng không hợp lệ", () => {
+    expect(() => make({ publishDate: new Date(Number.NaN) })).toThrow("Ngày đăng không hợp lệ");
+    expect(() => make().withMeta({ publishDate: new Date("rác") })).toThrow("Ngày đăng không hợp lệ");
+  });
+
+  it("chặn nguồn tin quá 80 ký tự, nhận đúng 80", () => {
+    expect(() => make({ sourceCredit: "x".repeat(81) })).toThrow("Nguồn tin tối đa 80 ký tự");
+    expect(make({ sourceCredit: "x".repeat(80) }).sourceCredit).toHaveLength(80);
+    expect(() => make().withMeta({ sourceCredit: "y".repeat(81) })).toThrow("Nguồn tin tối đa 80 ký tự");
+  });
+});
+
+describe("NewsProject snapshot / restore", () => {
+  it("snapshot là dữ liệu thuần, ngày dạng yyyy-mm-dd theo giờ địa phương", () => {
+    const s = make().snapshot();
+    expect(s).toMatchObject({
+      sourceCredit: "Đức Phong - VietNamNet",
+      publishDate: "2026-10-14",
+      templateId: "theanh28",
+    });
+    expect(s.scenes.map((x) => [x.id, x.role])).toEqual([
+      ["s1", "intro"],
+      ["s2", "body"],
+      ["s3", "body"],
+    ]);
+    expect(s.title).toBe(s.scenes[0]?.text);
+    expect(structuredClone(s)).toEqual(s);
+  });
+
+  it("restore dựng lại đúng dự án và dùng tiếp được (gộp, tách cảnh với bộ sinh id mới)", () => {
+    const original = make();
+    const restored = NewsProject.restore(structuredClone(original.snapshot()), sequentialIds("n"));
+    expect(restored.snapshot()).toEqual(original.snapshot());
+    expect(restored.formattedPublishDate()).toBe("14/10/2026");
+    expect(restored.mergeWithNext("s2").bodyScenes).toHaveLength(1);
+    expect(restored.splitScene("s3", 5).scenes.map((s) => s.id)).toContain("n1");
+  });
+
+  it("bản nháp hỏng thì ném ValidationError", () => {
+    const good = make().snapshot();
+    const bad = (patch: Partial<NewsProjectSnapshot>) => () => NewsProject.restore({ ...good, ...patch }, sequentialIds("n"));
+    expect(bad({ publishDate: "2026-13-40" })).toThrow("Ngày đăng không hợp lệ");
+    expect(bad({ publishDate: "14/10/2026" })).toThrow("Ngày đăng không hợp lệ");
+    expect(bad({ scenes: [] })).toThrow("Bản nháp hỏng");
+    expect(bad({ scenes: good.scenes.map((s) => ({ ...s, role: "body" as const })) })).toThrow("Bản nháp hỏng");
+    expect(bad({ scenes: [{ id: "x", text: "  ", role: "intro" }, ...good.scenes.slice(1)] })).toThrow(ValidationError);
+    expect(bad({ templateId: "" })).toThrow("Chưa chọn phong cách video");
+    expect(bad({ sourceCredit: "z".repeat(81) })).toThrow("Nguồn tin tối đa 80 ký tự");
   });
 });

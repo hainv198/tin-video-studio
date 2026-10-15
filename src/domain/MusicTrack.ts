@@ -10,6 +10,14 @@ export interface MusicTrackProps {
   gainOffsetDb?: number;
 }
 
+export interface MusicTrackSnapshot {
+  id: string;
+  title: string;
+  origin: MusicOrigin;
+  uri: string;
+  gainOffsetDb: number;
+}
+
 export class MusicTrack {
   static readonly MIN_OFFSET_DB = -6;
   static readonly MAX_OFFSET_DB = 6;
@@ -38,5 +46,16 @@ export class MusicTrack {
 
   get levelBelowVoiceDb(): number {
     return MusicTrack.BELOW_VOICE_DB - this.gainOffsetDb;
+  }
+
+  snapshot(): MusicTrackSnapshot {
+    return { id: this.id, title: this.title, origin: this.origin, uri: this.uri, gainOffsetDb: this.gainOffsetDb };
+  }
+
+  static restore(s: MusicTrackSnapshot): MusicTrack {
+    if (s.origin !== "library" && s.origin !== "upload") {
+      throw new ValidationError("Bản nháp hỏng: nguồn nhạc không hợp lệ");
+    }
+    return MusicTrack.create({ id: s.id, title: s.title, origin: s.origin, uri: s.uri, gainOffsetDb: s.gainOffsetDb });
   }
 }

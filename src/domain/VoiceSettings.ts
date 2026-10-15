@@ -2,6 +2,11 @@ import { ValidationError } from "./errors";
 
 const VOICE_NAME = /^[a-z]{2}-[A-Z]{2}-[A-Za-z0-9-]+$/;
 
+export interface VoiceSnapshot {
+  voiceName: string;
+  speakingRate: number;
+}
+
 export class VoiceSettings {
   static readonly MIN_RATE = 0.8;
   static readonly MAX_RATE = 1.3;
@@ -28,5 +33,13 @@ export class VoiceSettings {
 
   equals(other: VoiceSettings): boolean {
     return this.voiceName === other.voiceName && this.speakingRate === other.speakingRate;
+  }
+
+  snapshot(): VoiceSnapshot {
+    return { voiceName: this.voiceName, speakingRate: this.speakingRate };
+  }
+
+  static restore(s: VoiceSnapshot): VoiceSettings {
+    return VoiceSettings.create(s.voiceName, s.speakingRate);
   }
 }
