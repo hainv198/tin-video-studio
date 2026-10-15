@@ -34,6 +34,7 @@ export class Mp4Encoder implements VideoFrameSink {
   }
 
   async addAudio(mix: StereoMix): Promise<void> {
+    if (mix.left.length !== mix.right.length) throw new Error("Hai kênh âm thanh phải cùng độ dài");
     const chunk = Math.round(AUDIO_CHUNK_SEC * mix.sampleRate);
     for (let start = 0; start < mix.left.length; start += chunk) {
       const frames = Math.min(chunk, mix.left.length - start);

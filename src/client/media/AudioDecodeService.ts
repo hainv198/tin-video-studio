@@ -13,7 +13,7 @@ export class AudioDecodeService {
     // là đủ để đầu ra luôn đúng sampleRate đó, bất kể tần số gốc của file.
     const ctx = new OfflineAudioContext(2, 1, this.sampleRate);
     const buffer = await ctx.decodeAudioData(bytes.slice(0));
-    const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) => buffer.getChannelData(i).slice());
+    const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) => buffer.getChannelData(i));
     return { channels, durationSec: buffer.duration, sampleRate: buffer.sampleRate };
   }
 

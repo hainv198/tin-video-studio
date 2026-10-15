@@ -48,16 +48,18 @@ export class VideoFrameProvider implements FrameProvider {
       input.dispose();
       throw new Error("File video không có hình");
     }
-    const w = await track.getCodedWidth();
-    const h = await track.getCodedHeight();
+    const w = await track.getDisplayWidth();
+    const h = await track.getDisplayHeight();
     const scale = Math.min(1, maxSide / Math.max(w, h));
     const width = Math.round(w * scale);
     const height = Math.round(h * scale);
-    const sink = new CanvasSink(track, { width, height, fit: "fill" });
-    const durationSec = await input.computeDuration();
+    // poolSize 3: bộ đọc giữ tối đa hai canvas cùng lúc (hiện tại và kế tiếp)
+    const sink = new CanvasSink(track, { width, height, fit: "fill", poolSize: 3 });
+    const durationSec = await track.computeDuration();
     return new VideoFrameProvider(input, sink, durationSec, width, height);
   }
 
+  /** Phải gọi tuần tự, không chồng lệnh. */
   async frameAt(sourceTime: number): Promise<DrawableImage | null> {
     if (this.iterator === null || sourceTime < this.lastTime) {
       await this.iterator?.return();
