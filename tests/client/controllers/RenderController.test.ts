@@ -49,7 +49,20 @@ describe("RenderController", () => {
       sizeBytes: 3,
       fileName: "tieu-de-ban-tin_20261014.mp4",
       warnings: ["Cảnh báo thử"],
+      stale: false,
     });
+  });
+
+  it("markStale đánh dấu bản đã dựng là cũ một lần, bỏ qua khi chưa xong", async () => {
+    const { ctrl } = setup();
+    ctrl.markStale();
+    expect(ctrl.state.status).toBe("idle");
+    await ctrl.start();
+    ctrl.markStale();
+    expect(ctrl.state).toMatchObject({ status: "done", stale: true });
+    const after = ctrl.state;
+    ctrl.markStale();
+    expect(ctrl.state).toBe(after);
   });
 
   it("tiến độ: 0–25 % chuẩn bị, 25–95 % dựng hình", async () => {

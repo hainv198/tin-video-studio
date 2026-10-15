@@ -77,6 +77,9 @@ export function createStudio(services: ClientServices, options: StudioOptions = 
     onAuthLost,
   });
 
+  // Session chỉ báo khi dữ liệu dự án đổi; RenderController không ghi vào session nên không tự kích hoạt.
+  session.subscribe(() => render.markStale());
+
   const footage = new FootageController({ session, uploads: services.uploads, probe: services.probe, ids, onAuthLost });
   const voice = new VoiceController({ session, tts: services.tts, decoder: services.decoder, onAuthLost });
   const music = new MusicController({

@@ -1,5 +1,5 @@
 import { IDBFactory } from "fake-indexeddb";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createStudio } from "@/client/controllers/createStudio";
 import { createClientServices, type ClientEnv } from "@/client/container";
 import { SAMPLE_NEWS } from "@/client/sample/sampleNews";
@@ -36,6 +36,14 @@ describe("createStudio", () => {
     const studio = createStudio(services, { onAuthLost: () => lost++, schedule: () => () => {} });
     await studio.voice.loadVoices();
     expect(lost).toBe(1);
+    studio.dispose();
+  });
+
+  it("mỗi lần session đổi dữ liệu thì render.markStale được gọi", () => {
+    const studio = createStudio(createClientServices(env()), { schedule: () => () => {} });
+    const spy = vi.spyOn(studio.render, "markStale");
+    studio.session.update((d) => ({ ...d }));
+    expect(spy).toHaveBeenCalled();
     studio.dispose();
   });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Studio } from "@/client/controllers/createStudio";
 import { useController } from "@/views/hooks/useController";
 
@@ -8,28 +8,27 @@ export function StepMusic({ studio }: { studio: Studio }) {
   const data = useController(studio.session);
   const music = useController(studio.music);
   const playing = useRef<{ audio: HTMLAudioElement; url: string; trackId: string } | null>(null);
+  const seq = useRef(0);
+  const [playingId, setPlayingId] = useState<string | null>(null);
 
   useEffect(() => {
     void studio.music.loadLibrary();
   }, [studio]);
 
   function stop() {
+    seq.current++;
     if (!playing.current) return;
     playing.current.audio.pause();
     studio.services.env.revokeUrl(playing.current.url);
     playing.current = null;
+    setPlayingId(null);
   }
+  const stopRef = useRef(stop);
+  useEffect(() => {
+    stopRef.current = stop;
+  });
 
-  useEffect(
-    () => () => {
-      if (playing.current) {
-        playing.current.audio.pause();
-        studio.services.env.revokeUrl(playing.current.url);
-        playing.current = null;
-      }
-    },
-    [studio],
-  );
+  useEffect(() => () => stopRef.current(), []);
 
   const selected = data.music;
   const known = [...music.library, ...music.uploaded];
@@ -43,13 +42,16 @@ export function StepMusic({ studio }: { studio: Studio }) {
     if (wasPlaying) return;
     const track = tracks.find((t) => t.id === trackId);
     if (!track) return;
+    const req = ++seq.current;
     const blob = await studio.music.previewBlob(track);
-    if (!blob) return;
+    if (!blob || req !== seq.current) return;
     const url = studio.services.env.createUrl(blob);
     const audio = new Audio(url);
     audio.onended = () => stop();
+    audio.onerror = () => stop();
     playing.current = { audio, url, trackId };
-    void audio.play();
+    setPlayingId(trackId);
+    audio.play().catch(() => stop());
   }
 
   return (
@@ -76,7 +78,7 @@ export function StepMusic({ studio }: { studio: Studio }) {
               {track.origin === "upload" && <span className="text-xs text-neutral-500">(của bạn)</span>}
             </label>
             <button type="button" className="rounded-md bg-neutral-800 px-3 py-1" onClick={() => void toggle(track.id)}>
-              Nghe thử
+              {playingId === track.id ? "Dừng" : "Nghe thử"}
             </button>
           </li>
         ))}

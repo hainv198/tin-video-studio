@@ -12,7 +12,7 @@ export type RenderState =
   | { status: "idle" }
   | { status: "unsupported"; missing: string[] }
   | { status: "working"; label: string; percent: number }
-  | { status: "done"; url: string; durationSec: number; sizeBytes: number; fileName: string; warnings: string[] }
+  | { status: "done"; url: string; durationSec: number; sizeBytes: number; fileName: string; warnings: string[]; stale: boolean }
   | { status: "error"; message: string };
 
 export interface RenderControllerDeps {
@@ -84,6 +84,7 @@ export class RenderController extends StateController<RenderState> {
         sizeBytes: result.blob.size,
         fileName: fileNameFor(project.displayTitle, project.publishDate),
         warnings,
+        stale: false,
       });
     } catch (error) {
       if (error instanceof RenderCancelledError) {
@@ -92,6 +93,11 @@ export class RenderController extends StateController<RenderState> {
       }
       this.set({ status: "error", message: this.report(error) });
     }
+  }
+
+  /** Dự án đổi sau khi dựng xong: giữ video nhưng đánh dấu đã cũ. */
+  markStale(): void {
+    if (this.state.status === "done" && !this.state.stale) this.set({ ...this.state, stale: true });
   }
 
   cancel(): void {

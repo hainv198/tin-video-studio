@@ -21,7 +21,7 @@ export function StepRender({ studio }: { studio: Studio }) {
     <div className="flex flex-col gap-4">
       <h2 className="text-lg font-semibold">Dựng và tải về</h2>
       <p className="text-sm text-neutral-400">
-        {project.scenes.length} cảnh, giọng đọc khoảng {voiceSeconds.toFixed(0)} giây, nhạc: {data.music ? data.music.title : "không dùng"}.
+        {project.scenes.length} cảnh, giọng gốc khoảng {voiceSeconds.toFixed(0)} giây, nhạc: {data.music ? data.music.title : "không dùng"}.
       </p>
       {render.status === "unsupported" && (
         <p role="alert" className="text-red-400">
@@ -60,8 +60,11 @@ export function StepRender({ studio }: { studio: Studio }) {
           <p className="text-sm text-neutral-400">
             {render.durationSec.toFixed(1)} giây, {(render.sizeBytes / 1024 / 1024).toFixed(1)} MB
           </p>
-          {render.warnings.map((w) => (
-            <p key={w} className="text-sm text-amber-400">
+          {render.stale && (
+            <p className="text-sm text-amber-400">Kết quả này dựng trước khi bạn sửa dự án, hãy dựng lại để cập nhật.</p>
+          )}
+          {render.warnings.map((w, i) => (
+            <p key={`${i}-${w}`} className="text-sm text-amber-400">
               {w}
             </p>
           ))}
