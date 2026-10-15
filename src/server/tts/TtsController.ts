@@ -5,8 +5,8 @@ import type { SynthesisResult, TtsProvider, TtsVoice } from "./TtsProvider";
 
 const SynthesisSchema = z.object({
   text: z.string(),
-  voiceName: z.string().regex(/^[a-z]{2}-[A-Z]{2}-[A-Za-z0-9-]+$/),
-  speakingRate: z.number().min(VoiceSettings.MIN_RATE).max(VoiceSettings.MAX_RATE),
+  voiceName: z.string(),
+  speakingRate: z.number(),
 });
 
 export class TtsController {
@@ -37,6 +37,10 @@ export class TtsController {
     if (text.length > TtsController.MAX_CHARS) {
       throw new PayloadTooLargeError(`Mỗi lần tạo giọng tối đa ${TtsController.MAX_CHARS} ký tự`);
     }
-    return this.provider.synthesize({ ...parsed.data, text });
+    if (!parsed.data.voiceName.startsWith(`${TtsController.LANGUAGE}-`)) {
+      throw new ValidationError("Chỉ hỗ trợ giọng tiếng Việt (vi-VN)");
+    }
+    const voice = VoiceSettings.create(parsed.data.voiceName, parsed.data.speakingRate);
+    return this.provider.synthesize({ text, voiceName: voice.voiceName, speakingRate: voice.speakingRate });
   }
 }

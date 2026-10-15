@@ -26,7 +26,7 @@ function encode(args: string[]): void {
     process.exitCode = 1;
     return;
   }
-  const json = JSON.stringify(JSON.parse(readFileSync(file, "utf8")));
+  const json = JSON.stringify(JSON.parse(readFileSync(file, "utf8").replace(/^\uFEFF/, "")));
   UserDirectory.fromEnv(json);
   console.log(Buffer.from(json, "utf8").toString("base64"));
 }

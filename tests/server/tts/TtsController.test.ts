@@ -47,4 +47,18 @@ describe("TtsController", () => {
       c.synthesize({ text: "a".repeat(5001), voiceName: "vi-VN-Neural2-A", speakingRate: 1 }),
     ).rejects.toBeInstanceOf(PayloadTooLargeError);
   });
+
+  it("chỉ nhận giọng vi-VN", async () => {
+    const p = provider();
+    await expect(
+      new TtsController(p).synthesize({ text: "a", voiceName: "en-US-Studio-O", speakingRate: 1 }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(p.synthesize).not.toHaveBeenCalled();
+  });
+
+  it("làm tròn tốc độ qua VoiceSettings", async () => {
+    const p = provider();
+    await new TtsController(p).synthesize({ text: "a", voiceName: "vi-VN-Neural2-A", speakingRate: 1.0749 });
+    expect(p.synthesize).toHaveBeenCalledWith({ text: "a", voiceName: "vi-VN-Neural2-A", speakingRate: 1.07 });
+  });
 });

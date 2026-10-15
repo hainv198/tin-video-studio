@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { interleave, StockController } from "@/server/stock/StockController";
 import type { StockItem, StockProvider } from "@/server/stock/StockProvider";
 import { QuotaError, ValidationError } from "@/domain/errors";
@@ -42,6 +42,23 @@ describe("StockController", () => {
     const r = await new StockController([failing("pexels"), ok("pixabay", 1)]).search({ q: "x", kind: "video" });
     expect(r.items).toHaveLength(1);
     expect(r.warnings).toEqual(["pexels: pexels hết lượt"]);
+  });
+
+  it("nguồn lỗi lạ: không lộ nội dung lỗi trong cảnh báo", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const weird: StockProvider = {
+        name: "pexels",
+        search: async () => {
+          throw new TypeError("Cannot read properties of undefined");
+        },
+      };
+      const r = await new StockController([weird, ok("pixabay", 1)]).search({ q: "x", kind: "image" });
+      expect(r.warnings).toEqual(["pexels: lỗi không rõ"]);
+      expect(spy).toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("mọi nguồn lỗi: ném lỗi của nguồn cuối", async () => {

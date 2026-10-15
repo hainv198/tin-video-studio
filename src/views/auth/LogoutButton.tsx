@@ -13,9 +13,12 @@ export function LogoutButton() {
       type="button"
       className="rounded-md bg-neutral-800 px-3 py-1 text-sm"
       onClick={async () => {
-        await controller.logout();
-        router.replace("/dang-nhap");
-        router.refresh();
+        try {
+          await controller.logout();
+        } finally {
+          router.replace("/dang-nhap");
+          router.refresh();
+        }
       }}
     >
       Đăng xuất

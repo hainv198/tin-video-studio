@@ -62,9 +62,14 @@ describe("SessionController", () => {
 describe("safeNextPath", () => {
   it("chỉ nhận đường dẫn nội bộ, còn lại về /studio", () => {
     expect(safeNextPath(null)).toBe("/studio");
-    expect(safeNextPath("/studio/x")).toBe("/studio/x");
+    expect(safeNextPath("")).toBe("/studio");
+    expect(safeNextPath("/studio/x?a=1#h")).toBe("/studio/x?a=1#h");
     expect(safeNextPath("//evil.example")).toBe("/studio");
     expect(safeNextPath("/\\evil")).toBe("/studio");
+    expect(safeNextPath("/\t/evil.example")).toBe("/studio");
+    expect(safeNextPath("/\n/evil.example")).toBe("/studio");
+    expect(safeNextPath("/\r/evil.example")).toBe("/studio");
     expect(safeNextPath("https://evil.example")).toBe("/studio");
+    expect(safeNextPath("/")).toBe("/");
   });
 });

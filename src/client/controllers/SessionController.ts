@@ -6,10 +6,19 @@ export type LoginState =
   | { status: "error"; message: string }
   | { status: "done"; displayName: string };
 
-/** Chỉ nhận đường dẫn nội bộ ("/x"); chặn "//host", "/\host" và URL tuyệt đối để tránh open redirect. */
+const INTERNAL_ORIGIN = "http://internal.invalid";
+const FALLBACK_PATH = "/studio";
+
+/** Chỉ nhận đường dẫn nội bộ: phân giải bằng bộ phân tích URL (nó bỏ tab/xuống dòng, đổi "\\" thành "/") rồi kiểm origin. */
 export function safeNextPath(next: string | null): string {
-  if (next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\")) return next;
-  return "/studio";
+  if (!next || !next.startsWith("/")) return FALLBACK_PATH;
+  try {
+    const url = new URL(next, INTERNAL_ORIGIN);
+    if (url.origin !== INTERNAL_ORIGIN) return FALLBACK_PATH;
+    return url.pathname + url.search + url.hash;
+  } catch {
+    return FALLBACK_PATH;
+  }
 }
 
 export class SessionController {

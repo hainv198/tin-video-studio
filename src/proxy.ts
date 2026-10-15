@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SessionService } from "@/server/auth/SessionService";
 
-const PUBLIC_PATHS = new Set(["/dang-nhap", "/api/auth/login"]);
+const PUBLIC_PATHS = new Set(["/dang-nhap", "/api/auth/login", "/api/auth/logout"]);
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

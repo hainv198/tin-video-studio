@@ -13,7 +13,9 @@ export function makeStockSearchGet(getDeps: () => StockRouteDeps): (request: Req
     async (request) => {
       const params = Object.fromEntries(new URL(request.url).searchParams);
       const result = await getDeps().stock.search(params);
-      return Response.json(result, { headers: { "Cache-Control": "private, max-age=300" } });
+      return Response.json(result, {
+        headers: { "Cache-Control": result.warnings.length > 0 ? "no-store" : "private, max-age=300" },
+      });
     },
   );
 }

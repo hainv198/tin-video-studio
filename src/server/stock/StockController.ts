@@ -46,8 +46,13 @@ export class StockController {
         return;
       }
       lastError = result.reason;
-      const message = result.reason instanceof Error ? result.reason.message : "lỗi không rõ";
-      warnings.push(`${this.providers[i]?.name}: ${message}`);
+      const name = this.providers[i]?.name;
+      if (result.reason instanceof DomainError) {
+        warnings.push(`${name}: ${result.reason.message}`);
+      } else {
+        console.error(result.reason);
+        warnings.push(`${name}: lỗi không rõ`);
+      }
     });
 
     if (lists.length === 0) {
