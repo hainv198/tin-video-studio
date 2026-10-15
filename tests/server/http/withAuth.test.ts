@@ -37,4 +37,11 @@ describe("withAuth", () => {
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: { code: "INTERNAL", message: "Lỗi máy chủ" } });
   });
+
+  it("cookie phần trăm sai định dạng: 401 thay vì 500", async () => {
+    const { auth } = await makeTestAuth();
+    const handler = withAuth(() => auth, async () => new Response("ok"));
+    const res = await handler(new Request("http://localhost/api/x", { headers: { cookie: "tvs_session=%E0%A4%A" } }));
+    expect(res.status).toBe(401);
+  });
 });
