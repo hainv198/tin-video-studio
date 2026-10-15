@@ -59,6 +59,10 @@ export class FootageBoard {
     return sceneIds.filter((id) => !this.bySceneId.has(id));
   }
 
+  sceneIds(): string[] {
+    return [...this.bySceneId.keys()];
+  }
+
   snapshot(): FootageBoardSnapshot {
     return { assignments: [...this.bySceneId.entries()].map(([sceneId, footage]) => [sceneId, footage.snapshot()]) };
   }
