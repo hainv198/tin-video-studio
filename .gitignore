@@ -11,3 +11,4 @@ next-env.d.ts
 .env.*.local
 users.local.json
 .superpowers/
+AGENTS.md

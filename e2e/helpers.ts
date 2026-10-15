@@ -36,5 +36,5 @@ export async function goNext(page: Page, label: string): Promise<void> {
 }
 
 export function stepButton(page: Page, n: 1 | 2 | 3 | 4 | 5) {
-  return page.getByRole("button", { name: new RegExp(`^${n}\. `) });
+  return page.getByRole("button", { name: new RegExp(`^${n}\\. `) });
 }
