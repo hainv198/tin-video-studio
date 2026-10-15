@@ -10,3 +10,4 @@ next-env.d.ts
 .env.local
 .env.*.local
 users.local.json
+.superpowers/
