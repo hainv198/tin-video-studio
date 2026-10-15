@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { expect, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 export const E2E_USER = "e2e";
 
@@ -22,7 +22,8 @@ export async function login(page: Page): Promise<void> {
 /** Nếu còn bản nháp cũ thì bỏ, để mỗi test bắt đầu sạch. */
 export async function discardDraftIfOffered(page: Page): Promise<void> {
   const discard = page.getByRole("button", { name: "Bỏ bản nháp" });
-  if (await discard.isVisible({ timeout: 1500 }).catch(() => false)) await discard.click();
+  const offered = await discard.waitFor({ state: "visible", timeout: 1500 }).then(() => true, () => false);
+  if (offered) await discard.click();
 }
 
 export async function fillSampleAndSplit(page: Page): Promise<void> {
@@ -56,12 +57,41 @@ export async function renderAndDownload(page: Page, dir = "test-results", prefix
   // exact: true vì nút bước "5. Dựng video" cũng chứa chữ này
   await page.getByRole("button", { name: "Dựng video", exact: true }).click();
   await expect(page.getByTestId("ket-qua")).toBeVisible({ timeout: 150_000 });
-  mkdirSync(dir, { recursive: true });
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("link", { name: /^Tải MP4/ }).click(),
   ]);
-  const path = join(dir, prefix + download.suggestedFilename());
+  let path: string;
+  try {
+    path = test.info().outputPath(prefix + download.suggestedFilename());
+  } catch {
+    mkdirSync(dir, { recursive: true });
+    path = join(dir, prefix + download.suggestedFilename());
+  }
   await download.saveAs(path);
   return path;
+}
+
+const DRAFT_COUNT_SCRIPT = () =>
+  new Promise<number>((resolve) => {
+    const r = indexedDB.open("tin-video-studio");
+    r.onsuccess = () => {
+      const db = r.result;
+      const tx = db.transaction("kv", "readonly");
+      const g = tx.objectStore("kv").get("draft");
+      g.onsuccess = () => {
+        resolve(g.result ? 1 : 0);
+        db.close();
+      };
+      g.onerror = () => {
+        resolve(-1);
+        db.close();
+      };
+    };
+    r.onerror = () => resolve(-1);
+  });
+
+/** Đợi bản nháp xuất hiện (1) hoặc biến mất (0) trong IndexedDB. */
+export async function expectDraftStored(page: Page, expected: 0 | 1): Promise<void> {
+  await expect.poll(async () => page.evaluate(DRAFT_COUNT_SCRIPT), { timeout: 5000 }).toBe(expected);
 }

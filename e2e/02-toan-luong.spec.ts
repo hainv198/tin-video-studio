@@ -1,5 +1,6 @@
 import { statSync } from "node:fs";
 import { expect, test } from "@playwright/test";
+import { FfmpegMissingError, measureFile } from "../scripts/measure-mp4";
 import { autoFillFootage, discardDraftIfOffered, fillSampleAndSplit, generateVoices, goNext, login, renderAndDownload } from "./helpers";
 
 test("đi trọn 5 bước với nhà cung cấp giả và tải về MP4", async ({ page }) => {
@@ -20,7 +21,7 @@ test("đi trọn 5 bước với nhà cung cấp giả và tải về MP4", asyn
   const file = await renderAndDownload(page);
   const elapsedSec = (Date.now() - started) / 1000;
   const sizeMb = statSync(file).size / 1024 / 1024;
-  expect(file).toMatch(/phu-tho-.*_20261014\.mp4$/);
+  expect(file).toMatch(/phu-tho-.*_\d{8}\.mp4$/);
   expect(sizeMb).toBeGreaterThan(0.5);
   const shown = await page.getByText(/[\d.]+ giây, [\d.]+ MB/).textContent();
   const durationSec = Number(shown?.match(/([\d.]+) giây/)?.[1]);
@@ -28,18 +29,20 @@ test("đi trọn 5 bước với nhà cung cấp giả và tải về MP4", asyn
   expect(elapsedSec).toBeLessThan(durationSec * 1.5 + 10);
   console.log(`[e2e] dựng ${durationSec} s mất ${elapsedSec.toFixed(1)} s, ${sizeMb.toFixed(1)} MB → ${file}`);
 
-  // Đo âm nếu có ffmpeg (giọng giả là sóng sin nên chỉ kiểm giới hạn rộng)
-  const { measureFile } = await import("../scripts/measure-mp4");
+  // Đo âm nếu có ffmpeg (giọng giả là sóng sin, nhưng mức tổng vẫn phải đúng chuẩn)
   let metrics: ReturnType<typeof measureFile> | null = null;
   try {
     metrics = measureFile(file);
-  } catch {
+  } catch (error) {
+    if (!(error instanceof FfmpegMissingError)) throw error;
+    test.info().annotations.push({ type: "skip-audio", description: "không có ffmpeg" });
     console.log("[e2e] bỏ qua đo âm (không có ffmpeg)");
   }
   if (metrics) {
     expect(metrics.peak).toBeLessThan(0.89);
-    expect(metrics.voicedRmsDb).toBeGreaterThan(-19);
-    expect(metrics.voicedRmsDb).toBeLessThan(-14);
+    expect(metrics.voicedRmsDb).toBeGreaterThan(-18);
+    expect(metrics.voicedRmsDb).toBeLessThan(-15);
+    expect(metrics.quietRmsDb).toBeGreaterThan(-45); // có nhạc nền
     expect(Math.abs(metrics.durationSec - durationSec)).toBeLessThan(0.5);
     console.log(`[e2e] âm: có tiếng ${metrics.voicedRmsDb.toFixed(2)} dB, đỉnh ${metrics.peak.toFixed(3)}, nghỉ ${metrics.quietRmsDb.toFixed(2)} dB`);
   }
@@ -56,8 +59,14 @@ test("huỷ giữa chừng rồi dựng lại", async ({ page }) => {
   await goNext(page, "Dựng video");
   await page.getByRole("button", { name: "Dựng video", exact: true }).click();
   await expect(page.getByText(/Dựng hình \d+%/)).toBeVisible({ timeout: 60_000 });
-  await page.getByRole("button", { name: "Huỷ" }).click();
+  const cancel = page.getByRole("button", { name: "Huỷ" });
+  await expect(cancel).toBeVisible();
+  await cancel.click();
+  await expect(cancel).toBeHidden();
   await expect(page.getByRole("button", { name: "Dựng video", exact: true })).toBeEnabled();
   await expect(page.getByTestId("ket-qua")).toHaveCount(0);
-  await renderAndDownload(page, "test-results", "huy-roi-dung-lai-"); // tên khác để không đè file của bài trên
+  await page.waitForTimeout(2000);
+  await expect(page.getByTestId("ket-qua")).toHaveCount(0);
+  const file = await renderAndDownload(page, "test-results", "huy-roi-dung-lai-");
+  expect(statSync(file).size / 1024 / 1024).toBeGreaterThan(0.5);
 });
