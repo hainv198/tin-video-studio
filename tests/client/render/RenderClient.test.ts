@@ -117,4 +117,19 @@ describe("RenderClient", () => {
     await expect(promise).rejects.toThrow("Bộ dựng nhận dữ liệu lỗi");
     expect(w.terminated).toBe(true);
   });
+
+  it("worker cũ báo xong muộn không làm mất trạng thái của lần dựng mới (cancel vẫn dừng được)", async () => {
+    const a = new FakeWorker();
+    const b = new FakeWorker();
+    const workers = [a, b];
+    const client = new RenderClient(() => workers.shift() as FakeWorker);
+    const first = client.render(job);
+    client.cancel();
+    await expect(first).rejects.toBeInstanceOf(RenderCancelledError);
+    const second = client.render(job);
+    a.emit({ type: "done", blob: new Blob(["cũ"]), durationSec: 1 });
+    client.cancel();
+    await expect(second).rejects.toBeInstanceOf(RenderCancelledError);
+    expect(b.terminated).toBe(true);
+  });
 });
