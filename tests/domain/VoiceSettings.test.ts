@@ -42,3 +42,15 @@ describe("VoiceSettings snapshot / restore", () => {
     expect(() => VoiceSettings.restore({ voiceName: "vi-VN-Neural2-A", speakingRate: 5 })).toThrow(ValidationError);
   });
 });
+
+describe("VoiceSettings restore: dữ liệu hỏng không rõ kiểu", () => {
+  const run = (v: unknown) => () => VoiceSettings.restore(v as never);
+
+  it("ném ValidationError thay vì TypeError", () => {
+    expect(run(null)).toThrow("Bản nháp hỏng");
+    expect(run(undefined)).toThrow(ValidationError);
+    expect(run({ voiceName: 5, speakingRate: 1 })).toThrow("Bản nháp hỏng");
+    expect(run({ speakingRate: 1 })).toThrow(ValidationError);
+    expect(run({ voiceName: "vi-VN-Neural2-A", speakingRate: "1" })).toThrow(ValidationError);
+  });
+});

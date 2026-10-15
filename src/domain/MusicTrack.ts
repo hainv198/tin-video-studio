@@ -53,9 +53,16 @@ export class MusicTrack {
   }
 
   static restore(s: MusicTrackSnapshot): MusicTrack {
-    if (s.origin !== "library" && s.origin !== "upload") {
+    const raw = s as unknown as Record<string, unknown> | null;
+    if (typeof raw !== "object" || raw === null) throw new ValidationError("Bản nháp hỏng: dữ liệu nhạc không hợp lệ");
+    if (typeof raw.id !== "string" || typeof raw.uri !== "string") {
+      throw new ValidationError("Bản nháp hỏng: bản nhạc thiếu nguồn");
+    }
+    if (typeof raw.title !== "string" || !raw.title.trim()) throw new ValidationError("Bản nháp hỏng: thiếu tên bản nhạc");
+    if (raw.origin !== "library" && raw.origin !== "upload") {
       throw new ValidationError("Bản nháp hỏng: nguồn nhạc không hợp lệ");
     }
-    return MusicTrack.create({ id: s.id, title: s.title, origin: s.origin, uri: s.uri, gainOffsetDb: s.gainOffsetDb });
+    if (typeof raw.gainOffsetDb !== "number") throw new ValidationError("Bản nháp hỏng: mức âm lượng nhạc không hợp lệ");
+    return MusicTrack.create({ id: raw.id, title: raw.title, origin: raw.origin, uri: raw.uri, gainOffsetDb: raw.gainOffsetDb });
   }
 }

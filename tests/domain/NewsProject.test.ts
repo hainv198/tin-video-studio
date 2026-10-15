@@ -170,3 +170,54 @@ describe("NewsProject snapshot / restore", () => {
     expect(bad({ sourceCredit: "z".repeat(81) })).toThrow("Nguồn tin tối đa 80 ký tự");
   });
 });
+
+describe("NewsProject restore: dữ liệu hỏng không rõ kiểu", () => {
+  const good = () => make().snapshot();
+  const bad = (patch: Record<string, unknown>) => () =>
+    NewsProject.restore({ ...good(), ...patch } as unknown as NewsProjectSnapshot, sequentialIds("n"));
+
+  it("chặn tiêu đề rỗng hoặc không phải chuỗi", () => {
+    expect(bad({ title: "" })).toThrow("Bản nháp hỏng");
+    expect(bad({ title: "   " })).toThrow("Bản nháp hỏng");
+    expect(bad({ title: 5 })).toThrow("Bản nháp hỏng");
+    expect(bad({ title: undefined })).toThrow(ValidationError);
+  });
+
+  it("chặn id cảnh trùng nhau", () => {
+    const g = good();
+    const dup = [g.scenes[0], g.scenes[1], { ...(g.scenes[2] as object), id: g.scenes[1]?.id }];
+    expect(bad({ scenes: dup })).toThrow("Bản nháp hỏng");
+  });
+
+  it("chặn scenes không phải mảng", () => {
+    expect(bad({ scenes: "abc" })).toThrow("Bản nháp hỏng");
+    expect(bad({ scenes: null })).toThrow(ValidationError);
+    expect(bad({ scenes: undefined })).toThrow(ValidationError);
+  });
+
+  it("chặn sourceCredit có mặt nhưng không phải chuỗi", () => {
+    expect(bad({ sourceCredit: 123 })).toThrow("Bản nháp hỏng");
+    expect(bad({ sourceCredit: null })).toThrow(ValidationError);
+  });
+
+  it("chặn phần tử cảnh không phải đối tượng", () => {
+    const g = good();
+    expect(bad({ scenes: [g.scenes[0], null, g.scenes[2]] })).toThrow("Bản nháp hỏng");
+    expect(bad({ scenes: [g.scenes[0], "x", g.scenes[2]] })).toThrow(ValidationError);
+    expect(bad({ scenes: [g.scenes[0], { id: 1, text: 2, role: "body" }] })).toThrow(ValidationError);
+  });
+
+  it("chặn snapshot không phải đối tượng", () => {
+    expect(() => NewsProject.restore(null as never, sequentialIds("n"))).toThrow(ValidationError);
+  });
+
+  it("snapshot là bản sao sâu, sửa snapshot không đổi dự án", () => {
+    const p = make();
+    const before = p.scenes[1]?.text;
+    const s = p.snapshot();
+    (s.scenes[1] as { text: string }).text = "đã sửa";
+    s.publishDate = "1999-01-01";
+    expect(p.scenes[1]?.text).toBe(before);
+    expect(p.formattedPublishDate()).toBe("14/10/2026");
+  });
+});

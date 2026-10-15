@@ -40,6 +40,10 @@ export class VoiceSettings {
   }
 
   static restore(s: VoiceSnapshot): VoiceSettings {
-    return VoiceSettings.create(s.voiceName, s.speakingRate);
+    const raw = s as unknown as Record<string, unknown> | null;
+    if (typeof raw !== "object" || raw === null) throw new ValidationError("Bản nháp hỏng: dữ liệu giọng đọc không hợp lệ");
+    if (typeof raw.voiceName !== "string") throw new ValidationError("Bản nháp hỏng: thiếu tên giọng");
+    if (typeof raw.speakingRate !== "number") throw new ValidationError("Bản nháp hỏng: tốc độ đọc không hợp lệ");
+    return VoiceSettings.create(raw.voiceName, raw.speakingRate);
   }
 }

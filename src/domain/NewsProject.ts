@@ -27,7 +27,11 @@ function checkedCredit(raw: string): string {
 
 function checkedDate(date: Date): Date {
   if (Number.isNaN(date.getTime())) throw new ValidationError("Ngày đăng không hợp lệ");
-  return date;
+  return new Date(date.getTime());
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -180,14 +184,32 @@ export class NewsProject {
   }
 
   static restore(snapshot: NewsProjectSnapshot, nextId: IdGenerator): NewsProject {
-    if (!snapshot.templateId) throw new ValidationError("Chưa chọn phong cách video");
-    const credit = checkedCredit(snapshot.sourceCredit);
-    const publishDate = parseLocalDate(snapshot.publishDate);
-    const scenes = snapshot.scenes.map((s) => Scene.create(s.id, s.text, s.role));
+    const raw = snapshot as unknown;
+    if (!isRecord(raw)) throw new ValidationError("Bản nháp hỏng: dữ liệu không hợp lệ");
+    if (typeof raw.title !== "string" || !raw.title.trim()) throw new ValidationError("Bản nháp hỏng: thiếu tiêu đề");
+    if (typeof raw.templateId !== "string" || !raw.templateId) throw new ValidationError("Chưa chọn phong cách video");
+    if (raw.sourceCredit !== undefined && typeof raw.sourceCredit !== "string") {
+      throw new ValidationError("Bản nháp hỏng: nguồn tin không hợp lệ");
+    }
+    const credit = checkedCredit(raw.sourceCredit ?? "");
+    if (typeof raw.publishDate !== "string") throw new ValidationError("Ngày đăng không hợp lệ");
+    const publishDate = parseLocalDate(raw.publishDate);
+    if (!Array.isArray(raw.scenes)) throw new ValidationError("Bản nháp hỏng: danh sách cảnh không hợp lệ");
+    const entries: unknown[] = raw.scenes;
+    const scenes = entries.map((entry) => {
+      if (!isRecord(entry) || typeof entry.id !== "string" || typeof entry.text !== "string") {
+        throw new ValidationError("Bản nháp hỏng: cảnh không hợp lệ");
+      }
+      if (entry.role !== "intro" && entry.role !== "body") throw new ValidationError("Bản nháp hỏng: vai trò cảnh không hợp lệ");
+      return Scene.create(entry.id, entry.text, entry.role);
+    });
+    if (new Set(scenes.map((s) => s.id)).size !== scenes.length) {
+      throw new ValidationError("Bản nháp hỏng: id cảnh bị trùng");
+    }
     const structureOk =
       scenes.length >= 2 && scenes[0]?.role === "intro" && scenes.slice(1).every((s) => s.role === "body");
     if (!structureOk) throw new ValidationError("Bản nháp hỏng: cấu trúc cảnh không hợp lệ");
-    return new NewsProject(snapshot.title, credit, publishDate, snapshot.templateId, scenes, nextId);
+    return new NewsProject(raw.title, credit, publishDate, raw.templateId, scenes, nextId);
   }
 
   private indexOf(id: string): number {
