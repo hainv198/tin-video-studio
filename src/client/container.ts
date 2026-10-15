@@ -6,6 +6,7 @@ import { networkSafeFetch } from "@/client/services/apiError";
 import { defaultKeywordSuggester, type KeywordSuggester } from "@/client/services/KeywordSuggester";
 import { MusicLibrary } from "@/client/services/MusicLibrary";
 import { StockClient, type StockApi } from "@/client/services/StockClient";
+import { TrackSource } from "@/client/services/TrackSource";
 import { TtsClient, type TtsApi } from "@/client/services/TtsClient";
 import { BrandRepository } from "@/client/storage/BrandRepository";
 import { DraftRepository } from "@/client/storage/DraftRepository";
@@ -29,6 +30,7 @@ export interface ClientServices {
   stock: StockApi;
   keywords: KeywordSuggester;
   music: MusicLibrary;
+  tracks: TrackSource;
   drafts: DraftRepository;
   brands: BrandRepository;
   uploads: UploadRepository;
@@ -41,6 +43,7 @@ export interface ClientServices {
 /** Lắp mọi dịch vụ phía client ở một chỗ. Không chạm API trình duyệt cho tới khi dịch vụ được dùng. */
 export function createClientServices(env: ClientEnv): ClientServices {
   const store = new IdbKeyValueStore(env.indexedDB);
+  const uploads = new UploadRepository(store);
   const decoder = new AudioDecodeService();
   return {
     env,
@@ -49,9 +52,10 @@ export function createClientServices(env: ClientEnv): ClientServices {
     stock: new StockClient(env.fetch),
     keywords: defaultKeywordSuggester(),
     music: new MusicLibrary(env.fetch),
+    tracks: new TrackSource(env.fetch, uploads),
     drafts: new DraftRepository(store),
     brands: new BrandRepository(store),
-    uploads: new UploadRepository(store),
+    uploads,
     decoder,
     probe: new BrowserMediaProbe(decoder),
     render: new RenderClient(),

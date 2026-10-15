@@ -66,3 +66,9 @@ describe("createClientServices", () => {
     expect(await b.brands.load("t")).toBeNull();
   });
 });
+
+describe("createClientServices — tracks", () => {
+  it("có TrackSource", () => {
+    expect(typeof createClientServices(fakeEnv()).tracks.bytes).toBe("function");
+  });
+});
