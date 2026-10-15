@@ -267,3 +267,15 @@ Kèm script `npm run hash-password` để Hải tạo mật khẩu băm.
 6. Logo / tên kênh để làm bộ thương hiệu mặc định (không bắt buộc, mỗi người tự đặt được).
 
 Trong lúc chờ, bản phát triển dùng service giả cho TTS và stock để code và test được ngay.
+
+## 10. Bổ sung 2026-10-15: giọng clone qua MiniMax
+
+Hải muốn dùng giọng clone (giọng của Hải hoặc người đã đồng ý; không clone giọng người đọc của kênh khác).
+
+- **Nhà cung cấp thứ hai, tuỳ chọn.** `MiniMaxTtsService` cài cùng interface `TtsProvider` với Google. Chỉ bật khi có đủ `MINIMAX_API_KEY` và `MINIMAX_VOICES`. Thiếu thì app chạy như cũ, không lỗi.
+- **Tên giọng trong app:** `vi-VN-MiniMax-<Alias>` (Alias: chữ và số, 1–32 ký tự). Vẫn qua chốt `vi-VN` và `VoiceSettings`. Hạng hiển thị: `MiniMax`. Giọng MiniMax đứng đầu danh sách.
+- **Định tuyến:** `RoutingTtsProvider` gộp danh sách giọng của các nhà cung cấp (một nguồn lỗi thì vẫn trả các nguồn còn lại) và chuyển yêu cầu tạo giọng theo tên giọng.
+- **Gọi API:** `POST {MINIMAX_BASE_URL}/v1/t2a_v2`, header `Authorization: Bearer <key>`, body `{ model, text, stream:false, language_boost:"Vietnamese", output_format:"hex", voice_setting:{ voice_id, speed }, audio_setting:{ format:"mp3", sample_rate:44100, bitrate:128000, channel:1 } }`. `speed` = tốc độ đọc của app (0.8–1.3, nằm trong 0.5–2 của MiniMax). Âm thanh trả về dạng hex trong `data.audio`. Lỗi nằm ở `base_resp.status_code` (HTTP vẫn 200): 1002/1039 → hết hạn mức (429), còn lại → lỗi nhà cung cấp (502).
+- **Biến môi trường:** `MINIMAX_API_KEY`, `MINIMAX_VOICES` = JSON `[{"alias":"Hai","voiceId":"tvsHai001","gender":"MALE"}]`, `MINIMAX_MODEL` (mặc định `speech-2.8-hd`), `MINIMAX_BASE_URL` (mặc định `https://api.minimax.io`).
+- **Clone một lần:** `npm run minimax:clone -- <file-thu-am> <voiceId> [Alias]` đọc `.env.local`, tải file lên (`/v1/files/upload`, purpose `voice_clone`), gọi `/v1/voice_clone` (lọc ồn + chuẩn hoá âm lượng, kèm câu nghe thử) rồi in link nghe thử và dòng cần thêm vào `MINIMAX_VOICES`. File thu âm: mp3/m4a/wav, 10 giây – 5 phút, ≤ 20 MB. `voiceId`: 8–256 ký tự, bắt đầu bằng chữ, chỉ chữ/số/`-`/`_`, không kết thúc bằng `-`/`_`.
+- **Lưu ý từ MiniMax:** giọng clone không được dùng trong 7 ngày sẽ bị xoá. Sau khi clone phải tạo giọng thật ít nhất một lần trong 7 ngày.
