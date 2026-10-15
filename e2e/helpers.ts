@@ -1,3 +1,5 @@
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
 import { expect, type Page } from "@playwright/test";
 
 export const E2E_USER = "e2e";
@@ -37,4 +39,29 @@ export async function goNext(page: Page, label: string): Promise<void> {
 
 export function stepButton(page: Page, n: 1 | 2 | 3 | 4 | 5) {
   return page.getByRole("button", { name: new RegExp(`^${n}\\. `) });
+}
+
+export async function generateVoices(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Tạo giọng" }).click();
+  await expect(page.getByText(/✓ [\d.]+ giây/)).toHaveCount(6, { timeout: 60_000 });
+}
+
+export async function autoFillFootage(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Tự tìm cảnh còn trống" }).click();
+  await expect(page.getByRole("button", { name: "Tự tìm cảnh còn trống" })).toBeEnabled({ timeout: 30_000 });
+  await expect(page.getByRole("img", { name: "Cảnh trám đang chọn" })).toHaveCount(6);
+}
+
+export async function renderAndDownload(page: Page, dir = "test-results", prefix = ""): Promise<string> {
+  // exact: true vì nút bước "5. Dựng video" cũng chứa chữ này
+  await page.getByRole("button", { name: "Dựng video", exact: true }).click();
+  await expect(page.getByTestId("ket-qua")).toBeVisible({ timeout: 150_000 });
+  mkdirSync(dir, { recursive: true });
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("link", { name: /^Tải MP4/ }).click(),
+  ]);
+  const path = join(dir, prefix + download.suggestedFilename());
+  await download.saveAs(path);
+  return path;
 }
