@@ -97,6 +97,37 @@ describe("buildServerContainer", () => {
     }
   });
 
+  it("có cấu hình vclip: giọng vclip đứng đầu, trước MiniMax và Gemini", async () => {
+    const c = buildServerContainer({
+      ...base,
+      FAKE_PROVIDERS: "1",
+      VCLIP_API_KEY: "vk",
+      VCLIP_VOICES: JSON.stringify([{ alias: "Hai", voiceId: "voice-hai-1", gender: "MALE" }]),
+      MINIMAX_API_KEY: "mk",
+      MINIMAX_VOICES: JSON.stringify([{ alias: "Hai", voiceId: "tvsHai001", gender: "MALE" }]),
+      GEMINI_API_KEY: "gk",
+    });
+    const names = (await c.tts.voices()).map((v) => v.name);
+    expect(names.slice(0, 3)).toEqual(["vi-VN-Vclip-Hai", "vi-VN-MiniMax-Hai", "vi-VN-Gemini-Kore"]);
+    expect(names.slice(-2)).toEqual(["vi-VN-Fake-A", "vi-VN-Fake-B"]);
+  });
+
+  it("cấu hình vclip thiếu một nửa hoặc sai: chạy như cũ, cảnh báo không lộ key", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const half = buildServerContainer({ ...base, FAKE_PROVIDERS: "1", VCLIP_API_KEY: "vk-bi-mat" });
+      expect((await half.tts.voices()).map((v) => v.name)).toEqual(["vi-VN-Fake-A", "vi-VN-Fake-B"]);
+      const broken = buildServerContainer({ ...base, FAKE_PROVIDERS: "1", VCLIP_API_KEY: "vk-bi-mat", VCLIP_VOICES: "rác" });
+      expect((await broken.tts.voices()).map((v) => v.name)).toEqual(["vi-VN-Fake-A", "vi-VN-Fake-B"]);
+      expect(warn).toHaveBeenCalledTimes(2);
+      const logged = warn.mock.calls.flat().join(" ");
+      expect(logged).toContain("Bỏ qua giọng vclip");
+      expect(logged).not.toContain("vk-bi-mat");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("EDGE_TTS_DEV=1 (kèm giả lập) dùng giọng Edge; cấm khi production hoặc Vercel", async () => {
     const c = buildServerContainer({ ...base, FAKE_PROVIDERS: "1", EDGE_TTS_DEV: "1" });
     expect((await c.tts.voices()).map((v) => v.name)).toEqual(["vi-VN-HoaiMyNeural", "vi-VN-NamMinhNeural"]);

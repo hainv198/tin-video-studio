@@ -57,6 +57,22 @@ describe("validateEnv", () => {
     expect(bad.ok).toBe(false);
   });
 
+  it("vclip: cặp key + giọng đủ là nguồn giọng và ghi vào tóm tắt; thiếu một nửa thì cảnh báo; sai JSON thì lỗi", () => {
+    const stock = { PIXABAY_API_KEY: "x" };
+    const voices = JSON.stringify([{ alias: "Hai", voiceId: "v1", gender: "MALE" }]);
+    const on = validateEnv({ ...base, ...stock, VCLIP_API_KEY: "vk-bi-mat", VCLIP_VOICES: voices });
+    expect(on.ok).toBe(true);
+    const text = on.ok ? on.summary.join("\n") : "";
+    expect(text).toContain("Vclip: 1 giọng");
+    expect(text).not.toContain("vk-bi-mat");
+    const half = validateEnv({ ...base, FAKE_PROVIDERS: "1", VCLIP_API_KEY: "vk" });
+    expect(half.ok).toBe(true);
+    expect(half.ok ? half.summary.join() : "").toMatch(/Vclip: cảnh báo/);
+    const bad = validateEnv({ ...base, FAKE_PROVIDERS: "1", VCLIP_API_KEY: "vk", VCLIP_VOICES: "không phải json" });
+    expect(bad.ok).toBe(false);
+    expect(bad.ok ? "" : bad.problems.join()).toMatch(/VCLIP_VOICES/);
+  });
+
   it("Gemini: có key thì ghi vào tóm tắt (không lộ key), không có thì không sao", () => {
     const on = validateEnv({ ...base, FAKE_PROVIDERS: "1", GEMINI_API_KEY: "gk-bi-mat" });
     expect(on.ok).toBe(true);
