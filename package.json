@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "user:entry": "tsx scripts/users.ts entry",
-    "user:encode": "tsx scripts/users.ts encode"
+    "user:encode": "tsx scripts/users.ts encode",
+    "minimax:clone": "tsx scripts/minimax-clone.ts"
   },
   "dependencies": {
     "bcryptjs": "3.0.3",

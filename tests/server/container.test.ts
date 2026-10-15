@@ -31,4 +31,25 @@ describe("buildServerContainer", () => {
   it("cookie Secure khi NODE_ENV=production", () => {
     expect(buildServerContainer({ ...base, FAKE_PROVIDERS: "1", NODE_ENV: "production" }).secureCookies).toBe(true);
   });
+it("có cấu hình MiniMax: giọng clone đứng đầu, giọng cũ vẫn tạo được", async () => {
+    const c = buildServerContainer({
+      ...base,
+      FAKE_PROVIDERS: "1",
+      MINIMAX_API_KEY: "mk",
+      MINIMAX_VOICES: JSON.stringify([{ alias: "Hai", voiceId: "tvsHai001", gender: "MALE" }]),
+    });
+    expect((await c.tts.voices()).map((v) => v.name)).toEqual(["vi-VN-MiniMax-Hai", "vi-VN-Fake-A", "vi-VN-Fake-B"]);
+    const fake = await c.tts.synthesize({ text: "Xin chào.", voiceName: "vi-VN-Fake-A", speakingRate: 1 });
+    expect(fake.mimeType).toBe("audio/wav");
+  });
+
+  it("cấu hình MiniMax thiếu một nửa hoặc sai thì báo lỗi rõ", () => {
+    expect(() => buildServerContainer({ ...base, FAKE_PROVIDERS: "1", MINIMAX_API_KEY: "mk" })).toThrow(
+      "Cần cả MINIMAX_API_KEY và MINIMAX_VOICES",
+    );
+    expect(() =>
+      buildServerContainer({ ...base, FAKE_PROVIDERS: "1", MINIMAX_API_KEY: "mk", MINIMAX_VOICES: "rác" }),
+    ).toThrow("MINIMAX_VOICES không phải JSON hợp lệ");
+  });
 });
+

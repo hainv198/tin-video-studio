@@ -9,6 +9,8 @@ import { StockController } from "./stock/StockController";
 import type { StockProvider } from "./stock/StockProvider";
 import { FakeTtsProvider } from "./tts/FakeTtsProvider";
 import { GoogleTtsService } from "./tts/GoogleTtsService";
+import { MiniMaxTtsService, parseMiniMaxVoices } from "./tts/MiniMaxTtsService";
+import { routed, RoutingTtsProvider } from "./tts/RoutingTtsProvider";
 import { TtsController } from "./tts/TtsController";
 import type { TtsProvider } from "./tts/TtsProvider";
 
@@ -31,9 +33,8 @@ export function buildServerContainer(env: Record<string, string | undefined>): S
   const sessions = new SessionService(env.AUTH_SECRET ?? "");
   const auth = new AuthController(users, new BcryptPasswordHasher(), sessions);
 
-  const ttsProvider: TtsProvider = usingFakes
-    ? new FakeTtsProvider()
-    : new GoogleTtsService(env.GOOGLE_TTS_API_KEY ?? "");
+  const baseTts: TtsProvider = usingFakes ? new FakeTtsProvider() : new GoogleTtsService(env.GOOGLE_TTS_API_KEY ?? "");
+  const ttsProvider = withMiniMax(baseTts, env);
   const stockProviders: StockProvider[] = usingFakes
     ? [new FakeStockProvider()]
     : [new PexelsService(env.PEXELS_API_KEY ?? ""), new PixabayService(env.PIXABAY_API_KEY ?? "")];
@@ -47,6 +48,21 @@ export function buildServerContainer(env: Record<string, string | undefined>): S
     tts: new TtsController(ttsProvider),
     stock: new StockController(stockProviders),
   };
+}
+
+/** MiniMax là tuỳ chọn: chỉ bật khi có đủ key và danh sách giọng clone; giọng clone đứng đầu danh sách. */
+function withMiniMax(base: TtsProvider, env: Record<string, string | undefined>): TtsProvider {
+  const apiKey = env.MINIMAX_API_KEY?.trim();
+  const rawVoices = env.MINIMAX_VOICES?.trim();
+  if (!apiKey && !rawVoices) return base;
+  if (!apiKey || !rawVoices) throw new Error("Cần cả MINIMAX_API_KEY và MINIMAX_VOICES để bật giọng MiniMax");
+  const minimax = new MiniMaxTtsService({
+    apiKey,
+    voices: parseMiniMaxVoices(rawVoices),
+    model: env.MINIMAX_MODEL,
+    baseUrl: env.MINIMAX_BASE_URL,
+  });
+  return new RoutingTtsProvider([minimax, routed(base, (voiceName) => !minimax.owns(voiceName))]);
 }
 
 let cached: ServerContainer | undefined;
