@@ -18,7 +18,8 @@
     "user:entry": "tsx scripts/users.ts entry",
     "user:encode": "tsx scripts/users.ts encode",
     "minimax:clone": "tsx scripts/minimax-clone.ts",
-    "measure:mp4": "tsx scripts/measure-mp4.ts"
+    "measure:mp4": "tsx scripts/measure-mp4.ts",
+    "contact:sheet": "tsx scripts/contact-sheet.ts"
   },
   "dependencies": {
     "bcryptjs": "3.0.3",
