@@ -15,7 +15,7 @@
 - Thư mục dự án: `D:\Brain Hainv\ca-nhan\tools\tin-video-studio`, nhánh `feat/chang-4-nghiem-thu` (điều phối viên tạo từ `main`). Đường dẫn tính từ thư mục này.
 - **Agent thực thi CẤM chạy mọi lệnh git.** Bỏ qua bước "Commit"; điều phối viên commit. Không đọc/sửa `.env.local`; không tạo `.env*` ngoài `.env.example`. Không đưa key thật hay mật khẩu vào mã, test hay tài liệu.
 - **RED phải đỏ thật** cho test Vitest. Test Playwright (`e2e/*.spec.ts`) không có RED (app đã có); implementer chạy `npm run test:e2e` và ghi kết quả vào report; test treo hay đỏ thì KHÔNG nới timeout quá giá trị kế hoạch ghi, báo lại.
-- Test toàn luồng chỉ nằm trong `e2e/` (Playwright), không trong `tests/` (Vitest chỉ gom `tests/**/*.test.ts`). Tài khoản thử của e2e sinh trong `e2e/global-setup.ts` lúc chạy; app e2e chạy ở cổng **3101** với `FAKE_PROVIDERS=1`.
+- Test toàn luồng chỉ nằm trong `e2e/` (Playwright), không trong `tests/` (Vitest chỉ gom `tests/**/*.test.ts`). Tài khoản thử của e2e sinh trong `e2e/e2eEnv.ts` (gọi đồng bộ từ `playwright.config.ts`) lúc chạy; app e2e chạy ở cổng **3101** với `FAKE_PROVIDERS=1`.
 - Trên Vercel: `FAKE_PROVIDERS` và `EDGE_TTS_DEV` phải **trống** (container đã ném lỗi nếu bật trên production). `AUTH_SECRET` ≥ 32 ký tự. `APP_USERS` là base64 của JSON ≤ 5 người dùng. Node `>=22.2` (đã khai `engines`).
 - Chỉ Hải chạy `git push`, tạo repo GitHub và dự án Vercel (push trong phiên tự động bị treo ở hộp thoại đăng nhập; xem bộ nhớ dự án). Kế hoạch chuẩn bị lệnh và danh sách kiểm, không tự push.
 - Số đo âm giữ cùng phương pháp các chặng trước: cửa sổ 100 ms, cổng −45 dB, "đoạn có tiếng" = cửa sổ trên p90 − 12 dB, RMS trung bình năng lượng; đỉnh < 0,89; giọng −16,5 ± 1 dB.
@@ -28,7 +28,7 @@
 ```
 package.json                      # sửa: devDep @playwright/test, scripts test:e2e, measure:mp4, check-env, prebuild
 playwright.config.ts              # mới
-e2e/global-setup.ts               # mới: sinh APP_USERS + AUTH_SECRET cho app e2e
+e2e/e2eEnv.ts                     # mới: sinh APP_USERS + AUTH_SECRET ĐỒNG BỘ khi nạp config (webServer chạy trước globalSetup)
 e2e/helpers.ts                    # mới: đăng nhập, điền tin mẫu, chờ bước
 e2e/01-nhap-tin.spec.ts           # mới
 e2e/02-toan-luong.spec.ts         # mới: 5 bước → tải MP4 → đo (nếu có ffmpeg)
@@ -53,9 +53,10 @@ docs/superpowers/specs/...        # mục 13 "Nghiệm thu chặng 4" (điều p
 - **Vì sao kênh `chrome`:** bộ dựng cần WebCodecs H.264 + AAC. Bản Chromium của Playwright (mã nguồn mở) không chắc có bộ mã hoá H.264; Chrome và Edge thật trên máy Hải thì có (3A/3C đã dựng được trong Chromium nhúng của app desktop). `playwright.config.ts` dùng `channel: "chrome"`, có thể đổi `PW_CHANNEL=msedge`. Không chạy `npx playwright install`.
 - **Headless:** Chrome headless mới (`headless: true` trên Playwright ≥ 1.49 dùng chế độ headless của Chrome thật) có WebCodecs. Nếu dựng không ra MP4 ở headless, config cho phép `PW_HEADED=1`; implementer ghi vào report chế độ nào chạy được.
 - **Tải file từ blob URL:** nút "Tải MP4" là `<a download>` trỏ `blob:`; Playwright bắt bằng `page.waitForEvent("download")` rồi `saveAs`. Không cần `acceptDownloads` riêng (mặc định bật).
-- **Không dùng `.env.local` cho e2e:** `global-setup.ts` tạo mật khẩu ngẫu nhiên, băm bằng `BcryptPasswordHasher`, đóng gói `APP_USERS`, sinh `AUTH_SECRET`, rồi ghi vào `process.env` cho `webServer` (Playwright truyền env của tiến trình cho lệnh `webServer`). Cổng 3101 để không đụng dev server 3100.
+- **Không dùng `.env.local` cho e2e:** `e2e/e2eEnv.ts` tạo mật khẩu ngẫu nhiên, băm bằng `bcryptjs.hashSync`, đóng gói `APP_USERS`, sinh `AUTH_SECRET`, rồi ghi vào `process.env` **ngay khi `playwright.config.ts` được nạp** (Playwright khởi động `webServer` TRƯỚC `globalSetup`, nên `globalSetup` là quá muộn; chạy thử khô đã vấp lỗi này). Hàm idempotent để worker thừa hưởng env. Cổng 3101 để không đụng dev server 3100.
 - **Bitrate:** quyết định của Hải còn treo. Task 5 đo 5 Mbps và 8 Mbps trên cùng một dự án, ghi kích thước và ảnh phóng vùng chữ; mặc định code vẫn 8 Mbps cho tới khi Hải chốt. Hằng gom về `encodingDefaults.ts` để đổi một chỗ.
 - **Key thật:** Task 6 chỉ chạy khi `.env.local` có key (Hải cung cấp). Không có thì ghi "hoãn, cần key" và chặng vẫn hoàn thành phần còn lại.
+- **Kế hoạch đã chạy thử khô** (worktree riêng, `npm ci`): Task 1–3, 4.1, 5, 7 dựng được; 584 test Vitest, 8/8 e2e headless, build sạch; 5 lỗi tìm thấy đã sửa vào văn bản này.
 - **Không làm ở chặng 4:** phong cách thứ hai, phân trang tìm cảnh trám, thư viện file qua nhiều dự án, gói Vercel Pro (Hobby chỉ cho dùng phi thương mại, đặc tả mục 2).
 
 ---
@@ -64,25 +65,27 @@ docs/superpowers/specs/...        # mục 13 "Nghiệm thu chặng 4" (điều p
 
 **Files:**
 - Modify: `package.json`, `tsconfig.json`
-- Create: `playwright.config.ts`, `e2e/global-setup.ts`, `e2e/helpers.ts`, `e2e/01-nhap-tin.spec.ts`
+- Create: `playwright.config.ts`, `e2e/e2eEnv.ts`, `e2e/helpers.ts`, `e2e/01-nhap-tin.spec.ts`
+- Modify: `.gitignore` (thêm `.superpowers/`: thư mục sổ tiến độ và mẫu hiện chưa được bỏ qua)
 - Test: chính `e2e/01-nhap-tin.spec.ts` (chạy `npm run test:e2e -- e2e/01-nhap-tin.spec.ts`)
 
 **Interfaces:**
 - Consumes: `BcryptPasswordHasher`, `UserDirectory` (`src/server/auth`), `SAMPLE_NEWS` (chỉ để biết số câu), các nhãn nút tiếng Việt của view 3C ("Điền tin mẫu", "Chia cảnh", "Tiếp tục: …", "Tạo giọng", "Tự tìm cảnh còn trống", "Dựng video", "Tải MP4", "Mở lại", "Dự án mới").
 - Produces: `e2e/helpers.ts` xuất `E2E_USER = "e2e"`, `e2ePassword()` (đọc `process.env.E2E_PASSWORD`), `login(page)`, `fillSampleAndSplit(page)`, `goNext(page, label)`, `stepButton(page, n)`; `playwright.config.ts` đọc `E2E_BASE_URL` (có thì không bật `webServer`, dùng để chạy trên bản deploy ở Task 8).
 
-- [ ] **Step 1: Cài Playwright** — `npm install -D @playwright/test@1.64.1 --save-exact` (không chạy `playwright install`). Thêm vào `package.json` `scripts`: `"test:e2e": "playwright test"`, `"test:e2e:headed": "playwright test --headed"`. Thêm `"e2e/**/*.ts", "playwright.config.ts"` vào `include` của `tsconfig.json`.
+- [ ] **Step 1: Cài Playwright** — `npm install -D @playwright/test@1.64.1 --save-exact` (không chạy `playwright install`). Thêm vào `package.json` `scripts`: `"test:e2e": "playwright test"`, `"test:e2e:headed": "playwright test --headed"`. Thêm `"e2e/**/*.ts", "playwright.config.ts"` vào `include` của `tsconfig.json`. Thêm dòng `.superpowers/` vào `.gitignore`.
 
 - [ ] **Step 2: Viết `playwright.config.ts`**
 ```ts
 import { defineConfig } from "@playwright/test";
+import { ensureE2eEnv } from "./e2e/e2eEnv";
 
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3101";
 const external = Boolean(process.env.E2E_BASE_URL);
+if (!external) ensureE2eEnv(); // phải chạy trước khi Playwright khởi động webServer
 
 export default defineConfig({
   testDir: "./e2e",
-  globalSetup: external ? undefined : "./e2e/global-setup.ts",
   timeout: 180_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
@@ -112,15 +115,20 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 3: Viết `e2e/global-setup.ts`** (sinh tài khoản thử và khoá phiên; `webServer` thừa hưởng `process.env`)
+- [ ] **Step 3: Viết `e2e/e2eEnv.ts`** (sinh tài khoản thử và khoá phiên đồng bộ; `webServer` thừa hưởng `process.env`)
 ```ts
 import { randomBytes } from "node:crypto";
-import { BcryptPasswordHasher } from "../src/server/auth/PasswordHasher";
+import bcrypt from "bcryptjs";
 import { UserDirectory } from "../src/server/auth/UserDirectory";
 
-export default async function globalSetup(): Promise<void> {
+/**
+ * Sinh tài khoản thử + khoá phiên vào process.env. Phải chạy ĐỒNG BỘ ngay khi nạp playwright.config.ts
+ * (Playwright khởi động webServer TRƯỚC globalSetup nên globalSetup quá muộn). Idempotent: worker thừa hưởng env từ tiến trình chính.
+ */
+export function ensureE2eEnv(): void {
+  if (process.env.APP_USERS && process.env.E2E_PASSWORD) return;
   const password = process.env.E2E_PASSWORD ?? `e2e-${randomBytes(9).toString("base64url")}`;
-  const passwordHash = await new BcryptPasswordHasher(4).hash(password);
+  const passwordHash = bcrypt.hashSync(password, 4);
   const json = JSON.stringify([{ username: "e2e", passwordHash, displayName: "Người thử" }]);
   UserDirectory.fromEnv(json); // kiểm định dạng như lúc chạy thật
   process.env.E2E_PASSWORD = password;
@@ -538,15 +546,16 @@ export async function autoFillFootage(page: Page): Promise<void> {
   await expect(page.getByRole("img", { name: "Cảnh trám đang chọn" })).toHaveCount(6);
 }
 
-export async function renderAndDownload(page: Page, dir = "test-results"): Promise<string> {
-  await page.getByRole("button", { name: "Dựng video" }).click();
+export async function renderAndDownload(page: Page, dir = "test-results", prefix = ""): Promise<string> {
+  // exact: true vì nút bước "5. Dựng video" cũng chứa chữ này
+  await page.getByRole("button", { name: "Dựng video", exact: true }).click();
   await expect(page.getByTestId("ket-qua")).toBeVisible({ timeout: 150_000 });
   mkdirSync(dir, { recursive: true });
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("link", { name: /^Tải MP4/ }).click(),
   ]);
-  const path = join(dir, download.suggestedFilename());
+  const path = join(dir, prefix + download.suggestedFilename());
   await download.saveAs(path);
   return path;
 }
@@ -610,12 +619,12 @@ test("huỷ giữa chừng rồi dựng lại", async ({ page }) => {
   await goNext(page, "Cảnh trám");
   await goNext(page, "Nhạc nền");
   await goNext(page, "Dựng video");
-  await page.getByRole("button", { name: "Dựng video" }).click();
+  await page.getByRole("button", { name: "Dựng video", exact: true }).click();
   await expect(page.getByText(/Dựng hình \d+%/)).toBeVisible({ timeout: 60_000 });
   await page.getByRole("button", { name: "Huỷ" }).click();
-  await expect(page.getByRole("button", { name: "Dựng video" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Dựng video", exact: true })).toBeEnabled();
   await expect(page.getByTestId("ket-qua")).toHaveCount(0);
-  await renderAndDownload(page);
+  await renderAndDownload(page, "test-results", "huy-roi-dung-lai-"); // tên khác để không đè file của bài trên
 });
 ```
 Lưu ý: `measureFile` ném `FfmpegMissingError` (không `process.exit`) nên spec bắt được và bỏ qua phần đo; phần CLI của script chỉ chạy khi gọi trực tiếp.
@@ -646,8 +655,7 @@ test("hết phiên: API trả 401 thì về trang đăng nhập và bản nháp 
   await fillSampleAndSplit(page);
   await page.waitForTimeout(1200);
   await context.clearCookies();
-  await goNext(page, "Chọn giọng");
-  await page.getByRole("button", { name: "Tạo giọng" }).click();
+  await goNext(page, "Chọn giọng"); // bước 2 gọi /api/tts/voices → 401 → về trang đăng nhập ngay
   await expect(page).toHaveURL(/\/dang-nhap\?next=%2Fstudio$/, { timeout: 15_000 });
   await login(page);
   await expect(page.getByText(/^Có bản nháp/)).toBeVisible();
@@ -666,7 +674,7 @@ test("dự án mới xoá bản nháp", async ({ page }) => {
 });
 ```
 
-- [ ] **Step 4: Chạy** — `npm run test:e2e` → 01 (3), 02 (2), 03 (3) đều passed. Ghi vào report: chế độ headless hay headed, thời gian dựng, dòng `[e2e]`. Nếu bài "đi trọn 5 bước" lỗi ở WebCodecs trong headless, chạy `PW_HEADED=1 npm run test:e2e` và ghi rõ; nếu headed mới chạy được, đổi mặc định `headless` trong config thành `process.env.PW_HEADED !== "0" ? false : true` **và** ghi lý do trong report (điều phối viên sẽ ghi vào README).
+- [ ] **Step 4: Chạy** — `npm run test:e2e` → 01 (3), 02 (2), 03 (3) đều passed. Ghi vào report: chế độ headless hay headed, thời gian dựng, dòng `[e2e]`. Chạy thử khô đã xác nhận Chrome headless mã hoá được H.264 + AAC (8/8 bài, ~54 s một lượt, dựng 37 s mất 16,7 s). Nếu trên máy khác headless không dựng được, chạy `PW_HEADED=1 npm run test:e2e` và ghi rõ trong report.
 - [ ] **Step 5: `npx vitest run`, `npm run typecheck`, `npm run lint`** sạch.
 - [ ] **Step 6: Commit** (điều phối viên) — `test(e2e): toàn luồng 5 bước, tải MP4 và đo âm; bản nháp; hết phiên`
 
@@ -721,7 +729,7 @@ console.log(`Đã ghi ${out}: ${times.length} hàng × 2 cột (mẫu | dựng),
 ```
 Chạy thử với hai file mp4 bất kỳ có trên máy (hoặc cùng một file hai lần) và ghi đầu ra vào report; `npm run typecheck`, `npm run lint` sạch.
 
-- [ ] **Step 2 (điều phối viên): Lấy video mẫu** — tải về `.superpowers/sample/theanh28-phu-tho.mp4` (git-ignored) bằng `yt-dlp --impersonate chrome -o ".superpowers/sample/theanh28-phu-tho.%(ext)s" "https://www.tiktok.com/@theanh28entertainment/video/7696506064186969364"` (yt-dlp cần `curl_cffi`, xem bộ nhớ dự án). Không được thì ghi "thiếu video mẫu" và chỉ làm bước 4.
+- [ ] **Step 2 (điều phối viên): Lấy video mẫu** — tải về `.superpowers/sample/theanh28-phu-tho.mp4` (`.superpowers/` được bỏ qua từ Task 1) bằng `yt-dlp --impersonate chrome -o ".superpowers/sample/theanh28-phu-tho.%(ext)s" "https://www.tiktok.com/@theanh28entertainment/video/7696506064186969364"` (yt-dlp cần `curl_cffi`, xem bộ nhớ dự án). Không được thì ghi "thiếu video mẫu" và chỉ làm bước 4.
 - [ ] **Step 3 (điều phối viên): Dựng bản so sánh** — chạy e2e Task 3 lấy MP4 trong `test-results/` (giọng giả, ảnh giả) **và** một bản dựng bằng tay với giọng Edge + ảnh/video thật như Task 13 của 3C (bản này mới so được nhịp và bố cục). Chạy `npm run contact:sheet -- <mau> <dung> .superpowers/sample/so-khung.png 1,8,20,30`. Đo mức âm video mẫu: `npm run measure:mp4 -- <mau>` (ghi giọng, nhạc lúc nghỉ, đỉnh) để đối chiếu với đặc tả (giọng ≈ −16,5 dB, nhạc nghỉ ≈ −30 dB).
 - [ ] **Step 4 (điều phối viên): Danh sách kiểm, ghi từng dòng đạt/lệch (ước lượng px ở khung 540×960):**
   - Cảnh mở đầu: ảnh phủ y 0→500; dải gradient bắt đầu ≈ y 430; chip thương hiệu ≈ y 505; tem ngày ≈ y 575; tiêu đề in hoa bắt đầu ≈ y 607, tối đa 3 dòng, cỡ chữ ≈ 32 px; hoạ tiết nền dưới y 725.
@@ -867,7 +875,7 @@ describe("validateEnv", () => {
     expect(validateEnv({ ...base, FAKE_PROVIDERS: "1", VERCEL_ENV: "production" }).ok).toBe(false);
     const dev = validateEnv({ ...base, FAKE_PROVIDERS: "1" });
     expect(dev.ok).toBe(true);
-    expect(dev.ok ? dev.summary.join() : "").toMatch(/giả/);
+    expect(dev.ok ? dev.summary.join() : "").toMatch(/GIẢ LẬP/);
   });
 
   it("không fake mà thiếu key nào thì lỗi nêu đúng tên biến", () => {
