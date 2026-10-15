@@ -74,7 +74,7 @@ export class RenderController extends StateController<RenderState> {
         (label, ratio) => {
           if (run === this.run) this.set({ status: "working", label, percent: ratio * 25 });
         },
-        () => this.cancelRequested,
+        () => this.cancelRequested || run !== this.run,
       );
       if (this.cancelRequested || run !== this.run) throw new RenderCancelledError();
       let lastRatio = 0;

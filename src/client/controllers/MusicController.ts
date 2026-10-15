@@ -111,7 +111,7 @@ export class MusicController extends StateController<MusicState> {
       this.patch({ uploaded: [...this.state.uploaded, track] });
       this.choose(track);
     } catch (error) {
-      this.patch({ error: this.report(error) });
+      if (epoch === this.epoch) this.patch({ error: this.report(error) });
     } finally {
       this.patch({ busy: false });
     }

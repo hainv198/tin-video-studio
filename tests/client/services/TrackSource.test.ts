@@ -25,7 +25,15 @@ describe("TrackSource", () => {
       calls += 1;
       return new Response("");
     }) as unknown as typeof fetch, uploads);
-    for (const uri of ["https://evil.example/a.mp3", "//evil.example/a.mp3", "music/a.mp3"]) {
+    const hostile = [
+      "https://evil.example/a.mp3",
+      "//evil.example/a.mp3",
+      "music/a.mp3",
+      "/\\evil.example/a.mp3",
+      "/\t/evil.example/a.mp3",
+      "/\n/evil.example/a.mp3",
+    ];
+    for (const uri of hostile) {
       const track = MusicTrack.create({ id: "x", title: "X", origin: "library", uri });
       await expect(source.blob(track)).rejects.toThrow("Nguồn nhạc không hợp lệ");
     }
