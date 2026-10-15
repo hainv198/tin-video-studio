@@ -129,4 +129,63 @@ describe("WizardController", () => {
     expect((await uploads.list()).map((m) => m.id).sort()).toEqual([usedImage.id, usedMusic.id].sort());
     expect((await uploads.list()).some((m) => m.id === orphan.id)).toBe(false);
   });
+
+  it("discard giữ file chỉ nằm trong kho (liveUploadIds)", async () => {
+    const { drafts, uploads, session } = setup();
+    const wizard = new WizardController({ session, drafts, uploads, liveUploadIds: () => ["upload-u1"] });
+    await fillAll(session);
+    const pooled = await uploads.put(new Blob(["p"]), { name: "p.jpg", kind: "image" });
+    const orphan = await uploads.put(new Blob(["o"]), { name: "o.jpg", kind: "image" });
+    await wizard.discard();
+    const ids = (await uploads.list()).map((m) => m.id);
+    expect(ids).toContain(pooled.id);
+    expect(ids).not.toContain(orphan.id);
+  });
+
+  it("newProject gọi onReset trước khi dọn file", async () => {
+    const { drafts, uploads, session } = setup();
+    const order: string[] = [];
+    let live: string[] = ["upload-u1"];
+    const wizard = new WizardController({
+      session,
+      drafts,
+      uploads: { list: async () => { order.push("list"); return uploads.list(); }, delete: (id) => uploads.delete(id) },
+      liveUploadIds: () => live,
+      onReset: () => { order.push("reset"); live = []; },
+    });
+    await fillAll(session);
+    await uploads.put(new Blob(["p"]), { name: "p.jpg", kind: "image" });
+    await wizard.newProject();
+    expect(order).toEqual(["reset", "list"]);
+    expect(await uploads.list()).toEqual([]);
+  });
+
+  it("boot chạy hai lần: lượt cũ về muộn sau discard không đề nghị lại bản nháp", async () => {
+    const a = setup();
+    await fillAll(a.session);
+    const session = new StudioSession({ drafts: a.drafts, ids: sequentialIds("n"), schedule: manualScheduler().schedule });
+    const base = await a.drafts.load();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let calls = 0;
+    const slow = {
+      load: async () => {
+        calls += 1;
+        if (calls === 1) await gate;
+        return base;
+      },
+      clear: () => a.drafts.clear(),
+    };
+    const wizard = new WizardController({ session, drafts: slow, uploads: a.uploads });
+    const first = wizard.boot();
+    const second = wizard.boot();
+    await second;
+    expect(wizard.state.resume).not.toBeNull();
+    await wizard.discard();
+    expect(wizard.state.resume).toBeNull();
+    release();
+    await first;
+    expect(wizard.state.resume).toBeNull();
+    expect(wizard.state.booting).toBe(false);
+  });
 });

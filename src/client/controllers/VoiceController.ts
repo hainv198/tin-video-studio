@@ -117,6 +117,12 @@ export class VoiceController extends StateController<VoiceState> {
     this.cancelRequested = true;
   }
 
+  /** Dự án mới: dừng lượt đang chạy và bỏ lỗi, tiến độ của dự án cũ. */
+  reset(): void {
+    this.cancel();
+    this.patch({ error: null, failed: {}, progress: null });
+  }
+
   async previewVoice(): Promise<Blob | null> {
     const { project, voice } = this.deps.session.state;
     if (!project || !voice) {

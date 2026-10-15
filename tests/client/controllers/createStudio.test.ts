@@ -38,4 +38,15 @@ describe("createStudio", () => {
     expect(lost).toBe(1);
     studio.dispose();
   });
+
+  it("newProject làm sạch kho file và dựng lại của dự án cũ", async () => {
+    const studio = createStudio(createClientServices(env()), { schedule: () => () => {} });
+    studio.project.createFrom({ ...SAMPLE_NEWS, templateId: "theanh28" });
+    await studio.wizard.newProject();
+    expect(studio.session.state.project).toBeNull();
+    expect(studio.footage.pool()).toEqual([]);
+    expect(studio.render.state.status).toBe("idle");
+    expect(studio.search.state.byScene).toEqual({});
+    studio.dispose();
+  });
 });

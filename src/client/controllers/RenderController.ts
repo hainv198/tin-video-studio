@@ -99,6 +99,14 @@ export class RenderController extends StateController<RenderState> {
     this.deps.cancelRender();
   }
 
+  /** Dự án mới: huỷ lượt dựng, thu hồi url bản cũ, về `idle` (trừ `unsupported`). */
+  reset(): void {
+    if (this.state.status === "unsupported") return;
+    if (this.state.status === "working") this.cancel();
+    if (this.state.status === "done") this.deps.revokeUrl(this.state.url);
+    this.set({ status: "idle" });
+  }
+
   dispose(): void {
     this.cancel();
     if (this.state.status === "done") this.deps.revokeUrl(this.state.url);

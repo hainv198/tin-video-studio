@@ -59,6 +59,11 @@ export class FootageController extends StateController<FootageState> {
     this.finishWith(errors);
   }
 
+  /** Dự án mới: bỏ kho file và lỗi của dự án cũ. */
+  reset(): void {
+    this.patch({ added: [], error: null });
+  }
+
   /** Có lỗi thì hiện; không lỗi thì chỉ xoá lỗi cũ khi không còn lần tải nào khác đang chạy. */
   private finishWith(errors: string[]): void {
     if (errors.length > 0) this.patch({ error: errors.join("; ") });

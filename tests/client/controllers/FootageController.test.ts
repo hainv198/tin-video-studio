@@ -201,4 +201,15 @@ describe("FootageController", () => {
     const lost = uploadToFootage("g", "upload-khong-co", "image", { width: 10, height: 10 });
     expect(await ctrl.previewSource(lost)).toBeNull();
   });
+
+  it("reset xoá kho file đã thêm và lỗi", async () => {
+    const { ctrl } = setup(2);
+    await ctrl.addFiles([img("a.jpg")]);
+    await ctrl.addFiles([new File([new Uint8Array(1)], "x.txt", { type: "text/plain" })]);
+    expect(ctrl.state.added).toHaveLength(1);
+    expect(ctrl.state.error).not.toBeNull();
+    ctrl.reset();
+    expect(ctrl.state.added).toEqual([]);
+    expect(ctrl.state.error).toBeNull();
+  });
 });

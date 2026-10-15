@@ -107,4 +107,15 @@ describe("MusicController", () => {
     expect(session.state.music).toBeNull();
     expect(await store.keys("blob:")).toEqual([]);
   });
+
+  it("reset xoá nhạc đã tải lên và lỗi, giữ kho nhạc", async () => {
+    const { ctrl } = setup();
+    await ctrl.loadLibrary();
+    await ctrl.uploadTrack(mp3());
+    expect(ctrl.state.uploaded).toHaveLength(1);
+    ctrl.reset();
+    expect(ctrl.state.uploaded).toEqual([]);
+    expect(ctrl.state.error).toBeNull();
+    expect(ctrl.state.library).toHaveLength(2);
+  });
 });

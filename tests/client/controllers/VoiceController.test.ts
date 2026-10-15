@@ -143,4 +143,16 @@ describe("VoiceController", () => {
     expect(await ctrl.previewVoice()).toBeNull();
     expect(calls).toEqual([]);
   });
+
+  it("reset xoá lỗi từng câu, lỗi chung và tiến độ của dự án cũ", async () => {
+    const { ctrl, session, failOn } = setup();
+    failOn.add(session.state.project!.scenes[1]!.text);
+    await ctrl.generate();
+    expect(Object.keys(ctrl.state.failed).length).toBe(1);
+    ctrl.reset();
+    expect(ctrl.state.failed).toEqual({});
+    expect(ctrl.state.error).toBeNull();
+    expect(ctrl.state.progress).toBeNull();
+    expect(ctrl.state.generating).toBe(false);
+  });
 });

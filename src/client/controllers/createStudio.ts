@@ -1,5 +1,6 @@
 import type { ClientServices } from "@/client/container";
 import { defaultKeywordSuggester } from "@/client/services/KeywordSuggester";
+import { parseUploadUri } from "@/client/media/footageFactory";
 import { randomIds, type IdGenerator } from "@/domain/ids";
 import { BrandController } from "./BrandController";
 import { FootageController } from "./FootageController";
@@ -76,23 +77,46 @@ export function createStudio(services: ClientServices, options: StudioOptions = 
     onAuthLost,
   });
 
+  const footage = new FootageController({ session, uploads: services.uploads, probe: services.probe, ids, onAuthLost });
+  const voice = new VoiceController({ session, tts: services.tts, decoder: services.decoder, onAuthLost });
+  const music = new MusicController({
+    session,
+    library: services.music,
+    uploads: services.uploads,
+    tracks: services.tracks,
+    probe: services.probe,
+    onAuthLost,
+  });
+  const wizard = new WizardController({
+    session,
+    drafts: services.drafts,
+    uploads: services.uploads,
+    liveUploadIds: () =>
+      footage.pool().flatMap((f) => {
+        const s = f.snapshot();
+        const id = s.kind !== "fallback" ? parseUploadUri(s.source.uri) : null;
+        return id ? [id] : [];
+      }),
+    onReset: () => {
+      footage.reset();
+      search.reset();
+      voice.reset();
+      music.reset();
+      render.reset();
+    },
+    onAuthLost,
+  });
+
   return {
     services,
     session,
-    wizard: new WizardController({ session, drafts: services.drafts, uploads: services.uploads, onAuthLost }),
+    wizard,
     brand: new BrandController({ session, templates: services.templates, brands: services.brands, onAuthLost }),
     project: new ProjectController({ session, ids, onAuthLost }),
-    voice: new VoiceController({ session, tts: services.tts, decoder: services.decoder, onAuthLost }),
-    footage: new FootageController({ session, uploads: services.uploads, probe: services.probe, ids, onAuthLost }),
+    voice,
+    footage,
     search,
-    music: new MusicController({
-      session,
-      library: services.music,
-      uploads: services.uploads,
-      tracks: services.tracks,
-      probe: services.probe,
-      onAuthLost,
-    }),
+    music,
     render,
     dispose() {
       render.dispose();

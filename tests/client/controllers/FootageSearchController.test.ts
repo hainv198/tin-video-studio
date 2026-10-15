@@ -357,4 +357,14 @@ describe("FootageSearchController", () => {
     expect(ctrl.state.byScene.s2?.error).not.toBeNull();
     expect(ctrl.state.byScene.s2?.query).toBe("Công an vào cuộc.");
   });
+
+  it("reset huỷ lượt tìm và xoá kết quả, cảnh báo của dự án cũ", async () => {
+    const { ctrl } = setup({ news: { image: [item("n1")], warnings: ["Cảnh báo"] } });
+    await ctrl.search("s2", "news");
+    expect(Object.keys(ctrl.state.byScene)).toEqual(["s2"]);
+    expect(ctrl.state.warnings).toEqual(["Cảnh báo"]);
+    ctrl.reset();
+    expect(ctrl.state.byScene).toEqual({});
+    expect(ctrl.state.warnings).toEqual([]);
+  });
 });

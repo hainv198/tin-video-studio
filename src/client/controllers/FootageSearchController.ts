@@ -154,6 +154,13 @@ export class FootageSearchController extends StateController<FootageSearchState>
     if (changed) this.patch({ byScene });
   }
 
+  /** Dự án mới: huỷ lượt đang chạy và bỏ kết quả, cảnh báo của dự án cũ. */
+  reset(): void {
+    this.cancel();
+    this.manual.clear();
+    this.patch({ byScene: {}, warnings: [], autoRunning: false });
+  }
+
   private async fillScene(sceneId: string, run: number): Promise<void> {
     if (run !== this.run) return;
     const { project } = this.deps.session.state;

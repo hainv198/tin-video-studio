@@ -125,4 +125,24 @@ describe("RenderController", () => {
     await silent.ctrl.checkSupport();
     expect(silent.ctrl.state).toEqual({ status: "unsupported", missing: ["Bộ dựng không phản hồi"] });
   });
+
+  it("reset thu hồi url bản đã dựng và về idle; giữ unsupported", async () => {
+    const a = setup();
+    await a.ctrl.start();
+    a.ctrl.reset();
+    expect(a.revoked).toEqual(["blob:0"]);
+    expect(a.ctrl.state).toEqual({ status: "idle" });
+    const b = setup({ support: async () => ({ ok: false, missing: ["VideoEncoder"] }) });
+    await b.ctrl.checkSupport();
+    b.ctrl.reset();
+    expect(b.ctrl.state).toEqual({ status: "unsupported", missing: ["VideoEncoder"] });
+  });
+
+  it("reset khi lỗi thì về idle", async () => {
+    const { ctrl } = setup({ build: async () => { throw new Error("x"); } });
+    await ctrl.start();
+    expect(ctrl.state.status).toBe("error");
+    ctrl.reset();
+    expect(ctrl.state).toEqual({ status: "idle" });
+  });
 });

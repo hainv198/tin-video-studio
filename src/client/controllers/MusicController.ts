@@ -32,6 +32,11 @@ export class MusicController extends StateController<MusicState> {
     super({ library: [], uploaded: [], loading: false, busy: false, error: null }, deps.onAuthLost);
   }
 
+  /** Dự án mới: bỏ nhạc tải lên và lỗi của dự án cũ; kho nhạc giữ nguyên. */
+  reset(): void {
+    this.patch({ uploaded: [], error: null });
+  }
+
   async loadLibrary(): Promise<void> {
     this.patch({ loading: true, error: null });
     try {

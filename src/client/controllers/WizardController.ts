@@ -17,29 +17,37 @@ export interface WizardDeps {
   session: StudioSession;
   drafts: Pick<DraftRepository, "load" | "clear">;
   uploads: Pick<UploadRepository, "list" | "delete">;
+  /** Id file tải lên cần giữ thêm (ví dụ kho file của bước 3). */
+  liveUploadIds?: () => Iterable<string>;
+  /** Gọi khi bắt đầu dự án mới, trước khi dọn file. */
+  onReset?: () => void;
   onAuthLost?: () => void;
 }
 
 /** Điều hướng 5 bước, mở lại/bỏ bản nháp, dự án mới, dọn file tải lên không còn dùng. */
 export class WizardController extends StateController<WizardState> {
   private pending: (DraftBody & { savedAt: string }) | null = null;
+  private bootToken = 0;
+  private latestBooting = 0;
 
   constructor(private readonly deps: WizardDeps) {
     super({ step: "news", booting: false, resume: null, error: null }, deps.onAuthLost);
   }
 
   async boot(): Promise<void> {
+    const token = ++this.bootToken;
+    this.latestBooting = token;
     this.patch({ booting: true, error: null });
     try {
       const draft = await this.deps.drafts.load();
-      if (draft && !this.deps.session.state.project) {
+      if (token === this.bootToken && draft && !this.deps.session.state.project) {
         this.pending = draft;
         this.patch({ resume: { savedAt: draft.savedAt, title: draft.project.title } });
       }
     } catch (error) {
-      this.patch({ error: this.report(error) });
+      if (token === this.bootToken) this.patch({ error: this.report(error) });
     } finally {
-      this.patch({ booting: false });
+      if (token === this.latestBooting) this.patch({ booting: false });
     }
   }
 
@@ -57,6 +65,7 @@ export class WizardController extends StateController<WizardState> {
   }
 
   async discard(): Promise<void> {
+    this.bootToken++;
     this.pending = null;
     await this.deps.drafts.clear().catch(() => undefined);
     this.patch({ resume: null, error: null });
@@ -64,8 +73,10 @@ export class WizardController extends StateController<WizardState> {
   }
 
   async newProject(): Promise<void> {
+    this.bootToken++;
     this.pending = null;
     this.deps.session.reset();
+    this.deps.onReset?.();
     await this.deps.drafts.clear().catch(() => undefined);
     this.patch({ step: "news", resume: null, error: null });
     await this.cleanupUploads();
@@ -103,6 +114,7 @@ export class WizardController extends StateController<WizardState> {
       }
       const musicId = music ? parseUploadUri(music.uri) : null;
       if (musicId) used.add(musicId);
+      for (const id of this.deps.liveUploadIds?.() ?? []) used.add(id);
       for (const meta of await this.deps.uploads.list()) {
         if (!used.has(meta.id)) await this.deps.uploads.delete(meta.id);
       }
