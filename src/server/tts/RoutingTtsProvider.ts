@@ -24,17 +24,19 @@ export class RoutingTtsProvider implements TtsProvider {
     const voices: TtsVoice[] = [];
     let lastError: unknown;
     let anyOk = false;
+    let failed = false;
     for (const result of settled) {
       if (result.status === "fulfilled") {
         anyOk = true;
         voices.push(...result.value);
       } else {
+        failed = true;
         lastError = result.reason;
         console.error(result.reason);
       }
     }
     if (!anyOk) throw lastError;
-    return lastError === undefined ? voices : Object.assign(voices, { partial: true });
+    return failed ? Object.assign(voices, { partial: true }) : voices;
   }
 
   async synthesize(request: SynthesisRequest): Promise<SynthesisResult> {
