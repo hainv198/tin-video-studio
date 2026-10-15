@@ -4,7 +4,12 @@ import { useEffect, useState } from "react";
 import type { Studio } from "@/client/controllers/createStudio";
 import type { Footage } from "@/domain/Footage";
 
+// Remount theo id footage: state tải dở của footage trước (URL đã thu hồi) không bao giờ hiện lại khi đổi A→B→A.
 export function FootagePreview({ studio, footage }: { studio: Studio; footage: Footage | undefined }) {
+  return <FootagePreviewInner key={footage?.id ?? "none"} studio={studio} footage={footage} />;
+}
+
+function FootagePreviewInner({ studio, footage }: { studio: Studio; footage: Footage | undefined }) {
   const [loaded, setLoaded] = useState<{ for: Footage | undefined; src: string | null } | null>(null);
   // Chỉ dùng kết quả nếu nó thuộc đúng footage hiện tại: tránh hiện ảnh cũ trong lúc tải nguồn mới.
   const src = loaded && loaded.for === footage ? loaded.src : null;

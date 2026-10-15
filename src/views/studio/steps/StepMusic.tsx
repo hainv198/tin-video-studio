@@ -47,11 +47,15 @@ export function StepMusic({ studio }: { studio: Studio }) {
     if (!blob || req !== seq.current) return;
     const url = studio.services.env.createUrl(blob);
     const audio = new Audio(url);
-    audio.onended = () => stop();
-    audio.onerror = () => stop();
+    // Handler của bản nghe thử cũ không được dừng bản mới hơn: chỉ hành động nếu audio này vẫn là bản đang phát.
+    const stopIfCurrent = () => {
+      if (playing.current?.audio === audio) stop();
+    };
+    audio.onended = stopIfCurrent;
+    audio.onerror = stopIfCurrent;
     playing.current = { audio, url, trackId };
     setPlayingId(trackId);
-    audio.play().catch(() => stop());
+    audio.play().catch(stopIfCurrent);
   }
 
   return (
