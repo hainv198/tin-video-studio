@@ -82,7 +82,7 @@ export class VideoFrameProvider implements FrameProvider {
 
   /** Nhả bộ giải mã và canvas giữ trong bộ đệm; `frameAt` sau đó tự mở lại bộ đọc. */
   release(): void {
-    void this.iterator?.return();
+    this.iterator?.return().catch(() => {});
     this.iterator = null;
     this.current = null;
     this.upcoming = null;
