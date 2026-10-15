@@ -15,7 +15,9 @@ export function safeNextPath(next: string | null): string {
   try {
     const url = new URL(next, INTERNAL_ORIGIN);
     if (url.origin !== INTERNAL_ORIGIN) return FALLBACK_PATH;
-    return url.pathname + url.search + url.hash;
+    const path = url.pathname + url.search + url.hash;
+    if (path.startsWith("//") || path.startsWith("/\\")) return FALLBACK_PATH;
+    return path;
   } catch {
     return FALLBACK_PATH;
   }

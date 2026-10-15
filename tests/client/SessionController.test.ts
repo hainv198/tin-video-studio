@@ -69,6 +69,11 @@ describe("safeNextPath", () => {
     expect(safeNextPath("/\t/evil.example")).toBe("/studio");
     expect(safeNextPath("/\n/evil.example")).toBe("/studio");
     expect(safeNextPath("/\r/evil.example")).toBe("/studio");
+    expect(safeNextPath("/.//evil.example")).toBe("/studio");
+    expect(safeNextPath("/..//evil.example")).toBe("/studio");
+    expect(safeNextPath("/a/..//evil.example")).toBe("/studio");
+    expect(safeNextPath("/%2e%2e//evil.example")).toBe("/studio");
+    expect(safeNextPath("/\t.//evil.example")).toBe("/studio");
     expect(safeNextPath("https://evil.example")).toBe("/studio");
     expect(safeNextPath("/")).toBe("/");
   });
