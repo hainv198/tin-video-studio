@@ -62,12 +62,39 @@ describe("createStudio", () => {
     const file = (n: string) => new File([new Uint8Array(10)], n, { type: "image/jpeg" });
     const run = studio.footage.addFiles([file("a.jpg"), file("b.jpg")]);
     while (calls < 2) await new Promise((r) => setTimeout(r, 0));
-    await new Promise((r) => setTimeout(r, 10));
+    while ((await services.uploads.list()).length < 1) await new Promise((r) => setTimeout(r, 0));
     expect((await services.uploads.list()).length).toBe(1);
     await studio.wizard.discard();
     expect((await services.uploads.list()).length).toBe(1);
     release();
     await run;
+    studio.dispose();
+  });
+
+  it("discard không xoá nhạc đã tải lên nhưng chưa được chọn", async () => {
+    const services = createClientServices(env());
+    (services.probe as unknown as { audio: () => Promise<unknown> }).audio = async () => ({ durationSec: 30 });
+    const studio = createStudio(services, { schedule: () => () => {} });
+    await studio.music.uploadTrack(new File([new Uint8Array(10)], "n.mp3", { type: "audio/mpeg" }));
+    studio.music.none();
+    expect((await services.uploads.list()).length).toBe(1);
+    await studio.wizard.discard();
+    expect((await services.uploads.list()).length).toBe(1);
+    studio.dispose();
+  });
+
+  it("lỗi lưu bản nháp hiện thành thông báo trên wizard", async () => {
+    const services = createClientServices(env());
+    (services.drafts as unknown as { save: () => Promise<never> }).save = async () => {
+      throw new Error("QuotaExceeded");
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const studio = createStudio(services, { schedule: () => () => {} });
+    studio.project.createFrom({ ...SAMPLE_NEWS, templateId: "theanh28" });
+    await studio.session.flush();
+    expect(studio.wizard.state.error).toBe("Không lưu được bản nháp (bộ nhớ trình duyệt đầy hoặc bị chặn)");
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
     studio.dispose();
   });
 

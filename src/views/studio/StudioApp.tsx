@@ -33,6 +33,7 @@ export function StudioApp() {
     return () => {
       studio.render.cancel();
       studio.search.cancel();
+      studio.voice.cancel();
       void studio.session.flush();
     };
   }, [studio]);

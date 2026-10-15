@@ -1,4 +1,5 @@
 import type { ClientServices } from "@/client/container";
+import { parseUploadUri } from "@/client/media/footageFactory";
 import { defaultKeywordSuggester } from "@/client/services/KeywordSuggester";
 import { randomIds, type IdGenerator } from "@/domain/ids";
 import { BrandController } from "./BrandController";
@@ -41,10 +42,15 @@ const browserSchedule: SessionDeps["schedule"] = (fn, ms) => {
 export function createStudio(services: ClientServices, options: StudioOptions = {}): Studio {
   const ids = options.ids ?? randomIds();
   const onAuthLost = options.onAuthLost;
+  let reportSaveError: (message: string) => void = () => {};
   const session = new StudioSession({
     drafts: services.drafts,
     ids,
     schedule: options.schedule ?? browserSchedule,
+    onSaveError: (error) => {
+      console.warn("Không lưu được bản nháp", error);
+      reportSaveError("Không lưu được bản nháp (bộ nhớ trình duyệt đầy hoặc bị chặn)");
+    },
   });
   const builder = new RenderJobBuilder({
     templates: services.templates,
@@ -93,8 +99,14 @@ export function createStudio(services: ClientServices, options: StudioOptions = 
     session,
     drafts: services.drafts,
     uploads: services.uploads,
-    liveUploadIds: () => footage.uploadIds(),
-    deferCleanup: () => footage.ingesting,
+    liveUploadIds: () => [
+      ...footage.uploadIds(),
+      ...music.state.uploaded.flatMap((t) => {
+        const id = parseUploadUri(t.uri);
+        return id ? [id] : [];
+      }),
+    ],
+    deferCleanup: () => footage.ingesting || music.state.busy,
     onReset: () => {
       footage.reset();
       search.reset();
@@ -104,6 +116,8 @@ export function createStudio(services: ClientServices, options: StudioOptions = 
     },
     onAuthLost,
   });
+
+  reportSaveError = (message) => wizard.reportSaveError(message);
 
   return {
     services,

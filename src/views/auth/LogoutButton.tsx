@@ -1,13 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { SessionController } from "@/client/controllers/SessionController";
 import { AuthClient } from "@/client/services/AuthClient";
 
 export function LogoutButton() {
   const controller = useMemo(() => new SessionController(new AuthClient()), []);
-  const router = useRouter();
   return (
     <button
       type="button"
@@ -16,8 +14,8 @@ export function LogoutButton() {
         try {
           await controller.logout();
         } finally {
-          router.replace("/dang-nhap");
-          router.refresh();
+          // Tải lại cả trang (không điều hướng mềm) để bỏ singleton studio của phiên cũ.
+          window.location.assign(new URL("/dang-nhap", window.location.origin).href);
         }
       }}
     >

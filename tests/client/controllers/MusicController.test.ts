@@ -10,9 +10,17 @@ const tracks = [
   MusicTrack.create({ id: "b", title: "Bản B", origin: "library", uri: "/music/b.mp3" }),
 ];
 
-function setup(probe: Partial<MediaProbe> = {}) {
+function setup(probe: Partial<MediaProbe> = {}, hold?: Promise<void>) {
   const made = makeSessionWithProject(1);
-  const { uploads, store } = memoryUploads("m");
+  const { uploads: rawUploads, store } = memoryUploads("m");
+  const uploads = {
+    put: async (...args: Parameters<typeof rawUploads.put>) => {
+      const meta = await rawUploads.put(...args);
+      if (hold) await hold;
+      return meta;
+    },
+    delete: (id: string) => rawUploads.delete(id),
+  };
   const fullProbe: MediaProbe = {
     image: async () => ({ width: 1, height: 1 }),
     video: async () => ({ width: 1, height: 1, durationSec: 1 }),
@@ -32,12 +40,39 @@ function setup(probe: Partial<MediaProbe> = {}) {
     tracks: trackSource,
     probe: fullProbe,
   });
-  return { ...made, ctrl, store };
+  return { ...made, ctrl, store, rawUploads };
 }
 
 const mp3 = (name = "nhac.mp3", size = 10) => new File([new Uint8Array(size)], name, { type: "audio/mpeg" });
 
 describe("MusicController", () => {
+  it("reset giữa lúc tải nhạc lên: file vừa lưu bị xoá, không chọn không thêm", async () => {
+    let release!: () => void;
+    const hold = new Promise<void>((r) => (release = r));
+    const { ctrl, session, rawUploads } = setup({}, hold);
+    const run = ctrl.uploadTrack(mp3());
+    while ((await rawUploads.list()).length === 0) await new Promise((r) => setTimeout(r, 0));
+    ctrl.reset();
+    release();
+    await run;
+    expect(session.state.music).toBeNull();
+    expect(ctrl.state.uploaded).toEqual([]);
+    expect(await rawUploads.list()).toEqual([]);
+    expect(ctrl.state.busy).toBe(false);
+  });
+
+  it("uploadTrack lần hai khi đang bận bị bỏ qua", async () => {
+    let release!: () => void;
+    const hold = new Promise<void>((r) => (release = r));
+    const { ctrl, rawUploads } = setup({}, hold);
+    const first = ctrl.uploadTrack(mp3("a.mp3"));
+    await ctrl.uploadTrack(mp3("b.mp3"));
+    release();
+    await first;
+    expect(ctrl.state.uploaded).toHaveLength(1);
+    expect(await rawUploads.list()).toHaveLength(1);
+  });
+
   it("loadLibrary nạp kho nhạc", async () => {
     const { ctrl } = setup();
     await ctrl.loadLibrary();

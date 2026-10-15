@@ -152,7 +152,15 @@ export class StudioSession {
     try {
       await this.deps.drafts.save(buildDraftBody({ project, voice, narrations: [...narrations.values()], footage, music }));
     } catch (error) {
+      this.notifySaveError(error);
+    }
+  }
+
+  private notifySaveError(error: unknown): void {
+    try {
       this.deps.onSaveError?.(error);
+    } catch {
+      // callback hỏng không được làm đứt hàng đợi ghi
     }
   }
 
@@ -160,7 +168,7 @@ export class StudioSession {
     try {
       await this.deps.drafts.clear();
     } catch (error) {
-      this.deps.onSaveError?.(error);
+      this.notifySaveError(error);
     }
   }
 

@@ -60,6 +60,20 @@ describe("WizardController", () => {
     expect(b.state.resume).toEqual({ savedAt: "2026-10-14T08:00:00.000Z", title: "Tiêu đề bản tin" });
   });
 
+  it("bắt đầu dự án mới khi đang có lời đề nghị thì lời đề nghị biến mất và resume không ghi đè", async () => {
+    const a = setup();
+    await fillAll(a.session);
+    const session = new StudioSession({ drafts: a.drafts, ids: sequentialIds("n"), schedule: manualScheduler().schedule });
+    const wizard = new WizardController({ session, drafts: a.drafts, uploads: a.uploads });
+    await wizard.boot();
+    expect(wizard.state.resume).not.toBeNull();
+    const current = makeProject(1);
+    session.update((d) => ({ ...d, project: current }));
+    expect(wizard.state.resume).toBeNull();
+    await wizard.resume();
+    expect(session.state.project).toBe(current);
+  });
+
   it("không có bản nháp thì không đề nghị gì", async () => {
     const { wizard } = setup();
     await wizard.boot();

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Studio } from "@/client/controllers/createStudio";
+import { MusicTrack } from "@/domain/MusicTrack";
 import { useController } from "@/views/hooks/useController";
 
 export function StepMusic({ studio }: { studio: Studio }) {
@@ -87,12 +88,13 @@ export function StepMusic({ studio }: { studio: Studio }) {
           </li>
         ))}
       </ul>
-      <label className="w-fit cursor-pointer rounded-md bg-neutral-800 px-4 py-2 text-sm hover:bg-neutral-700">
+      <label className="w-fit cursor-pointer rounded-md bg-neutral-800 px-4 py-2 text-sm hover:bg-neutral-700 focus-within:ring-2 focus-within:ring-emerald-500">
         {music.busy ? "Đang xử lý…" : "Tải nhạc của bạn lên (MP3, WAV, M4A)"}
         <input
           type="file"
           accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,.mp3,.wav,.m4a"
-          className="hidden"
+          className="sr-only"
+          disabled={music.busy}
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) void studio.music.uploadTrack(file);
@@ -102,7 +104,7 @@ export function StepMusic({ studio }: { studio: Studio }) {
       </label>
       {selected && (
         <label className="flex flex-col gap-1 text-sm">
-          Âm lượng nhạc: thấp hơn giọng {selected.levelBelowVoiceDb} dB (mặc định 15 dB)
+          Âm lượng nhạc: thấp hơn giọng {selected.levelBelowVoiceDb} dB (mặc định {MusicTrack.BELOW_VOICE_DB} dB)
           <input
             type="range"
             min={-6}

@@ -18,6 +18,20 @@ describe("TrackSource", () => {
     expect(new Uint8Array(await source.bytes(lib))).toEqual(new Uint8Array([9, 8, 7]));
   });
 
+  it("nhạc kho: uri không phải đường dẫn nội bộ bị từ chối, không gọi fetch", async () => {
+    const { uploads } = memoryUploads();
+    let calls = 0;
+    const source = new TrackSource((async () => {
+      calls += 1;
+      return new Response("");
+    }) as unknown as typeof fetch, uploads);
+    for (const uri of ["https://evil.example/a.mp3", "//evil.example/a.mp3", "music/a.mp3"]) {
+      const track = MusicTrack.create({ id: "x", title: "X", origin: "library", uri });
+      await expect(source.blob(track)).rejects.toThrow("Nguồn nhạc không hợp lệ");
+    }
+    expect(calls).toBe(0);
+  });
+
   it("nhạc kho: lỗi HTTP và hết phiên thành ApiError", async () => {
     const { uploads } = memoryUploads();
     const notFound = new TrackSource((async () => new Response("", { status: 404 })) as unknown as typeof fetch, uploads);

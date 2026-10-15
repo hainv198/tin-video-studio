@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { Studio } from "@/client/controllers/createStudio";
 import { staleSceneIds } from "@/client/controllers/readiness";
+import { VoiceSettings } from "@/domain/VoiceSettings";
 import { useController } from "@/views/hooks/useController";
 
 export function StepVoice({ studio }: { studio: Studio }) {
@@ -62,13 +63,13 @@ export function StepVoice({ studio }: { studio: Studio }) {
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          Tốc độ đọc: {(settings?.speakingRate ?? 1.07).toFixed(2)}
+          Tốc độ đọc: {(settings?.speakingRate ?? VoiceSettings.DEFAULT_RATE).toFixed(2)}
           <input
             type="range"
             min={0.8}
             max={1.3}
             step={0.01}
-            value={settings?.speakingRate ?? 1.07}
+            value={settings?.speakingRate ?? VoiceSettings.DEFAULT_RATE}
             onChange={(e) => studio.voice.setRate(Number(e.target.value))}
           />
         </label>

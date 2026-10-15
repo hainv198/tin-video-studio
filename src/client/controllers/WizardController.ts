@@ -34,6 +34,18 @@ export class WizardController extends StateController<WizardState> {
 
   constructor(private readonly deps: WizardDeps) {
     super({ step: "news", booting: false, resume: null, error: null }, deps.onAuthLost);
+    // Đã có dự án đang làm thì lời đề nghị mở lại bản nháp hết hiệu lực.
+    deps.session.subscribe(() => {
+      if (this.pending && deps.session.state.project !== null) {
+        this.pending = null;
+        this.patch({ resume: null });
+      }
+    });
+  }
+
+  /** Báo lỗi lưu bản nháp (do session gặp, không do thao tác của wizard). */
+  reportSaveError(message: string): void {
+    this.patch({ error: message });
   }
 
   async boot(): Promise<void> {
@@ -57,6 +69,10 @@ export class WizardController extends StateController<WizardState> {
     const draft = this.pending;
     if (!draft) return;
     this.pending = null;
+    if (this.deps.session.state.project !== null) {
+      this.patch({ resume: null });
+      return;
+    }
     try {
       this.deps.session.restore(draft);
       this.patch({ resume: null, error: null, step: firstIncompleteStep(this.deps.session.state) });

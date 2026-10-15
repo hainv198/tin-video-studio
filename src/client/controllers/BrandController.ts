@@ -1,12 +1,11 @@
 import { BrandKit, type BrandFieldSpec } from "@/domain/BrandKit";
 import { ValidationError } from "@/domain/errors";
 import { classifyUpload } from "@/client/media/UploadValidator";
-import type { BrandRepository } from "@/client/storage/BrandRepository";
+import { MAX_LOGO_BYTES, type BrandRepository } from "@/client/storage/BrandRepository";
 import type { TemplateRegistry } from "@/templates/TemplateRegistry";
 import { StateController } from "./StateController";
 import type { StudioSession } from "./StudioSession";
 
-const MAX_LOGO_BYTES = 5 * 1024 * 1024;
 
 export interface BrandPanelState {
   templateId: string;

@@ -20,7 +20,7 @@ export interface MusicState {
 export interface MusicControllerDeps {
   session: StudioSession;
   library: Pick<MusicLibrary, "list">;
-  uploads: Pick<UploadRepository, "put">;
+  uploads: Pick<UploadRepository, "put" | "delete">;
   tracks: Pick<TrackSource, "blob">;
   probe: MediaProbe;
   onAuthLost?: () => void;
@@ -28,12 +28,16 @@ export interface MusicControllerDeps {
 
 /** Bước 4: chọn nhạc trong kho, tải nhạc lên, hoặc không nhạc; chỉnh âm lượng ±6 dB. */
 export class MusicController extends StateController<MusicState> {
+  /** Tăng mỗi lần reset: lần tải bắt đầu ở dự án cũ phải bỏ kết quả. */
+  private epoch = 0;
+
   constructor(private readonly deps: MusicControllerDeps) {
     super({ library: [], uploaded: [], loading: false, busy: false, error: null }, deps.onAuthLost);
   }
 
   /** Dự án mới: bỏ nhạc tải lên và lỗi của dự án cũ; kho nhạc giữ nguyên. */
   reset(): void {
+    this.epoch += 1;
     this.patch({ uploaded: [], error: null });
   }
 
@@ -87,11 +91,17 @@ export class MusicController extends StateController<MusicState> {
   }
 
   async uploadTrack(file: File): Promise<void> {
+    if (this.state.busy) return;
+    const epoch = this.epoch;
     this.patch({ busy: true, error: null });
     try {
       classifyUpload(file, ["audio"]);
       await this.deps.probe.audio(file); // kiểm giải mã được trước khi lưu
       const meta = await this.deps.uploads.put(file, { name: file.name, kind: "audio" });
+      if (epoch !== this.epoch) {
+        await this.deps.uploads.delete(meta.id).catch(() => {});
+        return;
+      }
       const track = MusicTrack.create({
         id: meta.id,
         title: file.name.replace(/\.[^.]+$/, ""),

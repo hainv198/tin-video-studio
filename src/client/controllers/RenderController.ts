@@ -37,6 +37,9 @@ const STAGE_LABEL: Record<Progress["stage"], string> = {
 /** Bước 5: dựng video và trả về MP4 để xem lại, tải về. */
 export class RenderController extends StateController<RenderState> {
   private cancelRequested = false;
+  /** Đổi mỗi lần bắt đầu/huỷ/reset: kết quả của lượt dựng cũ bị bỏ. */
+  private run = 0;
+  private dirtyDuringWork = false;
 
   constructor(private readonly deps: RenderControllerDeps) {
     super({ status: "idle" }, deps.onAuthLost);
@@ -47,7 +50,7 @@ export class RenderController extends StateController<RenderState> {
     try {
       const report = await this.deps.support();
       if (!report.ok) {
-        this.set({ status: "unsupported", missing: report.missing });
+        if (this.state.status === "idle") this.set({ status: "unsupported", missing: report.missing });
         return;
       }
       const missing = await this.deps.probeWorker();
@@ -61,21 +64,28 @@ export class RenderController extends StateController<RenderState> {
     if (this.state.status === "working" || this.state.status === "unsupported") return;
     if (this.state.status === "done") this.deps.revokeUrl(this.state.url);
     this.cancelRequested = false;
+    this.dirtyDuringWork = false;
+    const run = ++this.run;
     this.set({ status: "working", label: "Chuẩn bị", percent: 0 });
     try {
       const data = this.deps.session.state;
       const { job, warnings } = await this.deps.builder.build(
         data,
-        (label, ratio) => this.set({ status: "working", label, percent: ratio * 25 }),
+        (label, ratio) => {
+          if (run === this.run) this.set({ status: "working", label, percent: ratio * 25 });
+        },
         () => this.cancelRequested,
       );
-      if (this.cancelRequested) throw new RenderCancelledError();
+      if (this.cancelRequested || run !== this.run) throw new RenderCancelledError();
       let lastRatio = 0;
       const result = await this.deps.render(job, (p) => {
+        if (run !== this.run) return;
         if (p.frame && p.totalFrames) lastRatio = p.frame / p.totalFrames;
         const label = p.stage === "video" ? `${STAGE_LABEL.video} ${Math.round(lastRatio * 100)}%` : STAGE_LABEL[p.stage];
         this.set({ status: "working", label, percent: 25 + lastRatio * 70 });
       });
+      if (run !== this.run) return;
+      if (this.cancelRequested) throw new RenderCancelledError();
       const project = data.project!;
       this.set({
         status: "done",
@@ -84,9 +94,10 @@ export class RenderController extends StateController<RenderState> {
         sizeBytes: result.blob.size,
         fileName: fileNameFor(project.displayTitle, project.publishDate),
         warnings,
-        stale: false,
+        stale: this.dirtyDuringWork,
       });
     } catch (error) {
+      if (run !== this.run) return;
       if (error instanceof RenderCancelledError) {
         this.set({ status: "idle" });
         return;
@@ -97,12 +108,15 @@ export class RenderController extends StateController<RenderState> {
 
   /** Dự án đổi sau khi dựng xong: giữ video nhưng đánh dấu đã cũ. */
   markStale(): void {
-    if (this.state.status === "done" && !this.state.stale) this.set({ ...this.state, stale: true });
+    if (this.state.status === "working") this.dirtyDuringWork = true;
+    else if (this.state.status === "done" && !this.state.stale) this.set({ ...this.state, stale: true });
   }
 
   cancel(): void {
     this.cancelRequested = true;
+    this.run += 1;
     this.deps.cancelRender();
+    if (this.state.status === "working") this.set({ status: "idle" });
   }
 
   /** Dự án mới: huỷ lượt dựng, thu hồi url bản cũ, về `idle` (trừ `unsupported`). */

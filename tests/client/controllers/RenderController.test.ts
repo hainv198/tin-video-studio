@@ -151,6 +151,89 @@ describe("RenderController", () => {
     expect(b.ctrl.state).toEqual({ status: "unsupported", missing: ["VideoEncoder"] });
   });
 
+  function gate() {
+    let release!: () => void;
+    const promise = new Promise<void>((r) => (release = r));
+    return { promise, release };
+  }
+
+  it("markStale khi đang dựng thì bản dựng xong được đánh dấu cũ", async () => {
+    const g = gate();
+    const { ctrl } = setup({
+      render: async () => {
+        await g.promise;
+        return { blob: new Blob(["mp4"]), durationSec: 1 };
+      },
+    });
+    const run = ctrl.start();
+    ctrl.markStale();
+    g.release();
+    await run;
+    expect(ctrl.state).toMatchObject({ status: "done", stale: true });
+    await ctrl.start();
+    expect(ctrl.state).toMatchObject({ status: "done", stale: false });
+  });
+
+  it("reset giữa lúc dựng: kết quả về sau bị bỏ, trạng thái giữ idle", async () => {
+    const g = gate();
+    const ok = setup({
+      render: async () => {
+        await g.promise;
+        return { blob: new Blob(["mp4"]), durationSec: 1 };
+      },
+    });
+    const run = ok.ctrl.start();
+    await new Promise((r) => setTimeout(r, 0));
+    ok.ctrl.reset();
+    g.release();
+    await run;
+    expect(ok.ctrl.state).toEqual({ status: "idle" });
+    expect(ok.urls).toEqual([]);
+
+    const g2 = gate();
+    const bad = setup({
+      render: async () => {
+        await g2.promise;
+        throw new Error("hỏng muộn");
+      },
+    });
+    const run2 = bad.ctrl.start();
+    await new Promise((r) => setTimeout(r, 0));
+    bad.ctrl.reset();
+    g2.release();
+    await run2;
+    expect(bad.ctrl.state).toEqual({ status: "idle" });
+  });
+
+  it("checkSupport: kết quả không hỗ trợ về muộn không đè lên trạng thái đang dùng", async () => {
+    const g = gate();
+    const { ctrl } = setup({
+      support: async () => {
+        await g.promise;
+        return { ok: false, missing: ["VideoEncoder"] };
+      },
+    });
+    const check = ctrl.checkSupport();
+    await ctrl.start();
+    g.release();
+    await check;
+    expect(ctrl.state.status).toBe("done");
+  });
+
+  it("huỷ ngay trước khi tạo url thì không tạo url", async () => {
+    let ctrlRef: RenderController | null = null;
+    const made = setup({
+      render: async () => {
+        ctrlRef!.cancel();
+        return { blob: new Blob(["mp4"]), durationSec: 1 };
+      },
+    });
+    ctrlRef = made.ctrl;
+    await made.ctrl.start();
+    expect(made.ctrl.state).toEqual({ status: "idle" });
+    expect(made.urls).toEqual([]);
+  });
+
   it("reset khi lỗi thì về idle", async () => {
     const { ctrl } = setup({ build: async () => { throw new Error("x"); } });
     await ctrl.start();

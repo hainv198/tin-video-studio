@@ -138,6 +138,30 @@ describe("StudioSession", () => {
     expect(onSaveError).toHaveBeenCalledTimes(1);
   });
 
+  it("onSaveError ném lỗi cũng không làm hỏng hàng đợi", async () => {
+    const sched = manualScheduler();
+    const session = new StudioSession({
+      drafts: {
+        save: async () => {
+          throw new Error("đầy bộ nhớ");
+        },
+        load: async () => null,
+        clear: async () => {
+          throw new Error("không xoá được");
+        },
+      },
+      ids: sequentialIds("n"),
+      schedule: sched.schedule,
+      onSaveError: () => {
+        throw new Error("callback hỏng");
+      },
+    });
+    session.update((d) => ({ ...d, project: makeProject(1) }));
+    await expect(session.flush()).resolves.toBeUndefined();
+    session.reset();
+    await expect(session.flush()).resolves.toBeUndefined();
+  });
+
   describe("lưu nối tiếp", () => {
     function gated() {
       const sched = manualScheduler();

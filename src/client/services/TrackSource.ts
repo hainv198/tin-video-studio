@@ -18,6 +18,7 @@ export class TrackSource {
       if (!stored) throw new ValidationError("Không tìm thấy file nhạc đã tải lên, hãy chọn lại");
       return stored.blob;
     }
+    if (!track.uri.startsWith("/") || track.uri.startsWith("//")) throw new ValidationError("Nguồn nhạc không hợp lệ");
     const response = await this.fetchImpl(track.uri);
     assertSameSession(response);
     if (!response.ok) throw new ApiError(response.status, "TRACK", "Không tải được nhạc nền");
