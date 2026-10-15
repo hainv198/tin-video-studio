@@ -320,3 +320,28 @@ Chặng 2 làm xong và dựng thử thật được. Chỗ code đã khác sơ 
 - **Âm:** đoạn có tiếng −16,96 dB RMS, đỉnh 0,743 (trần 0,89).
 - **Đã kiểm thật:** probe worker (~1,5 s), BrowserMediaProbe (ảnh/video/nhạc), PNG giả qua createImageBitmap, bản nháp IndexedDB thật (giọng, file tải lên, nhạc còn sau tải lại trang), huỷ/dựng lại, cờ "kết quả cũ" khi sửa dự án, hết phiên → /dang-nhap và bản nháp còn.
 - **Chưa kiểm:** giọng Google/MiniMax thật, Pexels/Pixabay thật, chọn file bằng chuột thật. Chi tiết: `.superpowers/sdd/task-13-report.md` (git-ignored) và `docs/superpowers/plans/2026-10-15-00-lo-trinh.md`.
+
+## 13. Nghiệm thu chặng 4 (2026-10-15)
+
+### Test toàn luồng (Playwright, Chrome thật, headless)
+- `npm run test:e2e`: 8 bài, 4 lượt chạy đều đạt, ≈ 1,0–1,1 phút/lượt. App e2e chạy cổng 3101 với nhà cung cấp giả và tài khoản thử sinh lúc chạy (không dùng `.env.local`).
+- Bài "đi trọn 5 bước": tải MP4 qua trình duyệt rồi đo bằng ffmpeg: dựng 37 s mất 15,5 s (0,42×), 2,1 MB; giọng −16,51 dB, đỉnh 0,358, nhạc lúc nghỉ −31,51 dB; thời lượng file khớp số hiển thị ± 0,5 s.
+- Bài huỷ/dựng lại, bản nháp mở lại (đọc IndexedDB thật), hết phiên → `/dang-nhap`, dự án mới xoá bản nháp: đều đạt.
+
+### So khung với video mẫu (`npm run contact:sheet`)
+- Mẫu TikTok 62,7 s: giọng −15,99 dB, nhạc nghỉ −28,66 dB, đỉnh 1,000 (mẫu bị clip). Ta: −16,51 / −31,51 / 0,36. Mục tiêu đặc tả (−16,5; ≈ −30) đạt; ta không clip.
+- Bố cục khớp ở mọi mốc (ảnh mở đầu, chip, tem ngày, dòng nguồn tin, logo, dải ảnh, tem ngày dải). Lệch duy nhất: chữ tiêu đề mở đầu của ta to hơn mẫu ≈ 20 % (3 dòng thay vì 2). Tuỳ chọn: `intro.title.fontPx` 64 → 54–56 nếu Hải muốn sát mẫu.
+- Khác biệt đã chấp nhận: hoạ tiết chấm thay bản đồ thế giới; cắt thẳng thay mờ chồng.
+
+### Bitrate (cùng dự án: tin mẫu, giọng Edge, ảnh + video thật, nhạc tải lên)
+| | 8 Mbps (mặc định) | 5 Mbps |
+|---|---|---|
+| Dựng | 17,8 s | 18,8 s |
+| Tệp | 9,04 MB | 6,27 MB (−31 %) |
+| PSNR 5 so với 8 | — | > 60 dB (giống hệt) ở cảnh mở đầu và cảnh video; 52,9 dB ở cảnh ảnh + nền mờ |
+
+PSNR > 45 dB là không phân biệt được bằng mắt. Khuyến nghị chuyển mặc định sang 5 Mbps (hằng `RENDER_VIDEO_BITRATE` trong `src/client/render/encodingDefaults.ts`), hoặc cho người dùng chọn "chuẩn/nhẹ". **Chờ Hải chốt.**
+
+### Deploy
+- `npm run check-env` chạy tự động trước `next build` (`prebuild`): chặn thiếu `AUTH_SECRET`/`APP_USERS`/key, chặn `FAKE_PROVIDERS` trên production; không in giá trị key. Header bảo mật (nosniff, Referrer-Policy, X-Frame-Options DENY, Permissions-Policy). README có mục deploy Vercel từng bước và bảng biến môi trường.
+- **Hoãn, cần Hải:** kiểm với key thật (Google TTS, Pexels, Pixabay — chưa có trong `.env.local`) và kiểm trên bản deploy (chưa có repo GitHub/dự án Vercel). Cách làm ghi ở kế hoạch chặng 4, Task 6 và 8.
