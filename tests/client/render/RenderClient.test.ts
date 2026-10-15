@@ -132,4 +132,30 @@ describe("RenderClient", () => {
     await expect(second).rejects.toBeInstanceOf(RenderCancelledError);
     expect(b.terminated).toBe(true);
   });
+
+  it("probe: gửi yêu cầu, trả danh sách thiếu và đóng worker", async () => {
+    const w = new FakeWorker();
+    const promise = new RenderClient(() => w).probe();
+    expect(w.sent).toEqual([{ type: "probe" }]);
+    w.emit({ type: "probe-result", missing: ["Nạp font trong worker"] });
+    await expect(promise).resolves.toEqual(["Nạp font trong worker"]);
+    expect(w.terminated).toBe(true);
+  });
+
+  it("probe: lỗi nạp worker thì reject và đóng worker", async () => {
+    const w = new FakeWorker();
+    const promise = new RenderClient(() => w).probe();
+    w.onerror?.({ message: "không nạp được" });
+    await expect(promise).rejects.toThrow("Lỗi bộ dựng: không nạp được");
+    expect(w.terminated).toBe(true);
+  });
+
+  it("probe không làm hỏng lần dựng đang chạy: thông điệp probe-result lạ bị bỏ qua", async () => {
+    const w = new FakeWorker();
+    const promise = new RenderClient(() => w).render(job);
+    w.emit({ type: "probe-result", missing: [] });
+    const blob = new Blob(["x"]);
+    w.emit({ type: "done", blob, durationSec: 1 });
+    await expect(promise).resolves.toEqual({ blob, durationSec: 1 });
+  });
 });

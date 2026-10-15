@@ -34,11 +34,12 @@ export interface RenderJob {
   origin: string;
 }
 
-export type WorkerRequest = { type: "start"; job: RenderJob };
+export type WorkerRequest = { type: "start"; job: RenderJob } | { type: "probe" };
 
 export type RenderStage = "loading" | "audio" | "video" | "finalizing";
 
 export type WorkerMessage =
   | { type: "progress"; stage: RenderStage; frame?: number; totalFrames?: number }
   | { type: "done"; blob: Blob; durationSec: number }
+  | { type: "probe-result"; missing: string[] }
   | { type: "error"; message: string };

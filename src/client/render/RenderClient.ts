@@ -34,7 +34,7 @@ export class RenderClient {
         else if (m.type === "done") {
           finish();
           resolve({ blob: m.blob, durationSec: m.durationSec });
-        } else {
+        } else if (m.type === "error") {
           finish();
           reject(new Error(m.message));
         }
@@ -51,6 +51,32 @@ export class RenderClient {
         worker.postMessage({ type: "start", job });
       } catch {
         finish();
+        reject(new Error("Không gửi được dữ liệu cho bộ dựng"));
+      }
+    });
+  }
+
+  probe(): Promise<string[]> {
+    return new Promise((resolve, reject) => {
+      const worker = this.createWorker();
+      worker.onmessage = (e) => {
+        const m = e.data;
+        if (m.type === "probe-result") {
+          worker.terminate();
+          resolve(m.missing);
+        } else if (m.type === "error") {
+          worker.terminate();
+          reject(new Error(m.message));
+        }
+      };
+      worker.onerror = (e) => {
+        worker.terminate();
+        reject(new Error(`Lỗi bộ dựng: ${e.message ?? "không rõ"}`));
+      };
+      try {
+        worker.postMessage({ type: "probe" });
+      } catch {
+        worker.terminate();
         reject(new Error("Không gửi được dữ liệu cho bộ dựng"));
       }
     });

@@ -7,6 +7,7 @@ import { defaultTemplateRegistry } from "@/templates/registry";
 import { CanvasBackdropMaker } from "./BackdropMaker";
 import { Mp4Encoder } from "./Mp4Encoder";
 import { planRender } from "./RenderPlan";
+import { probeWorkerScope, type ProbeScope } from "./workerProbe";
 import type { FootageInput, RenderJob, WorkerMessage, WorkerRequest } from "./RenderJob";
 import { VideoRenderer, type FrameProvider, type RenderScene } from "./VideoRenderer";
 
@@ -126,6 +127,13 @@ async function render(job: RenderJob): Promise<void> {
 }
 
 scope.onmessage = (event) => {
+  if (event.data.type === "probe") {
+    scope.postMessage({
+      type: "probe-result",
+      missing: probeWorkerScope(globalThis as unknown as ProbeScope, () => new OffscreenCanvas(1, 1).getContext("2d")),
+    });
+    return;
+  }
   if (event.data.type !== "start") return;
   render(event.data.job).catch((error: unknown) => {
     scope.postMessage({ type: "error", message: error instanceof Error ? error.message : "Dựng video thất bại" });
