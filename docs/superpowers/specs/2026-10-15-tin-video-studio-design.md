@@ -279,3 +279,18 @@ Hải muốn dùng giọng clone (giọng của Hải hoặc người đã đồ
 - **Biến môi trường:** `MINIMAX_API_KEY`, `MINIMAX_VOICES` = JSON `[{"alias":"Hai","voiceId":"tvsHai001","gender":"MALE"}]`, `MINIMAX_MODEL` (mặc định `speech-2.8-hd`), `MINIMAX_BASE_URL` (mặc định `https://api.minimax.io`).
 - **Clone một lần:** `npm run minimax:clone -- <file-thu-am> <voiceId> [Alias] [MALE|FEMALE]` đọc `.env.local`, tải file lên (`/v1/files/upload`, purpose `voice_clone`), gọi `/v1/voice_clone` (lọc ồn + chuẩn hoá âm lượng, kèm câu nghe thử) rồi in link nghe thử và dòng cần thêm vào `MINIMAX_VOICES`. File thu âm: mp3/m4a/wav, 10 giây – 5 phút, ≤ 20 MB. `voiceId`: 8–256 ký tự, bắt đầu bằng chữ, chỉ chữ/số/`-`/`_`, không kết thúc bằng `-`/`_`.
 - **Lưu ý từ MiniMax:** giọng clone không được dùng trong 7 ngày sẽ bị xoá. Sau khi clone phải tạo giọng thật ít nhất một lần trong 7 ngày.
+
+## 11. Kết quả kiểm CORS CDN (2026-10-15, trước chặng 2)
+
+Chạy trong trình duyệt từ origin `http://localhost:3100`: `fetch(url, { mode: "cors" })` → blob → ảnh: `createImageBitmap` + vẽ lên `OffscreenCanvas` + `getImageData`; video: `URL.createObjectURL(blob)` → `<video>` → tua → vẽ khung + `getImageData`.
+
+| Nguồn | URL mẫu | Kết quả |
+|---|---|---|
+| Ảnh Pexels | `images.pexels.com/photos/2014422/...jpeg?...&w=940` | 200, 33 KB, 650×650, canvas đọc được |
+| Ảnh Pixabay | `cdn.pixabay.com/photo/2013/10/15/09/12/flower-195893_640.jpg` | 200, 72 KB, 640×360, canvas đọc được |
+| Video Pexels | `videos.pexels.com/video-files/10476430/10476430-sd_640_338_25fps.mp4` | 200, 1,5 MB, 23 s, canvas đọc được |
+| Video Pixabay | `cdn.pixabay.com/video/2015/08/08/125-135736646_large.mp4` | 200, 6,6 MB, 1920×1080, 11,8 s, canvas đọc được |
+
+curl kèm `Origin`: cả hai CDN trả `Access-Control-Allow-Origin: *` cho GET (Pixabay không trả header này cho HEAD).
+
+**Kết luận:** trình duyệt tải thẳng từ CDN, **không cần route proxy** trên Vercel, không vướng giới hạn 4,5 MB. Cách đọc media ở chặng 2: luôn `fetch` thành blob trước (canvas không bị khoá), không gán thẳng URL CDN vào `<img>`/`<video>`. Video Pixabay trả 200 cho yêu cầu Range (không trả 206) nên phải tải nguyên file; chặng 2 chọn bản ≤ 1920 cạnh dài như đã làm ở `PixabayService`.
