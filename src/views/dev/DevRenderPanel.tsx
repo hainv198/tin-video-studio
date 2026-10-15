@@ -16,10 +16,15 @@ export function DevRenderPanel() {
       support: () => browserSupport().check(),
       tts,
       decode: (bytes) => decoder.decode(bytes),
-      fetchBytes: async (url) => (await fetch(url)).arrayBuffer(),
+      fetchBytes: async (url) => {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Không tải được nhạc nền");
+        return response.arrayBuffer();
+      },
       render: (job, onProgress) => client.render(job, onProgress),
       cancel: () => client.cancel(),
       createUrl: (blob) => URL.createObjectURL(blob),
+      revokeUrl: (u) => URL.revokeObjectURL(u),
       // component client vẫn được render trên server một lần; window chỉ có ở trình duyệt
       origin: typeof window === "undefined" ? "" : window.location.origin,
     });
@@ -31,17 +36,20 @@ export function DevRenderPanel() {
   );
   const [voices, setVoices] = useState<VoiceInfo[]>([]);
   const [voice, setVoice] = useState("");
+  const [voicesError, setVoicesError] = useState<string | null>(null);
 
   useEffect(() => {
-    void controller.checkSupport();
+    controller.checkSupport().catch(() => undefined);
     tts
       .voices()
       .then((list) => {
         setVoices(list);
         setVoice(list[0]?.name ?? "");
       })
-      .catch(() => setVoices([]));
+      .catch((e) => setVoicesError(e instanceof Error ? e.message : "Không tải được danh sách giọng"));
   }, [controller, tts]);
+
+  useEffect(() => () => controller.cancel(), [controller]);
 
   const busy = state.status === "working";
   return (
@@ -50,6 +58,7 @@ export function DevRenderPanel() {
       {state.status === "unsupported" && (
         <p className="text-red-400">Hãy dùng Chrome hoặc Edge bản mới. Thiếu: {state.missing.join(", ")}</p>
       )}
+      {voicesError && <p className="text-red-400">{voicesError}</p>}
       <label className="flex flex-col gap-1 text-sm">
         Giọng đọc
         <select className="rounded-md bg-neutral-800 px-3 py-2" value={voice} onChange={(e) => setVoice(e.target.value)}>

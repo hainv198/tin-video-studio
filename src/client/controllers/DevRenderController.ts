@@ -44,6 +44,7 @@ export interface DevRenderDeps {
   render: (job: RenderJob, onProgress?: (p: Progress) => void) => Promise<{ blob: Blob; durationSec: number }>;
   cancel: () => void;
   createUrl: (blob: Blob) => string;
+  revokeUrl: (url: string) => void;
   origin: string;
 }
 
@@ -65,6 +66,7 @@ const STAGE_LABEL: Record<Progress["stage"], string> = {
 export class DevRenderController {
   private current: DevRenderState = { status: "idle" };
   private readonly listeners = new Set<() => void>();
+  private cancelRequested = false;
 
   constructor(private readonly deps: DevRenderDeps) {}
 
@@ -79,14 +81,18 @@ export class DevRenderController {
 
   async checkSupport(): Promise<void> {
     const report = await this.deps.support();
-    if (!report.ok) this.set({ status: "unsupported", missing: report.missing });
+    if (!report.ok && this.current.status === "idle") this.set({ status: "unsupported", missing: report.missing });
   }
 
   cancel(): void {
+    this.cancelRequested = true;
     this.deps.cancel();
   }
 
   async render(voiceName: string): Promise<void> {
+    if (this.current.status === "working") return;
+    if (this.current.status === "done") this.deps.revokeUrl(this.current.url);
+    this.cancelRequested = false;
     try {
       const voice = VoiceSettings.create(voiceName);
       const project = NewsProject.fromText(
@@ -99,11 +105,13 @@ export class DevRenderController {
       for (const [i, scene] of project.scenes.entries()) {
         this.set({ status: "working", label: `Tạo giọng ${i + 1}/${project.scenes.length}`, percent: (i / project.scenes.length) * 20 });
         const decoded = await this.deps.decode(await this.deps.tts.synthesize(scene.text, voice.voiceName, voice.speakingRate));
+        this.throwIfCancelled();
         narrations.push({ sceneId: scene.id, durationSec: decoded.durationSec, samples: AudioDecodeService.toMono(decoded.channels) });
       }
 
       this.set({ status: "working", label: "Nạp nhạc nền", percent: 20 });
       const music = await this.deps.decode(await this.deps.fetchBytes(DEV_SAMPLE.musicUrl));
+      this.throwIfCancelled();
       const track = MusicTrack.create({ id: "ban-tin-mac-dinh", title: "Bản tin", origin: "library", uri: DEV_SAMPLE.musicUrl });
 
       const job: RenderJob = {
@@ -127,8 +135,11 @@ export class DevRenderController {
         origin: this.deps.origin,
       };
 
+      this.throwIfCancelled();
+      let lastRatio = 0;
       const result = await this.deps.render(job, (p) => {
-        const ratio = p.frame && p.totalFrames ? p.frame / p.totalFrames : 0;
+        if (p.frame && p.totalFrames) lastRatio = p.frame / p.totalFrames;
+        const ratio = lastRatio;
         const label = p.stage === "video" ? `${STAGE_LABEL.video} ${Math.round(ratio * 100)}%` : STAGE_LABEL[p.stage];
         this.set({ status: "working", label, percent: 25 + ratio * 70 });
       });
@@ -141,6 +152,10 @@ export class DevRenderController {
       const message = error instanceof ApiError || error instanceof Error ? error.message : "Dựng video thất bại";
       this.set({ status: "error", message });
     }
+  }
+
+  private throwIfCancelled(): void {
+    if (this.cancelRequested) throw new RenderCancelledError();
   }
 
   private set(state: DevRenderState): void {
