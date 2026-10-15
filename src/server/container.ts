@@ -7,6 +7,7 @@ import { PexelsService } from "./stock/PexelsService";
 import { PixabayService } from "./stock/PixabayService";
 import { StockController } from "./stock/StockController";
 import type { StockProvider } from "./stock/StockProvider";
+import { EdgeCliTtsProvider } from "./tts/EdgeCliTtsProvider";
 import { FakeTtsProvider } from "./tts/FakeTtsProvider";
 import { GoogleTtsService } from "./tts/GoogleTtsService";
 import { MiniMaxTtsService, parseMiniMaxVoices } from "./tts/MiniMaxTtsService";
@@ -29,11 +30,18 @@ export function buildServerContainer(env: Record<string, string | undefined>): S
   if (usingFakes && env.VERCEL_ENV === "production") {
     throw new Error("FAKE_PROVIDERS không được bật trên production");
   }
+  if (env.EDGE_TTS_DEV === "1" && (env.NODE_ENV === "production" || env.VERCEL)) {
+    throw new Error("EDGE_TTS_DEV chỉ dùng khi phát triển trên máy, không dùng khi deploy");
+  }
   const users = UserDirectory.fromEnv(env.APP_USERS);
   const sessions = new SessionService(env.AUTH_SECRET ?? "");
   const auth = new AuthController(users, new BcryptPasswordHasher(), sessions);
 
-  const baseTts: TtsProvider = usingFakes ? new FakeTtsProvider() : new GoogleTtsService(env.GOOGLE_TTS_API_KEY ?? "");
+  const baseTts: TtsProvider = usingFakes
+    ? env.EDGE_TTS_DEV === "1"
+      ? new EdgeCliTtsProvider({ bin: env.EDGE_TTS_BIN })
+      : new FakeTtsProvider()
+    : new GoogleTtsService(env.GOOGLE_TTS_API_KEY ?? "");
   const ttsProvider = withMiniMax(baseTts, env);
   const stockProviders: StockProvider[] = usingFakes
     ? [new FakeStockProvider()]

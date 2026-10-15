@@ -64,4 +64,15 @@ describe("buildServerContainer", () => {
       warn.mockRestore();
     }
   });
+
+  it("EDGE_TTS_DEV=1 (kèm giả lập) dùng giọng Edge; cấm khi production hoặc Vercel", async () => {
+    const c = buildServerContainer({ ...base, FAKE_PROVIDERS: "1", EDGE_TTS_DEV: "1" });
+    expect((await c.tts.voices()).map((v) => v.name)).toEqual(["vi-VN-HoaiMyNeural", "vi-VN-NamMinhNeural"]);
+    expect(() => buildServerContainer({ ...base, FAKE_PROVIDERS: "1", EDGE_TTS_DEV: "1", NODE_ENV: "production" })).toThrow(
+      "EDGE_TTS_DEV chỉ dùng khi phát triển trên máy",
+    );
+    expect(() => buildServerContainer({ ...base, FAKE_PROVIDERS: "1", EDGE_TTS_DEV: "1", VERCEL: "1" })).toThrow(
+      "EDGE_TTS_DEV chỉ dùng khi phát triển trên máy",
+    );
+  });
 });
