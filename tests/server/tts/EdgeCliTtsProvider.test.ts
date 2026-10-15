@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 import { EdgeCliTtsProvider, ratePercent } from "@/server/tts/EdgeCliTtsProvider";
 import { UpstreamError } from "@/domain/errors";
@@ -18,20 +18,17 @@ describe("EdgeCliTtsProvider", () => {
     expect(await p.listVoices("en-US")).toEqual([]);
   });
 
-  it("gọi edge-tts với file văn bản, đọc file mp3 sinh ra rồi trả về", async () => {
-    let seen: { args: string[]; text: string } | undefined;
+  it("gọi edge-tts với --text=..., đọc file mp3 sinh ra rồi trả về", async () => {
+    let seen: string[] = [];
     const runner = vi.fn(async (args: string[]) => {
-      const textFile = args[args.indexOf("--file") + 1] as string;
-      const out = args[args.indexOf("--write-media") + 1] as string;
-      seen = { args, text: await readFile(textFile, "utf8") };
-      await writeFile(out, Buffer.from([0x49, 0x44, 0x33]));
+      seen = args;
+      await writeFile(args[args.indexOf("--write-media") + 1] as string, Buffer.from([0x49, 0x44, 0x33]));
     });
     const p = new EdgeCliTtsProvider({ runner });
-    const r = await p.synthesize({ text: "-Xin chào.", voiceName: "vi-VN-HoaiMyNeural", speakingRate: 1.07 });
+    const r = await p.synthesize({ text: "-Xin  chào.\n", voiceName: "vi-VN-HoaiMyNeural", speakingRate: 1.07 });
     expect(Array.from(r.audio)).toEqual([0x49, 0x44, 0x33]);
     expect(r.mimeType).toBe("audio/mpeg");
-    expect(seen?.text).toBe("-Xin chào.");
-    expect(seen?.args).toEqual(expect.arrayContaining(["--voice", "vi-VN-HoaiMyNeural", "--rate=+7%"]));
+    expect(seen).toEqual(expect.arrayContaining(["--voice", "vi-VN-HoaiMyNeural", "--rate=+7%", "--text=-Xin chào."]));
   });
 
   it("chạy lỗi hoặc không ra file thì UpstreamError, không lộ đường dẫn", async () => {

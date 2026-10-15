@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -45,17 +45,15 @@ export class EdgeCliTtsProvider implements TtsProvider {
   async synthesize(request: SynthesisRequest): Promise<SynthesisResult> {
     if (!VOICES.some((v) => v.name === request.voiceName)) throw new ValidationError(`Không có giọng ${request.voiceName}`);
     const dir = await mkdtemp(join(tmpdir(), "tvs-edge-"));
-    const textFile = join(dir, "in.txt");
     const outFile = join(dir, "out.mp3");
     try {
-      await writeFile(textFile, request.text, "utf8");
       try {
         await this.runner([
           "--voice",
           request.voiceName,
           `--rate=${ratePercent(request.speakingRate)}`,
-          "--file",
-          textFile,
+          // dạng --text=... để câu bắt đầu bằng dấu gạch không bị hiểu là cờ; truyền thẳng vì --file đọc sai tiếng Việt trên Windows
+          `--text=${request.text.replace(/\s+/g, " ").trim()}`,
           "--write-media",
           outFile,
         ]);
