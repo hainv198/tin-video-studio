@@ -128,3 +128,30 @@ describe("TheAnh28Template — nền mờ chuẩn bị sẵn", () => {
     expect(c.ops("drawImage")[0]?.state.filter).toBe("blur(48px)");
   });
 });
+
+describe("TheAnh28Template — dòng nguồn tin dài", () => {
+  const longCredit = Array.from({ length: 40 }, (_, i) => `Báo${i}`).join(" ");
+  const creditText = (c: ReturnType<typeof draw>) =>
+    String(c.ops("fillText").find((x) => String(x.args[0]).startsWith("THEO:"))?.args[0]);
+
+  it("cảnh thân bài: cắt bằng dấu … và không chạm logo góc phải", () => {
+    // tên kênh "28 NEWS" (7 ký tự × 46 × 0,5 = 161 px) → chữ bắt đầu x=823, huy hiệu x=745 → vùng cho phép 745 − 24 − 110 = 611 px
+    const text = creditText(draw(project({ sourceCredit: longCredit }), scene()));
+    expect(text.endsWith("…")).toBe(true);
+    expect(text.length * 13).toBeLessThanOrEqual(611);
+    expect(text.length * 13).toBeGreaterThan(611 - 100);
+  });
+
+  it("cảnh mở đầu: rộng hơn (không có logo góc phải), tối đa 930 px", () => {
+    const text = creditText(draw(project({ sourceCredit: longCredit }), scene({ role: "intro" })));
+    expect(text.endsWith("…")).toBe(true);
+    expect(text.length * 13).toBeLessThanOrEqual(930);
+    expect(text.length * 13).toBeGreaterThan(930 - 100);
+  });
+
+  it("nguồn tin ngắn giữ nguyên, dòng ẢNH: TỔNG HỢP không bị đổi", () => {
+    const c = draw(project(), scene());
+    expect(creditText(c)).toBe("THEO: ĐỨC PHONG - VIETNAMNET");
+    expect(c.texts()).toContain("ẢNH: TỔNG HỢP");
+  });
+});

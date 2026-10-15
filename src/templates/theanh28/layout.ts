@@ -23,7 +23,7 @@ export const LAYOUT = {
     backdropScale: 1.1,
     backdropShade: 0.18,
   },
-  credit: { x: 110, y: 240, lineHeight: 40, fontPx: 26 },
+  credit: { x: 110, y: 240, lineHeight: 40, fontPx: 26, rightMargin: 40, gapToLogo: 24 },
   logo: { right: 96, y: 250, size: 64, gap: 14, fontPx: 46 },
   dateTag: { h: 44, padX: 16, fontPx: 26 },
   kenBurns: { from: 1, to: 1.08 },
