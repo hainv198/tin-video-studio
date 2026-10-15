@@ -1,4 +1,5 @@
 import type { SupportReport } from "@/client/render/BrowserSupport";
+import { DEFAULT_VIDEO_QUALITY, VIDEO_BITRATE_CHOICES, type VideoQuality } from "@/client/render/encodingDefaults";
 import { RenderCancelledError } from "@/client/render/errors";
 import type { RenderJob, WorkerMessage } from "@/client/render/RenderJob";
 import { fileNameFor } from "./fileName";
@@ -8,12 +9,14 @@ import type { StudioSession } from "./StudioSession";
 
 type Progress = Extract<WorkerMessage, { type: "progress" }>;
 
-export type RenderState =
+export type RenderStatus =
   | { status: "idle" }
   | { status: "unsupported"; missing: string[] }
   | { status: "working"; label: string; percent: number }
   | { status: "done"; url: string; durationSec: number; sizeBytes: number; fileName: string; warnings: string[]; stale: boolean }
   | { status: "error"; message: string };
+
+export type RenderState = RenderStatus & { quality: VideoQuality };
 
 export interface RenderControllerDeps {
   session: StudioSession;
@@ -42,7 +45,12 @@ export class RenderController extends StateController<RenderState> {
   private dirtyDuringWork = false;
 
   constructor(private readonly deps: RenderControllerDeps) {
-    super({ status: "idle" }, deps.onAuthLost);
+    super({ status: "idle", quality: DEFAULT_VIDEO_QUALITY }, deps.onAuthLost);
+  }
+
+  /** Ghi trạng thái mới nhưng giữ chất lượng người dùng đã chọn. */
+  private put(status: RenderStatus): void {
+    this.set({ ...status, quality: this.state.quality });
   }
 
   async checkSupport(): Promise<void> {
@@ -50,13 +58,13 @@ export class RenderController extends StateController<RenderState> {
     try {
       const report = await this.deps.support();
       if (!report.ok) {
-        if (this.state.status === "idle") this.set({ status: "unsupported", missing: report.missing });
+        if (this.state.status === "idle") this.put({ status: "unsupported", missing: report.missing });
         return;
       }
       const missing = await this.deps.probeWorker();
-      if (missing.length > 0 && this.state.status === "idle") this.set({ status: "unsupported", missing });
+      if (missing.length > 0 && this.state.status === "idle") this.put({ status: "unsupported", missing });
     } catch (error) {
-      if (this.state.status === "idle") this.set({ status: "unsupported", missing: [this.report(error)] });
+      if (this.state.status === "idle") this.put({ status: "unsupported", missing: [this.report(error)] });
     }
   }
 
@@ -66,15 +74,16 @@ export class RenderController extends StateController<RenderState> {
     this.cancelRequested = false;
     this.dirtyDuringWork = false;
     const run = ++this.run;
-    this.set({ status: "working", label: "Chuẩn bị", percent: 0 });
+    this.put({ status: "working", label: "Chuẩn bị", percent: 0 });
     try {
       const data = this.deps.session.state;
       const { job, warnings } = await this.deps.builder.build(
         data,
         (label, ratio) => {
-          if (run === this.run) this.set({ status: "working", label, percent: ratio * 25 });
+          if (run === this.run) this.put({ status: "working", label, percent: ratio * 25 });
         },
         () => this.cancelRequested || run !== this.run,
+        { videoBitrate: VIDEO_BITRATE_CHOICES[this.state.quality] },
       );
       if (this.cancelRequested || run !== this.run) throw new RenderCancelledError();
       let lastRatio = 0;
@@ -82,12 +91,12 @@ export class RenderController extends StateController<RenderState> {
         if (run !== this.run) return;
         if (p.frame && p.totalFrames) lastRatio = p.frame / p.totalFrames;
         const label = p.stage === "video" ? `${STAGE_LABEL.video} ${Math.round(lastRatio * 100)}%` : STAGE_LABEL[p.stage];
-        this.set({ status: "working", label, percent: 25 + lastRatio * 70 });
+        this.put({ status: "working", label, percent: 25 + lastRatio * 70 });
       });
       if (run !== this.run) return;
       if (this.cancelRequested) throw new RenderCancelledError();
       const project = data.project!;
-      this.set({
+      this.put({
         status: "done",
         url: this.deps.createUrl(result.blob),
         durationSec: result.durationSec,
@@ -99,10 +108,10 @@ export class RenderController extends StateController<RenderState> {
     } catch (error) {
       if (run !== this.run) return;
       if (error instanceof RenderCancelledError) {
-        this.set({ status: "idle" });
+        this.put({ status: "idle" });
         return;
       }
-      this.set({ status: "error", message: this.report(error) });
+      this.put({ status: "error", message: this.report(error) });
     }
   }
 
@@ -112,11 +121,17 @@ export class RenderController extends StateController<RenderState> {
     else if (this.state.status === "done" && !this.state.stale) this.set({ ...this.state, stale: true });
   }
 
+  /** Chọn chất lượng cho lượt dựng sau; bản đã dựng bằng chất lượng khác thì đánh dấu cũ. */
+  setQuality(quality: VideoQuality): void {
+    if (this.state.status === "working" || quality === this.state.quality) return;
+    this.set(this.state.status === "done" ? { ...this.state, quality, stale: true } : { ...this.state, quality });
+  }
+
   cancel(): void {
     this.cancelRequested = true;
     this.run += 1;
     this.deps.cancelRender();
-    if (this.state.status === "working") this.set({ status: "idle" });
+    if (this.state.status === "working") this.put({ status: "idle" });
   }
 
   /** Dự án mới: huỷ lượt dựng, thu hồi url bản cũ, về `idle` (trừ `unsupported`). */
@@ -124,7 +139,7 @@ export class RenderController extends StateController<RenderState> {
     if (this.state.status === "unsupported") return;
     if (this.state.status === "working") this.cancel();
     if (this.state.status === "done") this.deps.revokeUrl(this.state.url);
-    this.set({ status: "idle" });
+    this.put({ status: "idle" });
   }
 
   dispose(): void {

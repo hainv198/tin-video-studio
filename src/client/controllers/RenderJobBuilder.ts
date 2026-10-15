@@ -40,6 +40,7 @@ export class RenderJobBuilder {
     data: StudioData,
     onProgress?: (label: string, ratio: number) => void,
     isCancelled: () => boolean = () => false,
+    options?: { videoBitrate?: number },
   ): Promise<BuiltJob> {
     const { project, voice, narrations, footage, music, brand } = data;
     if (!project) throw new ValidationError("Chưa có dự án");
@@ -86,6 +87,7 @@ export class RenderJobBuilder {
       }
     }
 
+    const videoBitrate = options?.videoBitrate ?? this.deps.videoBitrate;
     const job: RenderJob = {
       templateId: project.templateId,
       brandValues: brand.values,
@@ -100,7 +102,7 @@ export class RenderJobBuilder {
       music: musicBed,
       sampleRate: this.sampleRate,
       origin: this.deps.origin,
-      ...(this.deps.videoBitrate ? { videoBitrate: this.deps.videoBitrate } : {}),
+      ...(videoBitrate ? { videoBitrate } : {}),
     };
     return { job, warnings };
   }
