@@ -4,6 +4,7 @@ import type { RenderJob, WorkerMessage, WorkerRequest } from "./RenderJob";
 export interface WorkerLike {
   onmessage: ((e: { data: WorkerMessage }) => void) | null;
   onerror: ((e: { message?: string }) => void) | null;
+  onmessageerror?: (() => void) | null;
   postMessage(message: WorkerRequest): void;
   terminate(): void;
 }
@@ -19,11 +20,12 @@ export class RenderClient {
   constructor(private readonly createWorker: () => WorkerLike = defaultWorker) {}
 
   render(job: RenderJob, onProgress?: (p: Progress) => void): Promise<{ blob: Blob; durationSec: number }> {
+    if (this.active) return Promise.reject(new Error("Đang dựng video khác, hãy chờ hoặc huỷ"));
     return new Promise((resolve, reject) => {
       const worker = this.createWorker();
       const finish = () => {
         worker.terminate();
-        this.active = null;
+        if (this.active?.worker === worker) this.active = null;
       };
       this.active = { worker, reject };
       worker.onmessage = (e) => {
@@ -41,7 +43,16 @@ export class RenderClient {
         finish();
         reject(new Error(`Lỗi bộ dựng: ${e.message ?? "không rõ"}`));
       };
-      worker.postMessage({ type: "start", job });
+      worker.onmessageerror = () => {
+        finish();
+        reject(new Error("Bộ dựng nhận dữ liệu lỗi"));
+      };
+      try {
+        worker.postMessage({ type: "start", job });
+      } catch {
+        finish();
+        reject(new Error("Không gửi được dữ liệu cho bộ dựng"));
+      }
     });
   }
 

@@ -6,6 +6,7 @@ import type { RenderJob, WorkerMessage, WorkerRequest } from "@/client/render/Re
 class FakeWorker implements WorkerLike {
   onmessage: ((e: { data: WorkerMessage }) => void) | null = null;
   onerror: ((e: { message?: string }) => void) | null = null;
+  onmessageerror: (() => void) | null = null;
   readonly sent: WorkerRequest[] = [];
   terminated = false;
   postMessage(m: WorkerRequest): void {
@@ -16,6 +17,12 @@ class FakeWorker implements WorkerLike {
   }
   emit(data: WorkerMessage): void {
     this.onmessage?.({ data });
+  }
+}
+
+class ThrowingWorker extends FakeWorker {
+  postMessage(): void {
+    throw new Error("clone failed");
   }
 }
 
@@ -57,6 +64,57 @@ describe("RenderClient", () => {
     const promise = client.render(job);
     client.cancel();
     await expect(promise).rejects.toBeInstanceOf(RenderCancelledError);
+    expect(w.terminated).toBe(true);
+  });
+  it("render chồng lên khi đang dựng thì reject và không tạo worker thứ hai", async () => {
+    const workers: FakeWorker[] = [];
+    const client = new RenderClient(() => {
+      const w = new FakeWorker();
+      workers.push(w);
+      return w;
+    });
+    const first = client.render(job);
+    await expect(client.render(job)).rejects.toThrow("Đang dựng video khác, hãy chờ hoặc huỷ");
+    expect(workers).toHaveLength(1);
+    workers[0]?.emit({ type: "done", blob: new Blob(["x"]), durationSec: 1 });
+    await first;
+  });
+
+  it("dựng xong thì render mới chạy lại được; cancel sau khi xong không làm gì", async () => {
+    const workers: FakeWorker[] = [];
+    const client = new RenderClient(() => {
+      const w = new FakeWorker();
+      workers.push(w);
+      return w;
+    });
+    const first = client.render(job);
+    workers[0]?.emit({ type: "done", blob: new Blob(["x"]), durationSec: 1 });
+    await first;
+    expect(() => client.cancel()).not.toThrow();
+    const second = client.render(job);
+    expect(workers).toHaveLength(2);
+    client.cancel();
+    await expect(second).rejects.toBeInstanceOf(RenderCancelledError);
+    expect(workers[1]?.terminated).toBe(true);
+  });
+
+  it("postMessage ném lỗi thì terminate, reject và cho dựng lại", async () => {
+    const bad = new ThrowingWorker();
+    const good = new FakeWorker();
+    const queue: FakeWorker[] = [bad, good];
+    const client = new RenderClient(() => queue.shift() as FakeWorker);
+    await expect(client.render(job)).rejects.toThrow("Không gửi được dữ liệu cho bộ dựng");
+    expect(bad.terminated).toBe(true);
+    const next = client.render(job);
+    good.emit({ type: "done", blob: new Blob(["x"]), durationSec: 1 });
+    await expect(next).resolves.toBeDefined();
+  });
+
+  it("onmessageerror thì reject và terminate", async () => {
+    const w = new FakeWorker();
+    const promise = new RenderClient(() => w).render(job);
+    w.onmessageerror?.();
+    await expect(promise).rejects.toThrow("Bộ dựng nhận dữ liệu lỗi");
     expect(w.terminated).toBe(true);
   });
 });

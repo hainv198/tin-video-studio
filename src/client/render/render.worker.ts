@@ -29,15 +29,18 @@ async function blobOf(footage: FootageInput, origin: string): Promise<Blob> {
 
 async function render(job: RenderJob): Promise<void> {
   scope.postMessage({ type: "progress", stage: "loading" });
+  if (!scope.fonts) throw new Error("Trình duyệt không hỗ trợ nạp font trong worker");
   const template = defaultTemplateRegistry().get(job.templateId);
   await loadFonts(template.fonts, scope.fonts, job.origin);
   const brand = BrandKit.create(template.id, template.brandFields, job.brandValues);
-  const logoBitmap = job.logo ? await createImageBitmap(job.logo) : null;
-  const { timeline, voices } = planRender(job, template.defaults.timeline);
 
   const providers: FrameProvider[] = [];
   const scenes = new Map<string, RenderScene>();
+  let logoBitmap: ImageBitmap | null = null;
+  let encoder: Mp4Encoder | null = null;
   try {
+    logoBitmap = job.logo ? await createImageBitmap(job.logo) : null;
+    const { timeline, voices } = planRender(job, template.defaults.timeline);
     for (const [index, s] of job.scenes.entries()) {
       const slot = timeline.slots[index];
       if (!slot) throw new Error(`Thiếu mốc thời gian cho cảnh ${s.sceneId}`);
@@ -72,9 +75,10 @@ async function render(job: RenderJob): Promise<void> {
     const canvas = new OffscreenCanvas(width, height);
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Trình duyệt không cấp được canvas 2D");
-    const encoder = new Mp4Encoder({ canvas, fps, videoBitrate: VIDEO_BITRATE, audioBitrate: AUDIO_BITRATE });
-    await encoder.start();
-    await encoder.addAudio(mix);
+    const enc = new Mp4Encoder({ canvas, fps, videoBitrate: VIDEO_BITRATE, audioBitrate: AUDIO_BITRATE });
+    encoder = enc;
+    await enc.start();
+    await enc.addAudio(mix);
 
     await new VideoRenderer({
       template,
@@ -87,15 +91,28 @@ async function render(job: RenderJob): Promise<void> {
       timeline,
       scenes,
       fps,
-      sink: encoder,
+      sink: enc,
       onProgress: (p) => scope.postMessage({ type: "progress", stage: "video", frame: p.frame, totalFrames: p.totalFrames }),
     }).render();
 
     scope.postMessage({ type: "progress", stage: "finalizing" });
-    const blob = await encoder.finish();
+    const blob = await enc.finish();
     scope.postMessage({ type: "done", blob, durationSec: timeline.totalDuration });
+  } catch (error) {
+    try {
+      await encoder?.cancel();
+    } catch {
+      // bỏ qua lỗi huỷ bộ mã hoá, giữ lỗi gốc
+    }
+    throw error;
   } finally {
-    for (const p of providers) p.dispose();
+    for (const p of providers) {
+      try {
+        p.dispose();
+      } catch {
+        // một provider lỗi không được bỏ qua các provider còn lại
+      }
+    }
     logoBitmap?.close();
   }
 }
