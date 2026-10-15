@@ -14,7 +14,9 @@ function SceneCard({ studio, sceneId, index }: { studio: Studio; sceneId: string
   const project = data.project;
   const scene = project?.scenes.find((s) => s.id === sceneId);
   const state = search.byScene[sceneId];
-  const [query, setQuery] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ base: string; text: string } | null>(null);
+  const base = state?.query ?? "";
+  const shown = draft && draft.base === base ? draft.text : base;
   if (!project || !scene) return null;
   const current = data.footage.get(sceneId);
   const others = project.scenes.filter((s) => s.id !== sceneId);
@@ -31,14 +33,16 @@ function SceneCard({ studio, sceneId, index }: { studio: Studio; sceneId: string
         className="flex flex-wrap items-center gap-2 text-sm"
         onSubmit={(e) => {
           e.preventDefault();
-          void studio.search.search(sceneId, query ?? state?.query ?? "");
+          void studio.search.search(sceneId, shown);
+          setDraft(null);
         }}
       >
         <input
           className="min-w-40 flex-1 rounded-md bg-neutral-800 px-3 py-1.5"
           placeholder="Từ khoá tiếng Anh (ví dụ: police car)"
-          value={query ?? state?.query ?? ""}
-          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Từ khoá tìm cảnh trám"
+          value={shown}
+          onChange={(e) => setDraft({ base, text: e.target.value })}
         />
         <button type="submit" disabled={state?.loading} className="rounded-md bg-neutral-700 px-3 py-1.5 disabled:opacity-50">
           Tìm lại
@@ -71,12 +75,12 @@ function SceneCard({ studio, sceneId, index }: { studio: Studio; sceneId: string
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <label className="cursor-pointer rounded-md bg-neutral-800 px-3 py-1.5 hover:bg-neutral-700">
+        <label className="cursor-pointer rounded-md bg-neutral-800 px-3 py-1.5 hover:bg-neutral-700 focus-within:ring-2 focus-within:ring-emerald-500">
           Tải file thay thế
           <input
             type="file"
             accept={ACCEPT}
-            className="hidden"
+            className="sr-only"
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) void studio.footage.replaceWithFile(sceneId, file);
@@ -88,6 +92,7 @@ function SceneCard({ studio, sceneId, index }: { studio: Studio; sceneId: string
           Dùng nền mặc định
         </button>
         <select
+          aria-label="Hoán đổi với cảnh khác"
           className="rounded-md bg-neutral-800 px-2 py-1.5"
           value=""
           onChange={(e) => {
@@ -103,6 +108,7 @@ function SceneCard({ studio, sceneId, index }: { studio: Studio; sceneId: string
         </select>
         {pool.length > 0 && (
           <select
+            aria-label="Dùng file đã tải lên"
             className="rounded-md bg-neutral-800 px-2 py-1.5"
             value=""
             onChange={(e) => {
@@ -137,13 +143,13 @@ export function StepFootage({ studio }: { studio: Studio }) {
         gợi ý để đổi.
       </p>
       <div className="flex flex-wrap items-center gap-3">
-        <label className="cursor-pointer rounded-md bg-neutral-800 px-4 py-2 hover:bg-neutral-700">
+        <label className="cursor-pointer rounded-md bg-neutral-800 px-4 py-2 hover:bg-neutral-700 focus-within:ring-2 focus-within:ring-emerald-500">
           Tải ảnh/video lên
           <input
             type="file"
             multiple
             accept={ACCEPT}
-            className="hidden"
+            className="sr-only"
             onChange={(e) => {
               const files = Array.from(e.target.files ?? []);
               if (files.length > 0) void studio.footage.addFiles(files);

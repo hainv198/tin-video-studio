@@ -9,18 +9,21 @@ export function StepVoice({ studio }: { studio: Studio }) {
   const data = useController(studio.session);
   const voice = useController(studio.voice);
   const playing = useRef<{ audio: HTMLAudioElement; url: string } | null>(null);
+  const mounted = useRef(true);
 
   useEffect(() => {
     void studio.voice.loadVoices();
   }, [studio]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
       playing.current?.audio.pause();
       if (playing.current) studio.services.env.revokeUrl(playing.current.url);
-    },
-    [studio],
-  );
+      playing.current = null;
+    };
+  }, [studio]);
 
   const project = data.project;
   if (!project) return null;
@@ -29,7 +32,7 @@ export function StepVoice({ studio }: { studio: Studio }) {
 
   async function preview() {
     const blob = await studio.voice.previewVoice();
-    if (!blob) return;
+    if (!blob || !mounted.current) return;
     if (playing.current) {
       playing.current.audio.pause();
       studio.services.env.revokeUrl(playing.current.url);
@@ -37,7 +40,7 @@ export function StepVoice({ studio }: { studio: Studio }) {
     const url = studio.services.env.createUrl(blob);
     const audio = new Audio(url);
     playing.current = { audio, url };
-    void audio.play();
+    audio.play().catch(() => {});
   }
 
   return (

@@ -5,20 +5,29 @@ import type { Studio } from "@/client/controllers/createStudio";
 import type { Footage } from "@/domain/Footage";
 
 export function FootagePreview({ studio, footage }: { studio: Studio; footage: Footage | undefined }) {
-  const [src, setSrc] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState<{ for: Footage | undefined; src: string | null } | null>(null);
+  // Chỉ dùng kết quả nếu nó thuộc đúng footage hiện tại: tránh hiện ảnh cũ trong lúc tải nguồn mới.
+  const src = loaded && loaded.for === footage ? loaded.src : null;
 
   useEffect(() => {
     let cancelled = false;
     let objectUrl: string | null = null;
-    void studio.footage.previewSource(footage).then((source) => {
-      if (cancelled) return;
-      if (source instanceof Blob) {
-        objectUrl = studio.services.env.createUrl(source);
-        setSrc(objectUrl);
-      } else {
-        setSrc(source);
-      }
-    });
+    studio.footage
+      .previewSource(footage)
+      .then((source) => {
+        if (cancelled) return;
+        if (source === null) {
+          setLoaded({ for: footage, src: null });
+        } else if (source instanceof Blob) {
+          objectUrl = studio.services.env.createUrl(source);
+          setLoaded({ for: footage, src: objectUrl });
+        } else {
+          setLoaded({ for: footage, src: source });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoaded({ for: footage, src: null });
+      });
     return () => {
       cancelled = true;
       if (objectUrl) studio.services.env.revokeUrl(objectUrl);
