@@ -17,6 +17,7 @@
   "dependencies": {
     "bcryptjs": "3.0.3",
     "jose": "6.2.12",
+    "mediabunny": "1.61.4",
     "next": "16.4.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
