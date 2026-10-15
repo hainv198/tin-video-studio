@@ -20,6 +20,7 @@ export interface RenderJobBuilderDeps {
   decoder: Pick<AudioDecodeService, "decode">;
   origin: string;
   sampleRate?: number;
+  videoBitrate?: number;
 }
 
 export interface BuiltJob {
@@ -99,6 +100,7 @@ export class RenderJobBuilder {
       music: musicBed,
       sampleRate: this.sampleRate,
       origin: this.deps.origin,
+      ...(this.deps.videoBitrate ? { videoBitrate: this.deps.videoBitrate } : {}),
     };
     return { job, warnings };
   }

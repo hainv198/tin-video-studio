@@ -5,6 +5,7 @@ import { loadFonts, type FontSink } from "@/client/media/FontLoader";
 import { ImageFrameProvider, VideoFrameProvider } from "@/client/media/MediaFrameProvider";
 import { defaultTemplateRegistry } from "@/templates/registry";
 import { CanvasBackdropMaker } from "./BackdropMaker";
+import { RENDER_AUDIO_BITRATE, RENDER_VIDEO_BITRATE } from "./encodingDefaults";
 import { Mp4Encoder } from "./Mp4Encoder";
 import { planRender } from "./RenderPlan";
 import { probeWorkerScope, type ProbeScope } from "./workerProbe";
@@ -18,8 +19,6 @@ interface WorkerScope {
 }
 
 const scope = globalThis as unknown as WorkerScope;
-const VIDEO_BITRATE = 8_000_000;
-const AUDIO_BITRATE = 192_000;
 
 async function blobOf(footage: FootageInput, origin: string): Promise<Blob> {
   if (footage.blob) return footage.blob;
@@ -83,7 +82,7 @@ async function render(job: RenderJob): Promise<void> {
       if (!surfaceCtx) throw new Error("Trình duyệt không cấp được canvas 2D");
       return { canvas: surface, ctx: surfaceCtx };
     });
-    const enc = new Mp4Encoder({ canvas, fps, videoBitrate: VIDEO_BITRATE, audioBitrate: AUDIO_BITRATE });
+    const enc = new Mp4Encoder({ canvas, fps, videoBitrate: job.videoBitrate ?? RENDER_VIDEO_BITRATE, audioBitrate: RENDER_AUDIO_BITRATE });
     encoder = enc;
     await enc.start();
     await enc.addAudio(mix);

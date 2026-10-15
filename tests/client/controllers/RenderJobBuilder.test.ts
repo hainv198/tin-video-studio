@@ -129,3 +129,19 @@ describe("RenderJobBuilder", () => {
     expect(labels).toEqual(["Chuẩn bị giọng đọc 1/3", "Chuẩn bị giọng đọc 2/3", "Chuẩn bị giọng đọc 3/3"]);
   });
 });
+
+describe("RenderJobBuilder — bitrate", () => {
+  it("không đặt thì job không có videoBitrate; đặt thì truyền vào job", async () => {
+    const { builder, data } = setup();
+    expect((await builder.build(data)).job.videoBitrate).toBeUndefined();
+    const light = new RenderJobBuilder({
+      templates: defaultTemplateRegistry(),
+      uploads: memoryUploads("u").uploads,
+      tracks: { bytes: async () => new ArrayBuffer(0) },
+      decoder: { decode: async () => ({ channels: [new Float32Array(48000)], sampleRate: 48000, durationSec: 1 }) },
+      origin: "http://localhost:3100",
+      videoBitrate: 5_000_000,
+    });
+    expect((await light.build(data)).job.videoBitrate).toBe(5_000_000);
+  });
+});

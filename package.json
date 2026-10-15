@@ -7,15 +7,21 @@
   },
   "scripts": {
     "dev": "next dev -p 3100",
+    "check-env": "tsx scripts/check-env.ts",
+    "prebuild": "tsx scripts/check-env.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "user:entry": "tsx scripts/users.ts entry",
     "user:encode": "tsx scripts/users.ts encode",
-    "minimax:clone": "tsx scripts/minimax-clone.ts"
+    "minimax:clone": "tsx scripts/minimax-clone.ts",
+    "measure:mp4": "tsx scripts/measure-mp4.ts",
+    "contact:sheet": "tsx scripts/contact-sheet.ts"
   },
   "dependencies": {
     "bcryptjs": "3.0.3",
@@ -27,6 +33,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "22.20.5",
     "@types/react": "19.3.0",
