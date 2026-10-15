@@ -7,6 +7,8 @@
   },
   "scripts": {
     "dev": "next dev -p 3100",
+    "check-env": "tsx scripts/check-env.ts",
+    "prebuild": "tsx scripts/check-env.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
