@@ -1,0 +1,45 @@
+import { describe, expect, it } from "vitest";
+import { DEFAULT_TIMELINE_CONFIG } from "@/domain/Timeline";
+import { planRender } from "@/client/render/RenderPlan";
+import type { RenderJob } from "@/client/render/RenderJob";
+
+const job = (narrations: RenderJob["narrations"]): RenderJob => ({
+  templateId: "theanh28",
+  brandValues: {},
+  logo: null,
+  project: { displayTitle: "T", sourceCredit: "", publishDateText: "14/10/2026" },
+  scenes: [
+    { sceneId: "s1", role: "intro", text: "T", footage: { kind: "fallback" } },
+    { sceneId: "s2", role: "body", text: "B", footage: { kind: "fallback" } },
+  ],
+  narrations,
+  music: null,
+  sampleRate: 48000,
+  origin: "http://localhost:3100",
+});
+
+describe("planRender", () => {
+  it("dựng timeline theo thứ tự cảnh, giọng đặt ở voiceStart", () => {
+    const a = new Float32Array(3);
+    const b = new Float32Array(4);
+    const plan = planRender(
+      job([
+        { sceneId: "s2", durationSec: 1, samples: b },
+        { sceneId: "s1", durationSec: 2, samples: a },
+      ]),
+      DEFAULT_TIMELINE_CONFIG,
+    );
+    expect(plan.timeline.slots.map((s) => s.sceneId)).toEqual(["s1", "s2"]);
+    expect(plan.voices).toEqual([
+      { startSec: 0.3, samples: a },
+      { startSec: 2.65, samples: b },
+    ]);
+    expect(plan.timeline.totalDuration).toBeCloseTo(4.25, 9);
+  });
+
+  it("cảnh thiếu giọng thì báo lỗi rõ", () => {
+    expect(() => planRender(job([{ sceneId: "s1", durationSec: 1, samples: new Float32Array(1) }]), DEFAULT_TIMELINE_CONFIG)).toThrow(
+      "Cảnh s2 chưa có giọng đọc",
+    );
+  });
+});
