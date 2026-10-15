@@ -57,6 +57,10 @@ export class StudioSession {
   private current: StudioData = EMPTY_STUDIO;
   private readonly listeners = new Set<() => void>();
   private cancelSave: (() => void) | null = null;
+  /** Hàng đợi ghi bản nháp: mọi lần lưu/xoá nối đuôi nhau, không bao giờ reject. */
+  private chain: Promise<void> = Promise.resolve();
+  /** Tăng mỗi lần reset; lần lưu hẹn từ đời cũ bị bỏ qua. */
+  private generation = 0;
 
   constructor(private readonly deps: SessionDeps) {}
 
@@ -73,8 +77,8 @@ export class StudioSession {
 
   update(change: (data: StudioData) => StudioData): void {
     this.current = prune(change(this.current));
-    this.notify();
     this.scheduleSave();
+    this.notify();
   }
 
   /** Bộ thương hiệu lưu ở BrandRepository, không vào bản nháp. */
@@ -96,15 +100,22 @@ export class StudioSession {
     this.notify();
   }
 
+  /**
+   * Bỏ dự án đang làm (giữ bộ thương hiệu) và xoá luôn bản nháp đã lưu.
+   * Việc xoá nối vào hàng đợi nên luôn đến sau mọi lần lưu cũ đang chạy; lần lưu cũ chưa chạy bị bỏ.
+   */
   reset(): void {
     this.cancelPendingSave();
+    this.generation += 1;
+    this.chain = this.chain.then(() => this.doClear());
     this.current = { ...EMPTY_STUDIO, brand: this.current.brand };
     this.notify();
   }
 
   async flush(): Promise<void> {
     this.cancelPendingSave();
-    await this.save();
+    this.enqueueSave();
+    await this.chain;
   }
 
   private scheduleSave(): void {
@@ -112,7 +123,7 @@ export class StudioSession {
     this.cancelPendingSave();
     this.cancelSave = this.deps.schedule(() => {
       this.cancelSave = null;
-      void this.save();
+      this.enqueueSave();
     }, this.deps.autosaveMs ?? 800);
   }
 
@@ -121,11 +132,25 @@ export class StudioSession {
     this.cancelSave = null;
   }
 
-  private async save(): Promise<void> {
+  private enqueueSave(): void {
+    const generation = this.generation;
+    this.chain = this.chain.then(() => this.doSave(generation));
+  }
+
+  private async doSave(generation: number): Promise<void> {
+    if (generation !== this.generation) return;
     const { project, voice, narrations, footage, music } = this.current;
     if (!project) return;
     try {
       await this.deps.drafts.save(buildDraftBody({ project, voice, narrations: [...narrations.values()], footage, music }));
+    } catch (error) {
+      this.deps.onSaveError?.(error);
+    }
+  }
+
+  private async doClear(): Promise<void> {
+    try {
+      await this.deps.drafts.clear();
     } catch (error) {
       this.deps.onSaveError?.(error);
     }

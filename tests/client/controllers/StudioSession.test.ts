@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { StudioSession } from "@/client/controllers/StudioSession";
+import type { DraftBody } from "@/client/storage/ProjectDraft";
 import { FallbackFootage } from "@/domain/Footage";
 import { sequentialIds } from "@/domain/ids";
-import { fakeNarration, makeProject, makeSession, makeSessionWithProject, manualScheduler, VOICE } from "../../helpers/studioFixtures";
+import { fakeNarration, flush, makeProject, makeSession, makeSessionWithProject, manualScheduler, VOICE } from "../../helpers/studioFixtures";
 
 describe("StudioSession", () => {
   it("update thay state và báo cho người nghe", () => {
@@ -105,5 +106,84 @@ describe("StudioSession", () => {
     session.update((d) => ({ ...d, project: makeProject(1) }));
     await session.flush();
     expect(onSaveError).toHaveBeenCalledTimes(1);
+  });
+
+  describe("lưu nối tiếp", () => {
+    function gated() {
+      const sched = manualScheduler();
+      const events: string[] = [];
+      const stored: DraftBody[] = [];
+      const gates: Array<() => void> = [];
+      const session = new StudioSession({
+        drafts: {
+          save: async (body) => {
+            events.push("save:start");
+            await new Promise<void>((resolve) => gates.push(resolve));
+            stored.push(body);
+            events.push("save:end");
+          },
+          load: async () => null,
+          clear: async () => {
+            events.push("clear");
+          },
+        },
+        ids: sequentialIds("n"),
+        schedule: sched.schedule,
+      });
+      session.update((d) => ({ ...d, project: makeProject(2), voice: VOICE }));
+      return { session, sched, events, stored, gates };
+    }
+
+    it("hai lần lưu chồng nhau chạy lần lượt và bản cuối là snapshot mới nhất", async () => {
+      const { session, sched, events, stored, gates } = gated();
+      sched.runAll();
+      await flush();
+      expect(events).toEqual(["save:start"]);
+      session.update((d) => ({ ...d, project: d.project!.mergeWithNext(d.project!.scenes[1]!.id) }));
+      sched.runAll();
+      await flush();
+      expect(events).toEqual(["save:start"]); // lần 2 chưa bắt đầu khi lần 1 còn treo
+      gates[0]!();
+      await flush();
+      gates[1]!();
+      await flush();
+      expect(events).toEqual(["save:start", "save:end", "save:start", "save:end"]);
+      expect(stored).toHaveLength(2);
+      expect(stored[1]!.project.scenes).toHaveLength(session.state.project!.scenes.length);
+    });
+
+    it("flush khi đang có lần lưu chỉ xong sau cả hai lần và ghi bản mới nhất", async () => {
+      const { session, sched, stored, gates } = gated();
+      sched.runAll();
+      await flush();
+      session.update((d) => ({ ...d, voice: null }));
+      let done = false;
+      const flushing = session.flush().then(() => {
+        done = true;
+      });
+      expect(sched.pending()).toBe(0);
+      gates[0]!();
+      await flush();
+      expect(done).toBe(false);
+      gates[1]!();
+      await flushing;
+      expect(done).toBe(true);
+      expect(stored).toHaveLength(2);
+      expect(stored[1]!.voice).toBeNull();
+    });
+
+    it("reset khi đang lưu: clear chạy sau lần lưu cũ và không ghi lại gì nữa", async () => {
+      const { session, sched, events, gates } = gated();
+      sched.runAll();
+      await flush();
+      session.update((d) => ({ ...d, voice: null })); // lần lưu thứ hai đang hẹn
+      session.reset();
+      expect(sched.pending()).toBe(0);
+      gates[0]!();
+      await flush();
+      await flush();
+      expect(events).toEqual(["save:start", "save:end", "clear"]);
+      expect(gates).toHaveLength(1);
+    });
   });
 });
