@@ -65,6 +65,7 @@ tests/client/controllers/*.test.ts
 - **Giọng "cũ" (stale):** `Narration.isStaleFor(scene, voice)`. Sửa chữ của cảnh hoặc đổi giọng/tốc độ làm giọng cũ đi; cảnh mới tách/gộp chưa có giọng. Bước 2 hoàn tất khi mọi cảnh có giọng không cũ.
 - **Qua bước:** `canEnter(step, data)` đúng khi mọi bước đứng trước đã `stepReady`. Bước 3 và 4 luôn sẵn sàng khi bước 2 xong (cảnh trống dùng nền mặc định, không nhạc cũng được).
 - **Task 1 làm xong hạng mục "để dành" quan trọng nhất của 3A/3B:** lỗi mạng, phản hồi 200 không phải JSON, hết phiên bị chuyển hướng, `AbortSignal` cho tìm cảnh trám, `probe()` có timeout.
+- **Kế hoạch đã chạy thử khô (dry run) trong worktree riêng:** Task 1–12 dựng được, 513 test, typecheck/lint/build sạch; 7 lỗi tìm thấy đã sửa vào văn bản này. Chưa chạy thật trong trình duyệt (Task 13).
 - **Không làm ở 3C (để chặng 4):** Playwright toàn luồng, so khung với video mẫu, deploy Vercel, hạ bitrate 8→5 Mbps (quyết định của Hải).
 
 ---
@@ -103,13 +104,13 @@ describe("readJson", () => {
   });
 
   it("thân không phải JSON thì ApiError 502 BAD_RESPONSE", async () => {
-    const err = await readJson(new Response("<html></html>")).catch((e) => e);
+    const err: ApiError = await readJson<never>(new Response("<html></html>")).catch((e) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect([err.status, err.code]).toEqual([502, "BAD_RESPONSE"]);
   });
 
   it("phản hồi bị chuyển hướng (trang đăng nhập) thì ApiError 401 AUTH", async () => {
-    const err = await readJson(redirected()).catch((e) => e);
+    const err: ApiError = await readJson<never>(redirected()).catch((e) => e);
     expect([err.status, err.code]).toEqual([401, "AUTH"]);
     expect(() => assertSameSession(redirected())).toThrow(ApiError);
     expect(() => assertSameSession(new Response("ok"))).not.toThrow();
@@ -2865,7 +2866,7 @@ describe("fileNameFor", () => {
 import { describe, expect, it, vi } from "vitest";
 import { RenderJobBuilder } from "@/client/controllers/RenderJobBuilder";
 import { EMPTY_STUDIO, type StudioData } from "@/client/controllers/StudioSession";
-import { uploadToFootage, uploadUri } from "@/client/media/footageFactory";
+import { uploadToFootage } from "@/client/media/footageFactory";
 import { RenderCancelledError } from "@/client/render/errors";
 import { FallbackFootage, ImageFootage } from "@/domain/Footage";
 import { MusicTrack } from "@/domain/MusicTrack";
@@ -3497,7 +3498,7 @@ describe("WizardController", () => {
 
   it("bản nháp hỏng thì xoá đi và báo lỗi tiếng Việt", async () => {
     const { store, wizard, drafts } = setup();
-    await store.set("draft", { version: 1, savedAt: "x", project: { title: "T", scenes: "hỏng" }, narrations: [], footage: { assignments: [] }, voice: null, music: null });
+    await store.set("draft", { version: 1, savedAt: "x", project: { title: "T", templateId: "theanh28", sourceCredit: "Nguồn", publishDate: "2026-10-14", scenes: "hỏng" }, narrations: [], footage: { assignments: [] }, voice: null, music: null });
     await wizard.boot();
     expect(wizard.state.resume).not.toBeNull();
     await wizard.resume();
@@ -3582,7 +3583,7 @@ describe("createStudio", () => {
   it("onAuthLost của studio được gọi khi một controller gặp lỗi hết phiên", async () => {
     let lost = 0;
     const services = createClientServices(env());
-    (services.tts as { voices: () => Promise<never> }).voices = async () => {
+    (services.tts as unknown as { voices: () => Promise<never> }).voices = async () => {
       throw new ApiError(401, "AUTH", "Chưa đăng nhập");
     };
     const studio = createStudio(services, { onAuthLost: () => lost++, schedule: () => () => {} });
@@ -3872,7 +3873,10 @@ let instance: Studio | null = null;
 function getStudio(): Studio {
   if (!instance) {
     instance = createStudio(createClientServices(browserEnv()), {
-      onAuthLost: () => window.location.assign(`/dang-nhap?next=${encodeURIComponent("/studio")}`),
+      // replace (không phải assign) để lint của Next không cảnh báo; hết phiên thì không cần giữ /studio trong lịch sử
+      onAuthLost: () => {
+        window.location.replace(`/dang-nhap?next=${encodeURIComponent("/studio")}`);
+      },
     });
   }
   return instance;
@@ -3886,7 +3890,13 @@ export function StudioApp() {
   useEffect(() => {
     if (!studio) return;
     void studio.wizard.boot();
-    return () => studio.dispose();
+    // Studio là singleton của module và StrictMode chạy effect hai lần, nên cleanup KHÔNG dispose
+    // (dispose thu hồi URL video đã dựng); chỉ dừng việc đang chạy và lưu bản nháp.
+    return () => {
+      studio.render.cancel();
+      studio.search.cancel();
+      void studio.session.flush();
+    };
   }, [studio]);
 
   if (!studio) return <p className="mt-8 text-neutral-400">Đang tải…</p>;
@@ -4882,9 +4892,9 @@ export function StepRender({ studio }: { studio: Studio }) {
 
 - [ ] **Step 3: Sửa `StudioShell.tsx`** — import `StepMusic`, `StepRender`; trong `renderStep` thêm `case "music"` và `case "render"`, và **xoá** nhánh `default` (hoặc để `default` trả `null` nếu TypeScript đòi đủ nhánh).
 
-- [ ] **Step 4: Gỡ trang dựng thử** — xoá 4 file ghi ở phần Files. Chạy `grep -rn "DevRender\|dung-thu\|DEV_SAMPLE" src tests` (Grep tool) để chắc không còn tham chiếu; nếu còn trong tài liệu `docs/` thì để nguyên (lịch sử).
+- [ ] **Step 4: Gỡ trang dựng thử** — xoá 4 file ghi ở phần Files và xoá luôn thư mục rỗng `src/app/dev` (cả `src/app/dev/dung-thu`). Chạy `grep -rn "DevRender\|dung-thu\|DEV_SAMPLE" src tests` (Grep tool) để chắc không còn tham chiếu; nếu còn trong tài liệu `docs/` thì để nguyên (lịch sử). Rồi `rm -rf .next`: thư mục `.next/types` của lần build trước còn giữ kiểu của trang `/dev/dung-thu` và `tsconfig` include nó, nên typecheck sẽ đỏ nếu không xoá.
 
-- [ ] **Step 5: Chạy `npm run typecheck`, `npm run lint`, `npx vitest run`, `npm run build`** — sạch (số test giảm đúng bằng số test của `DevRenderController.test.ts`).
+- [ ] **Step 5: Chạy `npm run build`, rồi `npm run typecheck`, `npm run lint`, `npx vitest run`** — sạch (build trước để `.next/types` được tạo lại; số test giảm đúng bằng số test của `DevRenderController.test.ts`).
 
 - [ ] **Step 6: Commit** (điều phối viên) — `feat(views): bước nhạc nền và dựng video; gỡ trang dựng thử`
 
