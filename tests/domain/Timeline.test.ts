@@ -48,4 +48,14 @@ describe("Timeline tra cứu", () => {
     expect(t.frameCount(30)).toBe(525);
     expect(Timeline.build([{ sceneId: "x", durationSec: 0.1 }]).frameCount(30)).toBe(30);
   });
+
+  it("frameCount không dư khung do sai số số thực", () => {
+    // 0.3 + 0.22 + 0.6 = 1.12 s; 1.12 * 25 = 28.000000000000004 trong JS nên Math.ceil trần ra 29
+    expect(Timeline.build([{ sceneId: "x", durationSec: 0.22 }]).frameCount(25)).toBe(28);
+  });
+
+  it("frameCount chặn fps không hợp lệ", () => {
+    expect(() => t.frameCount(0)).toThrow("fps phải là số dương");
+    expect(() => t.frameCount(Number.NaN)).toThrow("fps phải là số dương");
+  });
 });

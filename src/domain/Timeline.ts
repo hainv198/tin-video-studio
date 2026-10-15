@@ -63,6 +63,7 @@ export class Timeline {
   }
 
   frameCount(fps: number): number {
-    return Math.ceil(this.totalDuration * fps);
+    if (!Number.isFinite(fps) || fps <= 0) throw new ValidationError("fps phải là số dương");
+    return Math.ceil(Math.round(this.totalDuration * fps * 1e6) / 1e6);
   }
 }
