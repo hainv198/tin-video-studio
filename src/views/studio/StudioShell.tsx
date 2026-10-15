@@ -5,7 +5,9 @@ import { STEPS, canEnter, type StepId } from "@/client/controllers/readiness";
 import { useController } from "@/views/hooks/useController";
 import { Stepper } from "./Stepper";
 import { StepFootage } from "./steps/StepFootage";
+import { StepMusic } from "./steps/StepMusic";
 import { StepNews } from "./steps/StepNews";
+import { StepRender } from "./steps/StepRender";
 import { StepVoice } from "./steps/StepVoice";
 
 const BLOCKED_HINT: Partial<Record<StepId, string>> = {
@@ -21,8 +23,10 @@ function renderStep(step: StepId, studio: Studio) {
       return <StepVoice studio={studio} />;
     case "footage":
       return <StepFootage studio={studio} />;
-    default:
-      return <p className="text-neutral-400">Bước này sẽ có ở task sau.</p>;
+    case "music":
+      return <StepMusic studio={studio} />;
+    case "render":
+      return <StepRender studio={studio} />;
   }
 }
 
