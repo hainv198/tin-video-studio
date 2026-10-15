@@ -120,3 +120,28 @@ describe("GeminiTtsService", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
+
+describe("GeminiTtsService — an toàn và định dạng", () => {
+  it("mimeType lạ -> UpstreamError, không bọc WAV bừa", async () => {
+    const f = async () => audioResponse([1, 2, 3, 4], "audio/mpeg");
+    const svc = new GeminiTtsService({ apiKey: KEY, fetchImpl: f as unknown as typeof fetch });
+    await expect(svc.synthesize({ text: "a", voiceName: `${GEMINI_VOICE_PREFIX}Kore`, speakingRate: 1 })).rejects.toThrow(
+      /định dạng âm thanh lạ/,
+    );
+  });
+
+  it("PCM lẻ byte thì bỏ byte cuối", async () => {
+    const f = async () => audioResponse([1, 2, 3]);
+    const svc = new GeminiTtsService({ apiKey: KEY, fetchImpl: f as unknown as typeof fetch });
+    const r = await svc.synthesize({ text: "a", voiceName: `${GEMINI_VOICE_PREFIX}Kore`, speakingRate: 1 });
+    expect(r.audio.byteLength).toBe(44 + 2);
+  });
+
+  it("thân lỗi của Google có chứa key thì log đã che", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const f = async () => new Response(`{"error":{"message":"API key not valid ${KEY}"}}`, { status: 400 });
+    const svc = new GeminiTtsService({ apiKey: KEY, fetchImpl: f as unknown as typeof fetch });
+    await expect(svc.synthesize({ text: "a", voiceName: `${GEMINI_VOICE_PREFIX}Kore`, speakingRate: 1 })).rejects.toThrow(UpstreamError);
+    expect(warn.mock.calls.map((c) => c.join(" ")).join("\n")).not.toContain(KEY);
+  });
+});

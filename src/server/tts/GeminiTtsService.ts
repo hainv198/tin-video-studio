@@ -80,14 +80,19 @@ export class GeminiTtsService implements TtsProvider {
         headers: { "Content-Type": "application/json", "x-goog-api-key": this.options.apiKey },
         body: JSON.stringify(body),
       },
-      LABELS,
+      { ...LABELS, redact: [this.options.apiKey] },
     );
 
     if (data.promptFeedback?.blockReason) throw new UpstreamError("Gemini từ chối đọc đoạn tin này");
     const inline = data.candidates?.[0]?.content?.parts?.find((p) => p.inlineData)?.inlineData;
     if (!inline?.data) throw new UpstreamError("Gemini không trả về âm thanh");
-    const rate = Number(/rate=(\d+)/.exec(inline.mimeType ?? "")?.[1]);
+    const mimeType = inline.mimeType ?? "";
+    // Gemini trả PCM 16-bit little-endian mono ("audio/L16;codec=pcm;rate=24000"); định dạng khác thì không bọc WAV bừa.
+    if (mimeType && !/audio\/l16|pcm/i.test(mimeType)) throw new UpstreamError(`Gemini trả về định dạng âm thanh lạ (${mimeType})`);
+    const rate = Number(/rate=(\d+)/.exec(mimeType)?.[1]); // NaN nếu không có rate= → dùng mặc định
     const sampleRate = Number.isFinite(rate) && rate > 0 ? rate : DEFAULT_SAMPLE_RATE;
-    return { audio: pcm16ToWav(Buffer.from(inline.data, "base64"), sampleRate), mimeType: "audio/wav" };
+    const raw = Buffer.from(inline.data, "base64");
+    const pcm = raw.subarray(0, raw.length & ~1); // bỏ byte lẻ cuối nếu có
+    return { audio: pcm16ToWav(pcm, sampleRate), mimeType: "audio/wav" };
   }
 }

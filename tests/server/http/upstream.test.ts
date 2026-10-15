@@ -30,4 +30,15 @@ describe("fetchJson", () => {
     };
     await expect(fetchJson(fNet as typeof fetch, "https://x", {}, labels)).rejects.toBeInstanceOf(UpstreamError);
   });
+
+  it("thân lỗi có chứa key thì log đã che key", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const f400 = async () => new Response('{"error":"API key not valid: sk-bi-mat-123"}', { status: 400 });
+    await expect(
+      fetchJson(f400 as typeof fetch, "https://x", {}, { ...labels, redact: ["sk-bi-mat-123"] }),
+    ).rejects.toThrow("Dịch vụ X lỗi 400");
+    const logged = warn.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(logged).not.toContain("sk-bi-mat-123");
+    expect(logged).toContain("[đã che]");
+  });
 });
