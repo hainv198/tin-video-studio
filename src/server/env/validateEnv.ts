@@ -52,5 +52,7 @@ export function validateEnv(env: Record<string, string | undefined>): EnvCheck {
     summary.push("MiniMax: cảnh báo — cần cả MINIMAX_API_KEY và MINIMAX_VOICES, đang bỏ qua");
   }
 
+  if (env.GEMINI_API_KEY?.trim()) summary.push("Gemini: đã đặt");
+
   return problems.length ? { ok: false, problems } : { ok: true, summary };
 }

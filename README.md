@@ -40,6 +40,14 @@ Thiếu một trong hai biến hoặc `MINIMAX_VOICES` sai định dạng thì a
 
 Có cấu hình MiniMax thì giọng clone dùng được cả khi `FAKE_PROVIDERS=1` (giọng Google lúc đó là giọng giả).
 
+## Giọng Gemini (AI Studio, tuỳ chọn)
+
+1. Vào https://aistudio.google.com, đăng nhập tài khoản Google, tạo API key (không cần thẻ).
+2. Dán vào `.env.local` (và biến môi trường trên Vercel) dòng `GEMINI_API_KEY=<key>`. Tuỳ chọn `GEMINI_MODEL` để đổi model (mặc định `gemini-2.5-flash-preview-tts`).
+3. Khởi động lại app: 8 giọng hiện với tên `vi-VN-Gemini-Kore`, `vi-VN-Gemini-Charon`... đứng sau giọng MiniMax (nếu có) và trước giọng Google.
+
+Lưu ý: gói miễn phí có giới hạn lượt gọi mỗi phút và mỗi ngày; hết lượt app báo "Gemini đã hết lượt tạo giọng, thử lại sau". Tốc độ đọc chỉ là gợi ý trong lời nhắc (nhanh hơn khi từ 1,15, chậm hơn khi từ 0,9 trở xuống), không chính xác như giọng Google.
+
 ## API (đều cần đăng nhập, trừ đăng nhập)
 
 | Route | Việc |
@@ -113,6 +121,7 @@ Lưu ý:
 | `PEXELS_API_KEY` | Có (khi không `FAKE_PROVIDERS`) | Đăng ký tại pexels.com/api |
 | `PIXABAY_API_KEY` | Có (khi không `FAKE_PROVIDERS`) | Đăng ký tại pixabay.com/api/docs |
 | `MINIMAX_API_KEY`, `MINIMAX_VOICES` | Không (phải có đủ cặp) | Xem mục giọng clone MiniMax |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | Không | Xem mục giọng Gemini; model mặc định `gemini-2.5-flash-preview-tts` |
 | `MINIMAX_MODEL`, `MINIMAX_BASE_URL` | Không | Mặc định `speech-2.8-hd` và `https://api.minimax.io` |
 | `FAKE_PROVIDERS` | Không, chỉ máy dev | `1` = giọng và cảnh trám giả lập; bật trên production là lỗi |
 | `EDGE_TTS_DEV` | Không, chỉ máy dev | `1` = nghe thử giọng Edge qua `edge-tts`; bật khi deploy là lỗi |

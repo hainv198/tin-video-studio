@@ -9,9 +9,10 @@ import { StockController } from "./stock/StockController";
 import type { StockProvider } from "./stock/StockProvider";
 import { EdgeCliTtsProvider } from "./tts/EdgeCliTtsProvider";
 import { FakeTtsProvider } from "./tts/FakeTtsProvider";
+import { GeminiTtsService } from "./tts/GeminiTtsService";
 import { GoogleTtsService } from "./tts/GoogleTtsService";
 import { MiniMaxTtsService, parseMiniMaxVoices } from "./tts/MiniMaxTtsService";
-import { routed, RoutingTtsProvider } from "./tts/RoutingTtsProvider";
+import { routed, RoutingTtsProvider, type RoutedTtsProvider } from "./tts/RoutingTtsProvider";
 import { TtsController } from "./tts/TtsController";
 import type { TtsProvider } from "./tts/TtsProvider";
 
@@ -42,7 +43,7 @@ export function buildServerContainer(env: Record<string, string | undefined>): S
       ? new EdgeCliTtsProvider({ bin: env.EDGE_TTS_BIN })
       : new FakeTtsProvider()
     : new GoogleTtsService(env.GOOGLE_TTS_API_KEY ?? "");
-  const ttsProvider = withMiniMax(baseTts, env);
+  const ttsProvider = composeTts(baseTts, env);
   const stockProviders: StockProvider[] = usingFakes
     ? [new FakeStockProvider()]
     : [new PexelsService(env.PEXELS_API_KEY ?? ""), new PixabayService(env.PIXABAY_API_KEY ?? "")];
@@ -58,18 +59,25 @@ export function buildServerContainer(env: Record<string, string | undefined>): S
   };
 }
 
-/** MiniMax là tuỳ chọn: chỉ bật khi có đủ key và danh sách giọng hợp lệ; thiếu hoặc sai thì cảnh báo và chạy như cũ. Giọng clone đứng đầu danh sách. */
-function withMiniMax(base: TtsProvider, env: Record<string, string | undefined>): TtsProvider {
+/** MiniMax và Gemini đều tuỳ chọn. Thứ tự danh sách giọng: MiniMax (giọng clone), Gemini, rồi giọng nền. */
+function composeTts(base: TtsProvider, env: Record<string, string | undefined>): TtsProvider {
+  const candidates: Array<RoutedTtsProvider | undefined> = [buildMiniMax(env), buildGemini(env)];
+  const optional = candidates.filter((p): p is RoutedTtsProvider => p !== undefined);
+  if (optional.length === 0) return base;
+  return new RoutingTtsProvider([...optional, routed(base, (voiceName) => !optional.some((p) => p.owns(voiceName)))]);
+}
+
+/** Chỉ bật khi có đủ key và danh sách giọng hợp lệ; thiếu hoặc sai thì cảnh báo và chạy như cũ. */
+function buildMiniMax(env: Record<string, string | undefined>): MiniMaxTtsService | undefined {
   const apiKey = env.MINIMAX_API_KEY?.trim();
   const rawVoices = env.MINIMAX_VOICES?.trim();
-  if (!apiKey && !rawVoices) return base;
+  if (!apiKey && !rawVoices) return undefined;
   if (!apiKey || !rawVoices) {
     console.warn("[MiniMax] Bỏ qua giọng MiniMax: cần cả MINIMAX_API_KEY và MINIMAX_VOICES");
-    return base;
+    return undefined;
   }
-  let minimax: MiniMaxTtsService;
   try {
-    minimax = new MiniMaxTtsService({
+    return new MiniMaxTtsService({
       apiKey,
       voices: parseMiniMaxVoices(rawVoices),
       model: env.MINIMAX_MODEL,
@@ -77,9 +85,14 @@ function withMiniMax(base: TtsProvider, env: Record<string, string | undefined>)
     });
   } catch (error) {
     console.warn(`[MiniMax] Bỏ qua giọng MiniMax: ${error instanceof Error ? error.message : "cấu hình sai"}`);
-    return base;
+    return undefined;
   }
-  return new RoutingTtsProvider([minimax, routed(base, (voiceName) => !minimax.owns(voiceName))]);
+}
+
+function buildGemini(env: Record<string, string | undefined>): GeminiTtsService | undefined {
+  const apiKey = env.GEMINI_API_KEY?.trim();
+  if (!apiKey) return undefined;
+  return new GeminiTtsService({ apiKey, model: env.GEMINI_MODEL?.trim() || undefined });
 }
 
 let cached: ServerContainer | undefined;

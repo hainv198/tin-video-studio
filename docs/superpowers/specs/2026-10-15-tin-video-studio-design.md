@@ -345,3 +345,9 @@ PSNR > 45 dB là không phân biệt được bằng mắt. Khuyến nghị chuy
 ### Deploy
 - `npm run check-env` chạy tự động trước `next build` (`prebuild`): chặn thiếu `AUTH_SECRET`/`APP_USERS`/key, chặn `FAKE_PROVIDERS` trên production; không in giá trị key. Header bảo mật (nosniff, Referrer-Policy, X-Frame-Options DENY, Permissions-Policy). README có mục deploy Vercel từng bước và bảng biến môi trường.
 - **Hoãn, cần Hải:** kiểm với key thật (Google TTS, Pexels, Pixabay — chưa có trong `.env.local`) và kiểm trên bản deploy (chưa có repo GitHub/dự án Vercel). Cách làm ghi ở kế hoạch chặng 4, Task 6 và 8.
+
+### Giọng Gemini (Google AI Studio) — kiểm với API thật, 2026-10-15
+- Nhà cung cấp thứ ba, tuỳ chọn, chỉ cần `GEMINI_API_KEY` (không cần thẻ). 8 giọng `vi-VN-Gemini-*` (Kore, Charon, Despina, Iapetus, Erinome, Alnilam, Sulafat, Rasalgethi), đứng sau giọng MiniMax và trước giọng Google/Edge. Key đi trong header, bị che trong log lỗi.
+- Tốc độ đọc chỉ là gợi ý trong câu lệnh: cùng câu 13 từ ở 0,85 / 1,07 / 1,3 ra 5,5 / 4,9 / 4,2 giây.
+- Tin mẫu 6 câu, giọng Kore: tạo giọng 34 s (≈ 4–7 s/câu, gói miễn phí không vấp hạn mức), tổng giọng 43,2 s; video 44,0 s dựng 19,4 s; giọng −16,65 dB, đỉnh 0,891 (bộ giới hạn làm việc đúng trần 0,89 với giọng thật), nhạc nghỉ −30,49 dB.
+- Chưa kiểm: nhiều người dùng chung một key (giới hạn lượt/ngày của gói miễn phí).

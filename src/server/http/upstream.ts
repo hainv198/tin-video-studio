@@ -3,6 +3,14 @@ import { QuotaError, UpstreamError } from "@/domain/errors";
 export interface UpstreamLabels {
   service: string;
   quotaMessage: string;
+  /** Chuỗi bí mật (key) phải che trước khi ghi log thân lỗi của nhà cung cấp. */
+  redact?: readonly string[];
+}
+
+function redacted(text: string, secrets: readonly string[] | undefined): string {
+  let out = text;
+  for (const s of secrets ?? []) if (s) out = out.split(s).join("[đã che]");
+  return out;
 }
 
 export async function fetchJson<T>(
@@ -20,7 +28,7 @@ export async function fetchJson<T>(
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     if (response.status === 429 || detail.includes("RESOURCE_EXHAUSTED")) throw new QuotaError(labels.quotaMessage);
-    console.warn(`[${labels.service}] HTTP ${response.status}: ${detail.slice(0, 300)}`);
+    console.warn(`[${labels.service}] HTTP ${response.status}: ${redacted(detail, labels.redact).slice(0, 300)}`);
     throw new UpstreamError(`${labels.service} lỗi ${response.status}`);
   }
   return (await response.json()) as T;

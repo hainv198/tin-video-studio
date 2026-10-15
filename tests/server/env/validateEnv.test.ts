@@ -54,6 +54,16 @@ describe("validateEnv", () => {
     const bad = validateEnv({ ...base, FAKE_PROVIDERS: "1", MINIMAX_API_KEY: "k", MINIMAX_VOICES: "không phải json" });
     expect(bad.ok).toBe(false);
   });
+
+  it("Gemini: có key thì ghi vào tóm tắt (không lộ key), không có thì không sao", () => {
+    const on = validateEnv({ ...base, FAKE_PROVIDERS: "1", GEMINI_API_KEY: "gk-bi-mat" });
+    expect(on.ok).toBe(true);
+    const text = on.ok ? on.summary.join("\n") : "";
+    expect(text).toContain("Gemini: đã đặt");
+    expect(text).not.toContain("gk-bi-mat");
+    const off = validateEnv({ ...base, FAKE_PROVIDERS: "1" });
+    expect(off.ok ? off.summary.join("\n") : "").not.toContain("Gemini");
+  });
 });
 
 describe("validateEnv — Vercel Preview", () => {
