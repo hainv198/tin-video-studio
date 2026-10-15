@@ -11,7 +11,7 @@ export function DevRenderPanel() {
   const tts = useMemo(() => new TtsClient(), []);
   const controller = useMemo(() => {
     const client = new RenderClient();
-    const decoder = new AudioDecodeService(48000);
+    const decoder = new AudioDecodeService();
     return new DevRenderController({
       support: () => browserSupport().check(),
       tts,
