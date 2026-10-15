@@ -35,7 +35,7 @@ export function validateEnv(env: Record<string, string | undefined>): EnvCheck {
       problems.push("Cần PEXELS_API_KEY hoặc PIXABAY_API_KEY để tìm cảnh trám (bỏ FAKE_PROVIDERS thì phải có ít nhất một)");
     }
     const hasTts = Boolean(env.GOOGLE_TTS_API_KEY?.trim() || env.GEMINI_API_KEY?.trim() || (env.MINIMAX_API_KEY?.trim() && env.MINIMAX_VOICES?.trim()) || (env.VCLIP_API_KEY?.trim() && env.VCLIP_VOICES?.trim()));
-    if (!hasTts) problems.push("Cần GOOGLE_TTS_API_KEY hoặc GEMINI_API_KEY (hoặc MiniMax) để tạo giọng đọc (bỏ FAKE_PROVIDERS thì phải có ít nhất một)");
+    if (!hasTts) problems.push("Cần một nguồn giọng: VCLIP_API_KEY + VCLIP_VOICES, GEMINI_API_KEY, GOOGLE_TTS_API_KEY hoặc MiniMax (bỏ FAKE_PROVIDERS thì phải có ít nhất một)");
     summary.push(`Google TTS: ${set(env.GOOGLE_TTS_API_KEY)}; Pexels: ${set(env.PEXELS_API_KEY)}; Pixabay: ${set(env.PIXABAY_API_KEY)}`);
   }
 

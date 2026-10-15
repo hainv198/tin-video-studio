@@ -36,7 +36,7 @@ Bỏ `FAKE_PROVIDERS`, điền ít nhất một nguồn cảnh trám (`PIXABAY_A
    Alias chỉ gồm chữ và số không dấu.
 4. Khởi động lại app: giọng hiện với tên `vi-VN-Vclip-Hai`, đứng đầu danh sách (trước MiniMax, Gemini, Google). Tốc độ đọc hỗ trợ 0,5–2.
 
-Thiếu một trong hai biến hoặc `VCLIP_VOICES` sai định dạng thì app chỉ ghi cảnh báo vào log và chạy như không có vclip. Mỗi lần tạo giọng vclip chạy bất đồng bộ (gửi, chờ xong rồi tải), tối đa khoảng 2 phút.
+Thiếu một trong hai biến thì app chỉ ghi cảnh báo vào log và chạy như không có vclip. Nếu `VCLIP_VOICES` sai định dạng thì kiểm tra khởi động (`check-env`) báo lỗi và dừng; còn app đang chạy chỉ ghi cảnh báo và bỏ qua vclip. Mỗi lần tạo giọng vclip chạy bất đồng bộ (gửi, chờ xong rồi tải), tối đa khoảng 2 phút chờ + thời gian từng yêu cầu.
 
 ## Giọng clone MiniMax (tuỳ chọn)
 

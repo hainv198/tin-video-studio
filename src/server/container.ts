@@ -75,7 +75,7 @@ function composeTts(base: TtsProvider | undefined, env: Record<string, string | 
   const candidates: Array<RoutedTtsProvider | undefined> = [buildVclip(env), buildMiniMax(env), buildGemini(env)];
   const optional = candidates.filter((p): p is RoutedTtsProvider => p !== undefined);
   if (!base && optional.length === 0) {
-    throw new Error("Cần GOOGLE_TTS_API_KEY hoặc GEMINI_API_KEY (hoặc MiniMax) để tạo giọng đọc");
+    throw new Error("Cần một nguồn giọng: VCLIP_API_KEY + VCLIP_VOICES, GEMINI_API_KEY, GOOGLE_TTS_API_KEY hoặc MiniMax");
   }
   if (!base) return new RoutingTtsProvider(optional);
   if (optional.length === 0) return base;

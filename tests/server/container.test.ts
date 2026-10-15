@@ -17,7 +17,7 @@ describe("buildServerContainer", () => {
   });
 
   it("không bật giả lập thì bắt buộc có đủ key thật", () => {
-    expect(() => buildServerContainer(base)).toThrow("Cần GOOGLE_TTS_API_KEY hoặc GEMINI_API_KEY");
+    expect(() => buildServerContainer(base)).toThrow("Cần một nguồn giọng");
     expect(() => buildServerContainer({ ...base, GOOGLE_TTS_API_KEY: "g" })).toThrow("Cần PEXELS_API_KEY hoặc PIXABAY_API_KEY");
     expect(buildServerContainer({ ...base, ...realKeys }).usingFakes).toBe(false);
   });

@@ -100,6 +100,6 @@ describe("validateEnv — Gemini thay Google", () => {
     expect(validateEnv({ ...base, GEMINI_API_KEY: "gm" }).ok).toBe(true);
     const none = validateEnv(base);
     expect(none.ok).toBe(false);
-    expect(none.ok ? "" : none.problems.join()).toMatch(/GOOGLE_TTS_API_KEY hoặc GEMINI_API_KEY/);
+    expect(none.ok ? "" : none.problems.join()).toMatch(/Cần một nguồn giọng/);
   });
 });

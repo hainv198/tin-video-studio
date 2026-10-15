@@ -161,19 +161,107 @@ describe("VclipTtsService", () => {
     expect(logged).not.toContain(KEY);
   });
 
-  it("lỗi giống hết hạn mức → QuotaError", async () => {
-    const { fetchImpl } = scripted([rpc({ error: { code: "FORBIDDEN", message: "Insufficient credits" } })]);
+  it("lỗi giống hết hạn mức → QuotaError, vẫn log đã che key", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { fetchImpl } = scripted([rpc({ error: { code: "FORBIDDEN", message: `insufficient credits ${KEY}` } })]);
     await expect(service(fetchImpl).synthesize(request)).rejects.toBeInstanceOf(QuotaError);
+    const logged = warn.mock.calls.flat().join(" ");
+    expect(logged).toContain("insufficient credits");
+    expect(logged).not.toContain(KEY);
+  });
+
+  it("lỗi chứa chữ limit nhưng không phải hạn mức → UpstreamError, không phải QuotaError", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { fetchImpl } = scripted([rpc({ error: { code: "BAD_REQUEST", message: "text exceeds the character limit" } })]);
+    const err = await service(fetchImpl).synthesize(request).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(UpstreamError);
+    expect(err).not.toBeInstanceOf(QuotaError);
+  });
+
+  it("HTTP không phải 200 từ RPC → UpstreamError, log đã che key", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { fetchImpl } = scripted([() => new Response(`lỗi máy chủ ${KEY}`, { status: 500 })]);
+    await expect(service(fetchImpl).synthesize(request)).rejects.toBeInstanceOf(UpstreamError);
+    const logged = warn.mock.calls.flat().join(" ");
+    expect(logged).toContain("500");
+    expect(logged).not.toContain(KEY);
+  });
+
+  it("lỗi dạng đối tượng error khi đang hỏi trạng thái → UpstreamError", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { fetchImpl } = scripted([rpc({ projectExportId: "e" }), rpc({ error: { code: "EXPORT_GONE", message: "m" } })]);
+    await expect(service(fetchImpl).synthesize(request)).rejects.toThrow(new UpstreamError("vclip lỗi: EXPORT_GONE"));
+  });
+
+  it("completed nhưng không có url → UpstreamError", async () => {
+    const { fetchImpl } = scripted([rpc({ projectExportId: "e" }), rpc({ state: "completed" })]);
+    await expect(service(fetchImpl).synthesize(request)).rejects.toThrow(new UpstreamError("vclip không trả về âm thanh"));
+  });
+
+  it("đường dẫn âm thanh không phải https → UpstreamError, không tải", async () => {
+    const { fetchImpl, calls } = scripted([rpc({ projectExportId: "e" }), rpc({ state: "completed", url: "http://cdn.vclip.io/x.mp3" })]);
+    await expect(service(fetchImpl).synthesize(request)).rejects.toThrow(
+      new UpstreamError("vclip trả về đường dẫn âm thanh không hợp lệ"),
+    );
+    expect(calls).toHaveLength(2);
+  });
+
+  it("trạng thái viết hoa vẫn được nhận", async () => {
+    const { fetchImpl } = scripted([rpc({ projectExportId: "e" }), rpc({ state: "COMPLETED", url: "https://cdn.vclip.io/u.mp3" }), audio([4])]);
+    expect(Array.from((await service(fetchImpl).synthesize(request)).audio)).toEqual([4]);
+  });
+
+  it("yêu cầu quá hạn (TimeoutError) → UpstreamError 'vclip không phản hồi'", async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new DOMException("hết giờ", "TimeoutError");
+    }) as unknown as typeof fetch;
+    await expect(service(fetchImpl).synthesize(request)).rejects.toThrow(new UpstreamError("vclip không phản hồi"));
+  });
+
+  it("tải âm thanh quá hạn → UpstreamError 'vclip không phản hồi'", async () => {
+    const { fetchImpl } = scripted([
+      rpc({ projectExportId: "e" }),
+      rpc({ state: "completed", url: "https://cdn.vclip.io/t.mp3" }),
+      () => {
+        throw new DOMException("hết giờ", "TimeoutError");
+      },
+    ]);
+    await expect(service(fetchImpl).synthesize(request)).rejects.toThrow(new UpstreamError("vclip không phản hồi"));
+  });
+
+  it("mọi yêu cầu có signal; tải âm thanh có signal nhưng không có Authorization", async () => {
+    const { fetchImpl, calls } = scripted([
+      rpc({ projectExportId: "e" }),
+      rpc({ state: "completed", url: "https://cdn.vclip.io/s.mp3" }),
+      audio([1]),
+    ]);
+    await service(fetchImpl).synthesize(request);
+    for (const c of calls) expect(c.init?.signal).toBeInstanceOf(AbortSignal);
+    expect(JSON.stringify(calls[2]!.init?.headers ?? {})).not.toContain("Authorization");
+  });
+
+  it("tốc độ không hữu hạn → dùng 1", async () => {
+    const { fetchImpl, calls } = scripted([
+      rpc({ projectExportId: "e" }),
+      rpc({ state: "completed", url: "https://cdn.vclip.io/n.mp3" }),
+      audio([1]),
+    ]);
+    await service(fetchImpl).synthesize({ ...request, speakingRate: Number.NaN });
+    expect(JSON.parse(String(calls[0]!.init?.body)).input.speed).toBe(1);
   });
 
   it("trạng thái failed → UpstreamError", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { fetchImpl } = scripted([rpc({ projectExportId: "e" }), rpc({ state: "failed" })]);
     await expect(service(fetchImpl).synthesize(request)).rejects.toThrow(new UpstreamError("vclip tạo giọng thất bại"));
+    expect(warn).toHaveBeenCalled();
   });
 
-  it("không có projectExportId → UpstreamError", async () => {
+  it("không có projectExportId → UpstreamError, có log", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { fetchImpl } = scripted([rpc({ result: {} })]);
     await expect(service(fetchImpl).synthesize(request)).rejects.toBeInstanceOf(UpstreamError);
+    expect(warn).toHaveBeenCalled();
   });
 
   it("quá thời gian chờ → UpstreamError (đồng hồ giả, không chờ thật)", async () => {
@@ -183,7 +271,18 @@ describe("VclipTtsService", () => {
     const svc = service(fetchImpl, { sleep, pollIntervalMs: 1000, timeoutMs: 3000 });
     await expect(svc.synthesize(request)).rejects.toThrow(new UpstreamError("vclip quá lâu không trả kết quả"));
     expect(sleep).toHaveBeenCalledWith(1000);
-    expect(calls.length).toBeLessThanOrEqual(1 + 4);
+    expect(sleep).toHaveBeenCalledTimes(3);
+    expect(calls).toHaveLength(1 + 4);
+  });
+
+  it("quá hạn theo đồng hồ (now giả) dù chưa hết số lần hỏi", async () => {
+    const steps: Step[] = [rpc({ projectExportId: "e" }), ...Array.from({ length: 10 }, () => rpc({ state: "processing" }))];
+    const { fetchImpl, calls } = scripted(steps);
+    let t = -1000;
+    const now = () => (t += 1000);
+    const svc = service(fetchImpl, { now, pollIntervalMs: 1, timeoutMs: 3000 });
+    await expect(svc.synthesize(request)).rejects.toThrow(new UpstreamError("vclip quá lâu không trả kết quả"));
+    expect(calls).toHaveLength(1 + 4);
   });
 
   it("tải âm thanh rỗng hoặc lỗi → UpstreamError", async () => {
