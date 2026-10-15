@@ -32,6 +32,8 @@ export interface RenderJob {
   sampleRate: number;
   /** Origin của trang, để worker dựng URL tuyệt đối cho font và media tương đối. */
   origin: string;
+  /** Bitrate hình (bps); bỏ trống dùng RENDER_VIDEO_BITRATE. */
+  videoBitrate?: number;
 }
 
 export type WorkerRequest = { type: "start"; job: RenderJob } | { type: "probe" };
