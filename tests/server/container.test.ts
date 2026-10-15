@@ -44,6 +44,26 @@ describe("buildServerContainer", () => {
     expect(fake.mimeType).toBe("audio/wav");
   });
 
+  it("có GEMINI_API_KEY: giọng Gemini đứng sau MiniMax, trước giọng cũ; không có thì không hiện", async () => {
+    const withGemini = buildServerContainer({
+      ...base,
+      FAKE_PROVIDERS: "1",
+      MINIMAX_API_KEY: "mk",
+      MINIMAX_VOICES: JSON.stringify([{ alias: "Hai", voiceId: "tvsHai001", gender: "MALE" }]),
+      GEMINI_API_KEY: "gk",
+    });
+    const names = (await withGemini.tts.voices()).map((v) => v.name);
+    expect(names[0]).toBe("vi-VN-MiniMax-Hai");
+    expect(names[1]).toBe("vi-VN-Gemini-Kore");
+    expect(names.slice(-2)).toEqual(["vi-VN-Fake-A", "vi-VN-Fake-B"]);
+    const without = buildServerContainer({ ...base, FAKE_PROVIDERS: "1" });
+    expect((await without.tts.voices()).some((v) => v.name.startsWith("vi-VN-Gemini-"))).toBe(false);
+    const geminiOnly = buildServerContainer({ ...base, FAKE_PROVIDERS: "1", GEMINI_API_KEY: "gk" });
+    expect((await geminiOnly.tts.voices())[0]?.name).toBe("vi-VN-Gemini-Kore");
+    const fake = await geminiOnly.tts.synthesize({ text: "Xin chào.", voiceName: "vi-VN-Fake-A", speakingRate: 1 });
+    expect(fake.mimeType).toBe("audio/wav");
+  });
+
   it("cấu hình MiniMax thiếu một nửa hoặc sai: app chạy như cũ, cảnh báo không lộ key", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
