@@ -261,4 +261,100 @@ describe("FootageSearchController", () => {
     expect(ctrl.state.byScene.s2?.error).toBe("Hết lượt tìm kiếm hôm nay");
     expect(ctrl.state.byScene.s2?.query).toBe("boom");
   });
+
+  describe("cảnh đang xếp hàng trong pool", () => {
+    function queued() {
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const hook: Hook = (_signal, query) => (query === "hang" ? gate : Promise.resolve());
+      const made = setup(
+        { news: { image: [item("n1"), item("n2"), item("n3"), item("n4")] }, manual: { image: [item("m1")] } },
+        { "": ["hang"] },
+        hook,
+        { concurrency: 3 },
+      );
+      return { ...made, release };
+    }
+
+    it("search thủ công cảnh còn xếp hàng: kết quả thủ công thắng, autoFill không chạy cảnh đó", async () => {
+      const { ctrl, calls, release } = queued();
+      const run = ctrl.autoFill();
+      await new Promise((r) => setTimeout(r, 0));
+      await ctrl.search("s4", "manual");
+      release();
+      await run;
+      expect(ctrl.state.byScene.s4).toMatchObject({ query: "manual", loading: false, error: null });
+      expect(ctrl.state.byScene.s4?.items.map((i) => i.id)).toEqual(["m1"]);
+      expect(calls.filter((c) => c === "image:hang")).toHaveLength(3);
+    });
+
+    it("choose thủ công cảnh còn xếp hàng: fillScene không gọi stock cho cảnh đó", async () => {
+      const { ctrl, session, calls, release } = queued();
+      const run = ctrl.autoFill();
+      await new Promise((r) => setTimeout(r, 0));
+      ctrl.choose("s4", item("hand"));
+      release();
+      await run;
+      expect(uri(session, "s4")).toBe("f-hand");
+      expect(calls.filter((c) => c === "image:hang")).toHaveLength(3);
+      expect(calls.filter((c) => c === "image:news")).toHaveLength(3);
+    });
+  });
+
+  it("cancel tắt loading của cảnh đang bay", async () => {
+    const hook = (signal?: AbortSignal) =>
+      new Promise<void>((_resolve, reject) => {
+        signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+      });
+    const { ctrl } = setup({ news: { image: [item("n1")] } }, {}, hook);
+    const run = ctrl.autoFill();
+    await Promise.resolve();
+    expect(ctrl.state.byScene.s1?.loading).toBe(true);
+    ctrl.cancel();
+    expect(ctrl.state.byScene.s1?.loading).toBe(false);
+    await run;
+    expect(ctrl.state.byScene.s1?.loading).toBe(false);
+  });
+
+  it("search sau cancel không làm pool đã huỷ chạy tiếp", async () => {
+    const hook: Hook = (signal, query) =>
+      query === "hang"
+        ? new Promise<void>((_resolve, reject) => {
+            signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+          })
+        : Promise.resolve();
+    const { ctrl, calls } = setup({ manual: { image: [item("m1")] }, news: { image: [item("n1")] } }, { "": ["hang"] }, hook);
+    const run = ctrl.autoFill();
+    await new Promise((r) => setTimeout(r, 0));
+    ctrl.cancel();
+    await run;
+    await ctrl.search("s1", "manual");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(ctrl.state.byScene.s1?.items.map((i) => i.id)).toEqual(["m1"]);
+    expect(ctrl.state.byScene.s2).toBeUndefined();
+    expect(ctrl.state.byScene.s3).toBeUndefined();
+    expect(calls.filter((c) => c.endsWith(":hang"))).toHaveLength(2);
+  });
+
+  it("sau khi autoFill xong, search lại cùng cảnh chạy bình thường (không lỗi huỷ)", async () => {
+    const { ctrl } = setup({ news: { image: [item("n1")] }, manual: { image: [item("m1")] } });
+    await ctrl.autoFill();
+    await ctrl.search("s1", "manual");
+    expect(ctrl.state.byScene.s1).toMatchObject({ query: "manual", loading: false, error: null });
+    expect(ctrl.state.byScene.s1?.items.map((i) => i.id)).toEqual(["m1"]);
+  });
+
+  it("templates.get ném lỗi: query lưu nội dung cảnh", async () => {
+    const templates = {
+      get: () => {
+        throw new Error("template hỏng");
+      },
+    };
+    const { ctrl } = setup({}, {}, undefined, { templates });
+    await ctrl.autoFill();
+    expect(ctrl.state.byScene.s2?.error).not.toBeNull();
+    expect(ctrl.state.byScene.s2?.query).toBe("Công an vào cuộc.");
+  });
 });

@@ -84,8 +84,8 @@ function uriOf(footage: Footage | undefined): string | null {
 export class FootageSearchController extends StateController<FootageSearchState> {
   private readonly inflight = new Map<string, AbortController>();
   private readonly suggesters = new Map<string, KeywordSource>();
+  private readonly manual = new Set<string>(); // cảnh người dùng tự tìm từ lúc autoFill bắt đầu
   private run = 0;
-  private authLost = false;
 
   constructor(private readonly deps: FootageSearchDeps) {
     super({ byScene: {}, autoRunning: false, warnings: [] }, deps.onAuthLost);
@@ -94,7 +94,7 @@ export class FootageSearchController extends StateController<FootageSearchState>
   async autoFill(): Promise<void> {
     if (this.state.autoRunning) return;
     const run = ++this.run;
-    this.authLost = false;
+    this.manual.clear();
     const { project, footage } = this.deps.session.state;
     if (!project) return;
     const todo = footage.unassignedSceneIds(project.scenes.map((s) => s.id));
@@ -107,12 +107,12 @@ export class FootageSearchController extends StateController<FootageSearchState>
   }
 
   async search(sceneId: string, query: string): Promise<void> {
-    this.authLost = false;
     const text = query.trim();
     if (!text) {
       this.setScene(sceneId, { query: "", loading: false, items: [], error: "Hãy nhập từ khoá", empty: false });
       return;
     }
+    this.manual.add(sceneId);
     const signal = this.begin(sceneId);
     this.setScene(sceneId, { query: text, loading: true, items: [], error: null, empty: false });
     try {
@@ -159,8 +159,10 @@ export class FootageSearchController extends StateController<FootageSearchState>
     const { project } = this.deps.session.state;
     const scene = project?.scenes.find((s) => s.id === sceneId);
     if (!project || !scene) return;
+    // cảnh người dùng đã tự tìm (đang bay hoặc đã xong) hoặc đã gán tay thì không ghi đè
+    if (this.manual.has(sceneId) || this.inflight.has(sceneId) || this.deps.session.state.footage.get(sceneId)) return;
     const signal = this.begin(sceneId);
-    let current = "";
+    let current = scene.text;
     try {
       const fallback = this.deps.templates.get(project.templateId).defaults.fallbackKeyword;
       const phrases = this.suggester(fallback).suggest(scene.text, MAX_PHRASES);
@@ -244,8 +246,6 @@ export class FootageSearchController extends StateController<FootageSearchState>
       return;
     }
     if (isSessionExpired(error)) {
-      if (this.authLost) return;
-      this.authLost = true;
       const message = this.report(error);
       this.cancel();
       this.setScene(sceneId, { query, loading: false, items: [], error: message, empty: false });
