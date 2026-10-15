@@ -20,7 +20,8 @@ export function DevRenderPanel() {
       render: (job, onProgress) => client.render(job, onProgress),
       cancel: () => client.cancel(),
       createUrl: (blob) => URL.createObjectURL(blob),
-      origin: window.location.origin,
+      // component client vẫn được render trên server một lần; window chỉ có ở trình duyệt
+      origin: typeof window === "undefined" ? "" : window.location.origin,
     });
   }, [tts]);
   const state = useSyncExternalStore(
