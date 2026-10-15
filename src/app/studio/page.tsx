@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SessionService } from "@/server/auth/SessionService";
@@ -18,6 +19,9 @@ export default async function StudioPage() {
         <h1 className="text-xl font-semibold">Tin Video Studio</h1>
         <div className="flex items-center gap-3 text-sm">
           <span>Xin chào, {user.displayName}</span>
+          <Link href="/cai-dat" className="underline">
+            Cấu hình
+          </Link>
           <LogoutButton />
         </div>
       </header>

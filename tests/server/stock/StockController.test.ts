@@ -87,3 +87,9 @@ describe("StockController", () => {
     expect(seen).toEqual({ query: "police", kind: "image", page: 1, perPage: 8 });
   });
 });
+
+describe("StockController.providerNames", () => {
+  it("trả về tên các nguồn đã cấu hình theo thứ tự", () => {
+    expect(new StockController([ok("pexels", 1), ok("pixabay", 1)]).providerNames()).toEqual(["pexels", "pixabay"]);
+  });
+});
