@@ -47,6 +47,23 @@ describe("OptionsController", () => {
     expect(ctrl.state.error).toBeNull();
   });
 
+  it("tinh chỉnh giọng: setTempo/setPitch ghi vào session, tự lưu; reset về mặc định", async () => {
+    const { ctrl, session, saves, sched } = setup();
+    ctrl.setTempo(1.25);
+    ctrl.setPitch(-2);
+    expect(session.state.options.voiceTweak).toEqual({ tempo: 1.25, pitchSemitones: -2 });
+    sched.runAll();
+    await flush();
+    expect(saves.at(-1)?.options).toMatchObject({ voiceTweak: { tempo: 1.25, pitchSemitones: -2 } });
+    const before = session.state.options;
+    ctrl.setTempo(2);
+    expect(ctrl.state.error).toBe("Tốc độ tinh chỉnh phải từ 0,80 đến 1,40");
+    expect(session.state.options).toBe(before);
+    ctrl.resetVoiceTweak();
+    expect(ctrl.state.error).toBeNull();
+    expect(session.state.options.voiceTweak).toEqual({ tempo: 1, pitchSemitones: 0 });
+  });
+
   it("giá trị lạ: báo lỗi tiếng Việt, session giữ nguyên; thao tác đúng sau đó xoá lỗi", () => {
     const { ctrl, session } = setup();
     const before = session.state.options;
@@ -71,6 +88,44 @@ describe("OptionsController", () => {
     expect(ctrl.introColors()).toEqual({ backgroundColor: "#112233", blockColor: "#445566", custom: true });
     ctrl.resetIntroColors();
     expect(ctrl.introColors()).toEqual({ backgroundColor: "#aa0000", blockColor: "#aa0000", custom: false });
+  });
+
+  it("cảnh trám riêng từng đoạn: bỏ tick thì dùng tiếp cảnh đoạn trước, tự lưu; chủ cảnh tính theo đoạn có cảnh riêng", async () => {
+    const made = makeSessionWithProject(4); // s1 mở đầu, s2…s5
+    const ctrl = new OptionsController({ session: made.session });
+    expect(ctrl.footageOwnerOf("s3")).toBe("s3");
+    ctrl.setSceneContinued("s3", true);
+    ctrl.setSceneContinued("s4", true);
+    expect(made.session.state.options.isSceneContinued("s3")).toBe(true);
+    expect(ctrl.footageOwnerOf("s4")).toBe("s2");
+    expect(ctrl.footageOwnerOf("s5")).toBe("s5");
+    made.sched.runAll();
+    await flush();
+    expect(made.saves.at(-1)?.options).toMatchObject({ continuedSceneIds: ["s3", "s4"] });
+    ctrl.setSceneContinued("s3", false);
+    expect(ctrl.footageOwnerOf("s4")).toBe("s3");
+  });
+
+  it("đoạn mở đầu hoặc đoạn lạ không bỏ tick được: báo lỗi, giữ nguyên", () => {
+    const { ctrl, session } = setup();
+    const before = session.state.options;
+    ctrl.setSceneContinued("s1", true);
+    expect(ctrl.state.error).toBe("Đoạn mở đầu luôn có cảnh trám riêng");
+    ctrl.setSceneContinued("khong-co", true);
+    expect(ctrl.state.error).toBe("Không tìm thấy đoạn này");
+    expect(session.state.options).toBe(before);
+    ctrl.setSceneContinued("s2", true);
+    expect(ctrl.state.error).toBeNull();
+  });
+
+  it("nút nhanh: gộp mỗi 2 đoạn một cảnh, rồi đặt lại mỗi đoạn một cảnh", () => {
+    const made = makeSessionWithProject(4);
+    const ctrl = new OptionsController({ session: made.session });
+    ctrl.setSceneContinued("s2", true);
+    ctrl.mergeScenesInPairs();
+    expect([...made.session.state.options.continuedSceneIds]).toEqual(["s3", "s5"]);
+    ctrl.resetSceneGrouping();
+    expect(made.session.state.options.continuedSceneIds.size).toBe(0);
   });
 
   it("danh sách font cho giao diện", () => {

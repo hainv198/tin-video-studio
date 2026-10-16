@@ -1,3 +1,4 @@
+import { resolveFootageSource } from "@/domain/footageGroups";
 import type { StudioData } from "./StudioSession";
 
 export type StepId = "news" | "voice" | "footage" | "music" | "render";
@@ -20,6 +21,22 @@ export function staleSceneIds(data: StudioData): string[] {
       return !narration || !voice || narration.isStaleFor(scene, voice);
     })
     .map((scene) => scene.id);
+}
+
+/** Chủ cảnh trám của từng đoạn (đoạn "dùng tiếp" trỏ về đoạn trước có cảnh riêng). Chưa có dự án = rỗng. */
+export function footageOwners(data: StudioData): Map<string, string> {
+  if (!data.project) return new Map();
+  return resolveFootageSource(data.project.scenes, data.options.continuedSceneIds);
+}
+
+/** Đoạn có cảnh trám riêng, theo thứ tự (đoạn dùng tiếp bị bỏ). */
+export function ownFootageSceneIds(data: StudioData): string[] {
+  return [...footageOwners(data)].filter(([id, owner]) => id === owner).map(([id]) => id);
+}
+
+/** Đoạn có cảnh trám riêng mà chưa gán cảnh (đoạn dùng tiếp không tính). */
+export function missingFootageSceneIds(data: StudioData): string[] {
+  return data.footage.unassignedSceneIds(ownFootageSceneIds(data));
 }
 
 export function stepReady(step: StepId, data: StudioData): boolean {

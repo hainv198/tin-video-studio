@@ -96,6 +96,17 @@ describe("FootageSearchController", () => {
     expect(ctrl.state.byScene.s2?.query).toBe("police");
   });
 
+  it("autoFill bỏ qua đoạn dùng tiếp cảnh đoạn trước (không cần cảnh riêng, không tìm)", async () => {
+    const { ctrl, session } = setup({ news: { image: [item("n1"), item("n2"), item("n3"), item("n4")] } });
+    session.update((d) => ({ ...d, options: d.options.withSceneContinued("s3", true) }));
+    await ctrl.autoFill();
+    expect(uri(session, "s1")).toBe("f-n1");
+    expect(uri(session, "s2")).toBe("f-n2");
+    expect(session.state.footage.get("s3")).toBeUndefined();
+    expect(ctrl.state.byScene.s3).toBeUndefined();
+    expect(uri(session, "s4")).toBe("f-n3");
+  });
+
   it("cụm đầu không có kết quả thì thử cụm kế (cuối cùng là từ khoá chung của phong cách)", async () => {
     const { ctrl, session, calls } = setup({ news: { image: [item("n1")] } }, { "Công an": ["land"] });
     await ctrl.autoFill();

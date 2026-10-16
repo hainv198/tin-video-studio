@@ -93,6 +93,32 @@ test("Ảnh | Video ở từng cảnh: chỉ hiện loại đã chọn và đư�
   await expect(sidebar(page).getByRole("radio", { name: "Ưu tiên video" })).toBeChecked();
 });
 
+test("bỏ tick \"Có cảnh trám riêng\": đoạn thu gọn, dùng tiếp cảnh đoạn trước; nút nhanh gộp/đặt lại", async ({ page }) => {
+  await login(page);
+  await discardDraftIfOffered(page);
+  await fillSampleAndSplit(page);
+  await goNext(page, "Chọn giọng");
+  await generateVoices(page);
+  await goNext(page, "Cảnh trám");
+
+  const card = (label: string) => page.getByRole("listitem").filter({ hasText: new RegExp(`^${label}:`) });
+  await expect(card("Mở đầu").getByRole("checkbox", { name: "Có cảnh trám riêng" })).toHaveCount(0);
+  const own = card("Cảnh 2").getByRole("checkbox", { name: "Có cảnh trám riêng" });
+  await expect(own).toBeChecked();
+  await own.uncheck();
+  await expect(card("Cảnh 2").getByText("Dùng tiếp cảnh của Cảnh 1")).toBeVisible();
+  await expect(card("Cảnh 2").getByLabel("Từ khoá tìm cảnh trám")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Tự tìm cảnh còn trống" }).click();
+  await expect(page.getByRole("button", { name: "Tự tìm cảnh còn trống" })).toBeEnabled({ timeout: 30_000 });
+  await expect(page.getByRole("img", { name: "Cảnh trám đang chọn" })).toHaveCount(5); // đoạn dùng tiếp không có cảnh riêng
+
+  await page.getByRole("button", { name: "Mỗi đoạn một cảnh" }).click();
+  await expect(card("Cảnh 2").getByRole("checkbox", { name: "Có cảnh trám riêng" })).toBeChecked();
+  await page.getByRole("button", { name: "Gộp: mỗi 2 đoạn một cảnh" }).click();
+  await expect(page.getByText(/^Dùng tiếp cảnh của/)).toHaveCount(2);
+});
+
 const SUBTITLE_BODY: Region = { x: 130, y: 1464, w: 820, h: 136 }; // vùng phụ đề cảnh thân bài
 const INTRO_BLOCK: Region = { x: 0, y: 1700, w: 1080, h: 200 }; // khối đặc sau tiêu đề (cảnh mở đầu)
 const BODY_BAND: Region = { x: 0, y: 400, w: 1080, h: 800 }; // dải ảnh cảnh thân bài (đối chứng: không đổi)

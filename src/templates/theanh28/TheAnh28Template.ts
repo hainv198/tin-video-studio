@@ -186,8 +186,11 @@ export class TheAnh28Template extends VideoTemplate {
     return upper(project.brand.get("channelName") ?? "TIN NHANH");
   }
 
+  /** Tiến độ Ken Burns theo thời gian cảnh trám (cả nhóm đoạn dùng chung), không theo từng đoạn. */
   private progress(scene: SceneFrame): number {
-    return scene.sceneDuration > 0 ? scene.sceneTime / scene.sceneDuration : 0;
+    const time = scene.footageTime ?? scene.sceneTime;
+    const duration = scene.footageDuration ?? scene.sceneDuration;
+    return duration > 0 ? time / duration : 0;
   }
 
   private drawClipped(ctx: Canvas2D, image: DrawableImage, box: Rect, progress: number): void {

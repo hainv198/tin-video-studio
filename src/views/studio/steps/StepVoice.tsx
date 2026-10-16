@@ -3,12 +3,14 @@
 import { useEffect, useRef } from "react";
 import type { Studio } from "@/client/controllers/createStudio";
 import { staleSceneIds } from "@/client/controllers/readiness";
+import { PITCH_SEMITONES_RANGE, TEMPO_RANGE } from "@/domain/VideoOptions";
 import { VoiceSettings } from "@/domain/VoiceSettings";
 import { useController } from "@/views/hooks/useController";
 
 export function StepVoice({ studio }: { studio: Studio }) {
   const data = useController(studio.session);
   const voice = useController(studio.voice);
+  const optionsPanel = useController(studio.options);
   const playing = useRef<{ audio: HTMLAudioElement; url: string } | null>(null);
   const mounted = useRef(true);
 
@@ -30,6 +32,10 @@ export function StepVoice({ studio }: { studio: Studio }) {
   if (!project) return null;
   const stale = new Set(staleSceneIds(data));
   const settings = data.voice;
+  const tweak = data.options.voiceTweak;
+  const tweaked = tweak.tempo !== TEMPO_RANGE.default || tweak.pitchSemitones !== PITCH_SEMITONES_RANGE.default;
+  const tempoText = tweak.tempo.toFixed(2).replace(".", ",");
+  const pitchText = `${tweak.pitchSemitones > 0 ? "+" : tweak.pitchSemitones < 0 ? "−" : ""}${String(Math.abs(tweak.pitchSemitones)).replace(".", ",")}`;
 
   async function preview() {
     const blob = await studio.voice.previewVoice();
@@ -63,7 +69,7 @@ export function StepVoice({ studio }: { studio: Studio }) {
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          Tốc độ đọc: {(settings?.speakingRate ?? VoiceSettings.DEFAULT_RATE).toFixed(2)}
+          Tốc độ lúc tạo giọng (đổi phải tạo lại): {(settings?.speakingRate ?? VoiceSettings.DEFAULT_RATE).toFixed(2)}
           <input
             type="range"
             min={0.8}
@@ -74,6 +80,49 @@ export function StepVoice({ studio }: { studio: Studio }) {
           />
         </label>
       </div>
+      <fieldset className="flex flex-col gap-2 rounded-lg border border-neutral-800 p-3 text-sm">
+        <legend className="px-1 font-medium">Tinh chỉnh sau khi tạo giọng (không cần tạo lại)</legend>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex flex-col gap-1">
+            Tốc độ: ×{tempoText}
+            <input
+              type="range"
+              min={TEMPO_RANGE.min}
+              max={TEMPO_RANGE.max}
+              step={TEMPO_RANGE.step}
+              value={tweak.tempo}
+              onChange={(e) => studio.options.setTempo(Number(e.target.value))}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            Tông: {pitchText} nửa cung
+            <input
+              type="range"
+              min={PITCH_SEMITONES_RANGE.min}
+              max={PITCH_SEMITONES_RANGE.max}
+              step={PITCH_SEMITONES_RANGE.step}
+              value={tweak.pitchSemitones}
+              onChange={(e) => studio.options.setPitch(Number(e.target.value))}
+            />
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            disabled={!tweaked}
+            className="rounded-md bg-neutral-800 px-3 py-1.5 disabled:opacity-40"
+            onClick={() => studio.options.resetVoiceTweak()}
+          >
+            Về mặc định
+          </button>
+          <span className="text-xs text-neutral-500">Xử lý ngay trên máy khi nghe thử và khi dựng; video, phụ đề và thời lượng đổi theo.</span>
+        </div>
+        {optionsPanel.error && (
+          <p role="alert" className="text-red-400">
+            {optionsPanel.error}
+          </p>
+        )}
+      </fieldset>
       {voice.fallbackNotice && (
         <p role="status" className="rounded-md bg-amber-950 px-3 py-2 text-sm text-amber-300">
           {voice.fallbackNotice}

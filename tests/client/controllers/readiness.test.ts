@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EMPTY_STUDIO } from "@/client/controllers/StudioSession";
-import { canEnter, firstIncompleteStep, staleSceneIds, stepReady, STEPS } from "@/client/controllers/readiness";
+import { canEnter, firstIncompleteStep, footageOwners, missingFootageSceneIds, staleSceneIds, stepReady, STEPS } from "@/client/controllers/readiness";
+import { FallbackFootage } from "@/domain/Footage";
 import { VoiceSettings } from "@/domain/VoiceSettings";
 import { fakeNarration, makeProject, VOICE } from "../../helpers/studioFixtures";
 
@@ -43,5 +44,15 @@ describe("readiness", () => {
     expect(staleSceneIds(faster)).toEqual(["s1", "s2", "s3"]);
     const edited = { ...d0, narrations, project: d0.project.updateSceneText("s2", "Câu đã sửa.") };
     expect(staleSceneIds(edited)).toEqual(["s2"]);
+  });
+
+  it("cảnh thiếu chỉ đếm đoạn có cảnh trám riêng; đoạn dùng tiếp trỏ về chủ cảnh", () => {
+    const d0 = withProject(); // s1 mở đầu, s2, s3
+    expect(missingFootageSceneIds(d0)).toEqual(["s1", "s2", "s3"]);
+    expect(Object.fromEntries(footageOwners(d0))).toEqual({ s1: "s1", s2: "s2", s3: "s3" });
+    const d = { ...d0, options: d0.options.withSceneContinued("s3", true), footage: d0.footage.assign("s2", new FallbackFootage("x")) };
+    expect(missingFootageSceneIds(d)).toEqual(["s1"]);
+    expect(footageOwners(d).get("s3")).toBe("s2");
+    expect(missingFootageSceneIds(EMPTY_STUDIO)).toEqual([]);
   });
 });

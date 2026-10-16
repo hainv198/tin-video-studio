@@ -1,6 +1,7 @@
 import { AudioDecodeService, RENDER_SAMPLE_RATE, type DecodedAudio } from "@/client/media/AudioDecodeService";
 import type { MusicBed } from "@/client/media/AudioMix";
 import { trimSilence } from "@/client/media/audioTrim";
+import { applyVoiceTweak } from "@/client/media/voiceTweak";
 import { parseUploadUri } from "@/client/media/footageFactory";
 import { RenderCancelledError } from "@/client/render/errors";
 import type { FootageInput, NarrationInput, RenderJob, RenderSceneInput } from "@/client/render/RenderJob";
@@ -10,7 +11,7 @@ import type { UploadRepository } from "@/client/storage/UploadRepository";
 import { ValidationError } from "@/domain/errors";
 import type { Footage } from "@/domain/Footage";
 import type { TemplateRegistry } from "@/templates/TemplateRegistry";
-import { staleSceneIds } from "./readiness";
+import { footageOwners, staleSceneIds } from "./readiness";
 import type { StudioData } from "./StudioSession";
 
 export interface RenderJobBuilderDeps {
@@ -52,6 +53,7 @@ export class RenderJobBuilder {
     const total = sceneCount + (music ? 1 : 0);
     const narrationInputs: NarrationInput[] = [];
     const sceneInputs: RenderSceneInput[] = [];
+    const owners = footageOwners(data);
 
     for (const [index, scene] of project.scenes.entries()) {
       if (isCancelled()) throw new RenderCancelledError();
@@ -61,11 +63,19 @@ export class RenderJobBuilder {
       const decoded = this.checkRate(await this.deps.decoder.decode(narration.audio.slice().buffer as ArrayBuffer));
       // Cắt lặng ở mỗi lần dựng; độ dài gửi cho bộ dựng là độ dài đã cắt.
       const trimmed = trimSilence(AudioDecodeService.toMono(decoded.channels), decoded.sampleRate);
+      // Tinh chỉnh tốc độ/tông sau khi cắt lặng (mặc định trả nguyên mảng); timeline, phụ đề và chuẩn hoá âm lượng chạy trên mẫu đã xử lý.
+      const samples = applyVoiceTweak(trimmed.samples, decoded.sampleRate, videoOptions.voiceTweak);
       narrationInputs.push({
         sceneId: scene.id,
-        durationSec: trimmed.samples.length / decoded.sampleRate,
-        samples: trimmed.samples,
+        durationSec: samples.length / decoded.sampleRate,
+        samples,
       });
+      const owner = owners.get(scene.id) ?? scene.id;
+      if (owner !== scene.id) {
+        // Dùng tiếp cảnh của đoạn trước: không nạp cảnh riêng (nếu đang giữ) để khỏi tải thừa.
+        sceneInputs.push({ sceneId: scene.id, role: scene.role, text: scene.text, footage: { kind: "fallback" }, footageFrom: owner });
+        continue;
+      }
       sceneInputs.push({
         sceneId: scene.id,
         role: scene.role,

@@ -5,6 +5,7 @@ import { sourceTimeFor } from "@/client/media/sourceTime";
 import type { Canvas2D } from "@/templates/Canvas2D";
 import type { DrawableImage, ProjectFrame, VideoTemplate } from "@/templates/VideoTemplate";
 import type { BackdropMaker } from "./BackdropMaker";
+import { footageSpans } from "./RenderPlan";
 import { RenderCancelledError } from "./errors";
 
 export interface FrameProvider {
@@ -19,8 +20,11 @@ export interface RenderScene {
   sceneId: string;
   role: SceneRole;
   text: string;
+  /** Với chủ cảnh dùng chung, `playback` tính theo cả khoảng của nhóm (xem `footageSpans`). */
   playback: FootagePlayback;
   frames: FrameProvider | null;
+  /** Đoạn không có cảnh trám riêng: id đoạn chủ cảnh; ảnh/video của chủ cảnh chạy tiếp, không cắt cảnh. */
+  footageFrom?: string;
 }
 
 export interface VideoFrameSink {
@@ -54,9 +58,12 @@ export class VideoRenderer {
   async render(): Promise<number> {
     const { template, ctx, project, timeline, scenes, fps, sink, onProgress, signal, backdrop } = this.input;
     const total = timeline.frameCount(fps);
-    let currentSceneId: string | null = null;
+    const owners = new Map<string, string>();
+    for (const scene of scenes.values()) if (scene.footageFrom) owners.set(scene.sceneId, scene.footageFrom);
+    const spans = footageSpans(timeline, owners);
+    let currentOwnerId: string | null = null;
     const releaseCurrent = () => {
-      if (currentSceneId !== null) scenes.get(currentSceneId)?.frames?.release();
+      if (currentOwnerId !== null) scenes.get(currentOwnerId)?.frames?.release();
     };
     try {
       for (let i = 0; i < total; i++) {
@@ -65,13 +72,19 @@ export class VideoRenderer {
         const slot = timeline.slotAt(t);
         const scene = scenes.get(slot.sceneId);
         if (!scene) throw new Error(`Thiếu dữ liệu cảnh ${slot.sceneId}`);
-        if (slot.sceneId !== currentSceneId) {
+        const span = spans.get(slot.sceneId) ?? { ownerId: slot.sceneId, start: slot.start, end: slot.end };
+        const owner = scenes.get(span.ownerId);
+        if (!owner) throw new Error(`Thiếu dữ liệu cảnh ${span.ownerId}`);
+        // Nhả bộ giải mã khi đổi cảnh trám (không phải khi đổi đoạn): nhóm dùng chung đọc liền một mạch.
+        if (span.ownerId !== currentOwnerId) {
           releaseCurrent();
-          currentSceneId = slot.sceneId;
+          currentOwnerId = span.ownerId;
         }
         const sceneTime = t - slot.start;
-        const sourceTime = sourceTimeFor(scene.playback, sceneTime);
-        const image = sourceTime === null || !scene.frames ? null : await scene.frames.frameAt(sourceTime);
+        // Thời gian tính từ đầu cảnh trám (đầu nhóm): Ken Burns và khung video liên tục qua biên đoạn dùng tiếp.
+        const footageTime = t - span.start;
+        const sourceTime = sourceTimeFor(owner.playback, footageTime);
+        const image = sourceTime === null || !owner.frames ? null : await owner.frames.frameAt(sourceTime);
         const backdropImage = image && scene.role === "body" && backdrop ? backdrop.make(image) : null;
         template.drawFrame(ctx, project, {
           role: scene.role,
@@ -80,6 +93,8 @@ export class VideoRenderer {
           backdrop: backdropImage,
           sceneTime,
           sceneDuration: slot.end - slot.start,
+          footageTime,
+          footageDuration: span.end - span.start,
           voiceStart: slot.voiceStart - slot.start,
           voiceDuration: slot.voiceEnd - slot.voiceStart,
         });

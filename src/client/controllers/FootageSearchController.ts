@@ -5,6 +5,7 @@ import type { Footage } from "@/domain/Footage";
 import type { IdGenerator } from "@/domain/ids";
 import type { FootageKindPreference, SceneFootageKind } from "@/domain/VideoOptions";
 import type { TemplateRegistry } from "@/templates/TemplateRegistry";
+import { footageOwners, missingFootageSceneIds } from "./readiness";
 import { StateController } from "./StateController";
 import type { StudioSession } from "./StudioSession";
 
@@ -96,9 +97,9 @@ export class FootageSearchController extends StateController<FootageSearchState>
     if (this.state.autoRunning) return;
     const run = ++this.run;
     this.manual.clear();
-    const { project, footage } = this.deps.session.state;
-    if (!project) return;
-    const todo = footage.unassignedSceneIds(project.scenes.map((s) => s.id));
+    if (!this.deps.session.state.project) return;
+    // Chỉ đoạn có cảnh trám riêng; đoạn dùng tiếp cảnh đoạn trước không cần tìm.
+    const todo = missingFootageSceneIds(this.deps.session.state);
     this.patch({ autoRunning: true, warnings: [] });
     try {
       await runPool(todo, this.deps.concurrency ?? 3, (sceneId) => this.fillScene(sceneId, run));
@@ -182,6 +183,8 @@ export class FootageSearchController extends StateController<FootageSearchState>
     if (!project || !scene) return;
     // cảnh người dùng đã tự tìm (đang bay hoặc đã xong) hoặc đã gán tay thì không ghi đè
     if (this.manual.has(sceneId) || this.inflight.has(sceneId) || this.deps.session.state.footage.get(sceneId)) return;
+    // đoạn vừa chuyển sang "dùng tiếp" trong lúc chờ thì không cần cảnh riêng nữa
+    if (footageOwners(this.deps.session.state).get(sceneId) !== sceneId) return;
     const explicit = options.sceneFootageKind(sceneId);
     const preferred: FootageKindPreference = explicit ?? options.footageKind;
     // Ưu tiên chung (không phải lựa chọn riêng của cảnh) mà không có kết quả thì lùi về loại còn lại.

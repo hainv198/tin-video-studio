@@ -1,5 +1,6 @@
 import { isQuotaExhausted, isSessionExpired } from "@/client/errors/userMessage";
-import type { AudioDecodeService } from "@/client/media/AudioDecodeService";
+import { AudioDecodeService } from "@/client/media/AudioDecodeService";
+import { applyVoiceTweak, encodeWav, isDefaultVoiceTweak } from "@/client/media/voiceTweak";
 import type { TtsApi, VoiceInfo } from "@/client/services/TtsClient";
 import { ValidationError } from "@/domain/errors";
 import { Narration } from "@/domain/Narration";
@@ -155,7 +156,18 @@ export class VoiceController extends StateController<VoiceState> {
     }
     this.patch({ previewing: true, error: null });
     try {
-      return await this.previewWith(project.introScene.text, voice, true);
+      const tweak = this.deps.session.state.options.voiceTweak;
+      if (isDefaultVoiceTweak(tweak)) return await this.previewWith(project.introScene.text, voice, true);
+      // Có tinh chỉnh: dùng giọng đã tạo của câu tiêu đề nếu còn mới (khỏi tốn lượt), không thì đọc thử; xử lý ở máy rồi phát WAV.
+      const intro = project.introScene;
+      const narration = this.deps.session.state.narrations.get(intro.id);
+      const bytes =
+        narration && !narration.isStaleFor(intro, voice)
+          ? (narration.audio.slice().buffer as ArrayBuffer)
+          : await (await this.previewWith(intro.text, voice, true)).arrayBuffer();
+      const decoded = await this.deps.decoder.decode(bytes);
+      const samples = applyVoiceTweak(AudioDecodeService.toMono(decoded.channels), decoded.sampleRate, tweak);
+      return new Blob([encodeWav(samples, decoded.sampleRate)], { type: "audio/wav" });
     } catch (error) {
       this.patch({ error: this.report(error) });
       return null;
