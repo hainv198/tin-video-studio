@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { discardDraftIfOffered, expectDraftSaved, fillSampleAndSplit, goNext, login, stepButton } from "./helpers";
+import { autoFillFootage, discardDraftIfOffered, expectDraftSaved, fillSampleAndSplit, generateVoices, goNext, login, stepButton } from "./helpers";
 
 export const sidebar = (page: Page) => page.getByRole("complementary", { name: "Tuỳ chọn video" });
 
@@ -58,4 +58,35 @@ test("màn hẹp: tuỳ chọn thu gọn thành ngăn kéo phía trên các bư�
   const sideBox = await side.boundingBox();
   const stepBox = await stepButton(page, 1).boundingBox();
   expect(sideBox && stepBox && sideBox.y < stepBox.y).toBe(true);
+});
+
+test("Ảnh | Video ở từng cảnh: chỉ hiện loại đã chọn và được nhớ; ưu tiên video vẫn tự điền bằng ảnh khi thiếu video", async ({ page }) => {
+  await login(page);
+  await discardDraftIfOffered(page);
+  await fillSampleAndSplit(page);
+  await sidebar(page).getByRole("radio", { name: "Ưu tiên video" }).check();
+  await goNext(page, "Chọn giọng");
+  await generateVoices(page);
+  await goNext(page, "Cảnh trám");
+  await autoFillFootage(page); // nguồn giả không có video ⇒ lùi về ảnh, đủ 6 cảnh
+
+  const card = () => page.getByRole("listitem").filter({ hasText: /^Cảnh 1:/ });
+  const kindButton = (name: "Ảnh" | "Video") =>
+    card().getByRole("group", { name: "Loại cảnh trám" }).getByRole("button", { name, exact: true });
+  await kindButton("Video").click();
+  await expect(kindButton("Video")).toHaveAttribute("aria-pressed", "true");
+  await expect(card().getByText(/^Không tìm ra kết quả/)).toBeVisible();
+  await expect(card().getByRole("img", { name: "Cảnh trám đang chọn" })).toBeVisible(); // không tự đổi cảnh đang gán
+  await kindButton("Ảnh").click();
+  await expect(kindButton("Ảnh")).toHaveAttribute("aria-pressed", "true");
+  await expect(card().getByRole("img", { name: "Ảnh gợi ý" }).first()).toBeVisible();
+  await expect(card().getByRole("img", { name: "Video gợi ý" })).toHaveCount(0);
+  await expectDraftSaved(page, (d) => d.sceneKindCount === 1);
+
+  await page.reload();
+  await page.getByRole("button", { name: "Mở lại" }).click();
+  await stepButton(page, 3).click();
+  await expect(kindButton("Ảnh")).toHaveAttribute("aria-pressed", "true");
+  await expect(kindButton("Video")).toHaveAttribute("aria-pressed", "false");
+  await expect(sidebar(page).getByRole("radio", { name: "Ưu tiên video" })).toBeChecked();
 });
