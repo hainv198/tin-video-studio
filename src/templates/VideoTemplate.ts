@@ -63,6 +63,10 @@ export interface SceneFrame {
   /** Giây tính từ đầu cảnh. */
   sceneTime: number;
   sceneDuration: number;
+  /** Giây (tính từ đầu cảnh) giọng đọc bắt đầu; bỏ trống = 0. */
+  voiceStart?: number;
+  /** Độ dài giọng đọc của cảnh; bỏ trống = cả cảnh. */
+  voiceDuration?: number;
 }
 
 /** Một phong cách video. Hàm vẽ phải thuần theo thời gian: cùng đầu vào ra cùng hình. */

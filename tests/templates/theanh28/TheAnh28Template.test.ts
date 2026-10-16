@@ -242,3 +242,51 @@ describe("TheAnh28Template — màu thumbnail đầu", () => {
     expect(stops(styled)).toEqual(stops(plain));
   });
 });
+
+describe("TheAnh28Template — phụ đề", () => {
+  const subtitleStyle = (enabled = true) => frameStyleFor(VideoOptions.defaults().withSubtitlesEnabled(enabled).snapshot());
+  const subtitleTexts = (c: RecordingCanvas) => c.ops("fillText").filter((x) => x.state.font.includes('"TVS Phudu"'));
+  const S = LAYOUT.subtitle;
+
+  it("bật: câu ngắn vẽ giữa khung, đáy vùng phụ đề cảnh thân bài, viền đen trước rồi chữ trắng", () => {
+    const c = draw(project({ style: subtitleStyle() }), scene({ text: "Câu tin." }));
+    const fills = subtitleTexts(c);
+    expect(fills.map((x) => x.args)).toEqual([["Câu tin.", 540, S.bodyBottom - S.lineHeight]]);
+    expect(fills[0]?.state.font.startsWith("800 54px")).toBe(true);
+    expect(fills[0]?.state.fillStyle).toBe("#FFFFFF");
+    expect(c.ops("strokeText").map((x) => x.args)).toEqual([["Câu tin.", 540, S.bodyBottom - S.lineHeight]]);
+    const strokeAt = c.calls.findIndex((x) => x.op === "strokeText");
+    const fillAt = c.calls.findIndex((x) => x.op === "fillText" && x.args[0] === "Câu tin.");
+    expect(strokeAt).toBeLessThan(fillAt);
+  });
+
+  it("tắt phụ đề hoặc không có style: không vẽ phụ đề", () => {
+    for (const p of [project({ style: subtitleStyle(false) }), project()]) {
+      const c = draw(p, scene({ text: "Câu tin." }));
+      expect(c.ops("strokeText")).toHaveLength(0);
+      expect(c.texts()).not.toContain("Câu tin.");
+    }
+  });
+
+  it("cảnh mở đầu: phụ đề nằm trên chip tên kênh, không đè tiêu đề", () => {
+    const c = draw(project({ style: subtitleStyle() }), scene({ role: "intro", text: "Tiêu đề ngắn." }));
+    const y = subtitleTexts(c)[0]?.args[2] as number;
+    expect(y).toBe(S.introBottom - S.lineHeight);
+    expect(y + S.lineHeight).toBeLessThan(LAYOUT.intro.chip.y);
+  });
+
+  it("câu dài: chia đoạn ≤ 2 dòng và đổi đoạn theo thời gian giọng đọc (thuần theo sceneTime)", () => {
+    const text = Array.from({ length: 24 }, (_, i) => `tu${String(i).padStart(2, "0")}`).join(" ");
+    const at = (sceneTime: number) =>
+      subtitleTexts(
+        draw(project({ style: subtitleStyle() }), scene({ text, sceneTime, sceneDuration: 4.35, voiceStart: 0, voiceDuration: 4 })),
+      ).map((x) => [String(x.args[0]), x.args[2]]);
+    expect(at(0)).toEqual([
+      ["tu00 tu01 tu02 tu03 tu04 tu05", S.bodyBottom - 2 * S.lineHeight],
+      ["tu06 tu07 tu08 tu09 tu10 tu11", S.bodyBottom - S.lineHeight],
+    ]);
+    expect(at(2.5).map(([line]) => line)).toEqual(["tu12 tu13 tu14 tu15 tu16 tu17", "tu18 tu19 tu20 tu21 tu22 tu23"]);
+    expect(at(4.3)).toEqual(at(2.5));
+    expect(at(0)).toEqual(at(0)); // cùng đầu vào ra cùng hình (cache không đổi kết quả)
+  });
+});

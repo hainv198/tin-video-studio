@@ -25,4 +25,9 @@ export type Canvas2D = Pick<
   | "imageSmoothingEnabled"
   | "imageSmoothingQuality"
   | "lineWidth"
+  | "strokeText"
+  | "lineJoin"
+  | "shadowColor"
+  | "shadowBlur"
+  | "shadowOffsetY"
 >;

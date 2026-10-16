@@ -95,6 +95,10 @@ describe("VideoRenderer", () => {
     expect(template.frames[14]?.role).toBe("body");
     expect(template.frames[14]?.sceneTime).toBeCloseTo(0.05, 9);
     expect(template.frames[14]?.sceneDuration).toBeCloseTo(1.1, 9);
+    expect(template.frames[0]?.voiceStart).toBeCloseTo(0.3, 9);
+    expect(template.frames[0]?.voiceDuration).toBeCloseTo(0.7, 9);
+    expect(template.frames[14]?.voiceStart).toBeCloseTo(0, 9);
+    expect(template.frames[14]?.voiceDuration).toBeCloseTo(0.5, 9);
   });
 
   it("video lặp lấy khung theo thời gian lặp", async () => {

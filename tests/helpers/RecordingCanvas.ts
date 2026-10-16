@@ -17,6 +17,10 @@ export class RecordingCanvas {
   globalAlpha = 1;
   filter = "none";
   lineWidth = 1;
+  lineJoin: CanvasLineJoin = "miter";
+  shadowColor = "rgba(0, 0, 0, 0)";
+  shadowBlur = 0;
+  shadowOffsetY = 0;
   letterSpacing = "0px";
   imageSmoothingEnabled = true;
   imageSmoothingQuality: "low" | "medium" | "high" = "low";
@@ -41,6 +45,7 @@ export class RecordingCanvas {
   fillRect(...args: unknown[]): void { this.record("fillRect", args); }
   drawImage(...args: unknown[]): void { this.record("drawImage", args); }
   fillText(...args: unknown[]): void { this.record("fillText", args); }
+  strokeText(...args: unknown[]): void { this.record("strokeText", args); }
   beginPath(): void { this.record("beginPath", []); }
   rect(...args: unknown[]): void { this.record("rect", args); }
   roundRect(...args: unknown[]): void { this.record("roundRect", args); }

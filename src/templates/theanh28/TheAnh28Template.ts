@@ -7,11 +7,13 @@ import {
   type DrawableImage,
   type FontFaceSpec,
   type FontStyle,
+  type FrameStyle,
   type ProjectFrame,
   type SceneFrame,
   type TemplateDefaults,
 } from "../VideoTemplate";
 import { coverRect, kenBurnsRect, LAYOUT, withAlpha, wrapText, type Rect } from "./layout";
+import { cueAt, splitSubtitle, timeCues, type SubtitleCue } from "./subtitles";
 
 export const THEANH28_FONT_FAMILY = "TVS Barlow Condensed";
 const DEFAULT_COLOR = "#1F9D55";
@@ -46,6 +48,9 @@ export class TheAnh28Template extends VideoTemplate {
     { family: THEANH28_FONT_FAMILY, url: "/templates/theanh28/fonts/BarlowCondensed-SemiBold.ttf", weight: "600" },
     { family: THEANH28_FONT_FAMILY, url: "/templates/theanh28/fonts/BarlowCondensed-ExtraBold.ttf", weight: "800" },
   ];
+
+  /** Đoạn phụ đề đã chia, theo (font, mốc giọng, câu). Chỉ là bộ nhớ đệm: kết quả chỉ phụ thuộc đầu vào nên hàm vẽ vẫn thuần. */
+  private readonly cueCache = new Map<string, SubtitleCue[]>();
 
   protected drawIntro(ctx: Canvas2D, project: ProjectFrame, scene: SceneFrame): void {
     const color = this.color(project);
@@ -126,6 +131,47 @@ export class TheAnh28Template extends VideoTemplate {
     const lines = project.sourceCredit ? [`THEO: ${upper(project.sourceCredit)}`, "ẢNH: TỔNG HỢP"] : ["ẢNH: TỔNG HỢP"];
     lines.forEach((line, i) => ctx.fillText(wrapText(line, limit, measure, 1)[0] ?? "", C.x, C.y + i * C.lineHeight));
     if (scene.role === "body") this.drawCornerLogo(ctx, project);
+    if (project.style?.subtitles.enabled) this.drawSubtitle(ctx, project.style, scene);
+  }
+
+  private drawSubtitle(ctx: Canvas2D, style: FrameStyle, scene: SceneFrame): void {
+    const S = LAYOUT.subtitle;
+    ctx.save();
+    ctx.font = cssFont(style.subtitles.font, "bold", S.fontPx);
+    const voiceStart = scene.voiceStart ?? 0;
+    const voiceDuration = scene.voiceDuration ?? scene.sceneDuration;
+    const cue = cueAt(this.cues(ctx, scene.text, voiceStart, voiceDuration), scene.sceneTime);
+    if (cue) {
+      const bottom = scene.role === "intro" ? S.introBottom : S.bodyBottom;
+      const top = bottom - cue.lines.length * S.lineHeight;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.lineJoin = "round";
+      ctx.lineWidth = S.strokePx;
+      ctx.strokeStyle = "rgba(0,0,0,0.85)";
+      ctx.shadowColor = "rgba(0,0,0,0.6)";
+      ctx.shadowBlur = S.shadowBlurPx;
+      ctx.shadowOffsetY = S.shadowOffsetPx;
+      cue.lines.forEach((line, i) => ctx.strokeText(line, S.centerX, top + i * S.lineHeight));
+      ctx.shadowColor = "rgba(0,0,0,0)";
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+      ctx.fillStyle = WHITE;
+      cue.lines.forEach((line, i) => ctx.fillText(line, S.centerX, top + i * S.lineHeight));
+    }
+    ctx.restore();
+  }
+
+  private cues(ctx: Canvas2D, text: string, voiceStart: number, voiceDuration: number): SubtitleCue[] {
+    const key = `${ctx.font}|${voiceStart}|${voiceDuration}|${text}`;
+    let cues = this.cueCache.get(key);
+    if (!cues) {
+      if (this.cueCache.size >= 64) this.cueCache.clear();
+      const S = LAYOUT.subtitle;
+      cues = timeCues(splitSubtitle(text, S.maxWidth, (s) => ctx.measureText(s).width, S.maxLines), voiceStart, voiceDuration);
+      this.cueCache.set(key, cues);
+    }
+    return cues;
   }
 
   private font(project: ProjectFrame, weight: Weight, px: number): string {
