@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
-import { autoFillFootage, discardDraftIfOffered, expectDraftSaved, fillSampleAndSplit, generateVoices, goNext, login, stepButton } from "./helpers";
+import { autoFillFootage, discardDraftIfOffered, expectDraftSaved, fillSampleAndSplit, generateVoices, goNext, login, renderAndDownload, stepButton } from "./helpers";
+import { FfmpegMissingError } from "../scripts/measure-mp4";
+import { grabRegion, meanAbsDiff, type Region } from "../scripts/lib/frameRegion";
 
 export const sidebar = (page: Page) => page.getByRole("complementary", { name: "Tuỳ chọn video" });
 
@@ -89,4 +91,67 @@ test("Ảnh | Video ở từng cảnh: chỉ hiện loại đã chọn và đư�
   await expect(kindButton("Ảnh")).toHaveAttribute("aria-pressed", "true");
   await expect(kindButton("Video")).toHaveAttribute("aria-pressed", "false");
   await expect(sidebar(page).getByRole("radio", { name: "Ưu tiên video" })).toBeChecked();
+});
+
+const SUBTITLE_BODY: Region = { x: 130, y: 1464, w: 820, h: 136 }; // vùng phụ đề cảnh thân bài
+const INTRO_BLOCK: Region = { x: 0, y: 1700, w: 1080, h: 200 }; // khối đặc sau tiêu đề (cảnh mở đầu)
+const BODY_BAND: Region = { x: 0, y: 400, w: 1080, h: 800 }; // dải ảnh cảnh thân bài (đối chứng: không đổi)
+
+async function rerenderAndDownload(page: Page, prefix: string): Promise<string> {
+  await page.getByRole("button", { name: "Dựng lại", exact: true }).click();
+  await expect(page.getByTestId("ket-qua")).toHaveCount(0);
+  await expect(page.getByTestId("ket-qua")).toBeVisible({ timeout: 150_000 });
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: /^Tải MP4/ }).click()]);
+  const path = test.info().outputPath(prefix + download.suggestedFilename());
+  await download.saveAs(path);
+  return path;
+}
+
+test("phụ đề và màu khối thumbnail có trong MP4; tắt phụ đề thì mất; tốc độ dựng không giảm đáng kể", async ({ page }) => {
+  test.setTimeout(300_000);
+  await login(page);
+  await discardDraftIfOffered(page);
+  await fillSampleAndSplit(page);
+  await goNext(page, "Chọn giọng");
+  await generateVoices(page);
+  await goNext(page, "Cảnh trám");
+  await autoFillFootage(page);
+  await goNext(page, "Nhạc nền");
+  await goNext(page, "Dựng video");
+  const side = sidebar(page);
+  await expect(side.getByRole("checkbox", { name: "Hiện phụ đề" })).toBeChecked();
+
+  let started = Date.now();
+  const withSubs = await renderAndDownload(page, "test-results", "co-phu-de-");
+  const withSubsSec = (Date.now() - started) / 1000;
+  const shown = await page.getByText(/[\d.]+ giây, [\d.]+ MB/).textContent();
+  const durationSec = Number(shown?.match(/([\d.]+) giây/)?.[1]);
+
+  await side.getByRole("checkbox", { name: "Hiện phụ đề" }).uncheck();
+  await side.getByLabel("Màu khối sau tiêu đề").fill("#c0392b");
+  await expect(page.getByText(/Kết quả này không còn khớp/)).toBeVisible(); // đổi tuỳ chọn ⇒ kết quả cũ
+  started = Date.now();
+  const noSubs = await rerenderAndDownload(page, "khong-phu-de-");
+  const noSubsSec = (Date.now() - started) / 1000;
+
+  console.log(
+    `[e2e] video ${durationSec} s: có phụ đề dựng ${withSubsSec.toFixed(1)} s (${(withSubsSec / durationSec).toFixed(2)}×), ` +
+      `tắt phụ đề ${noSubsSec.toFixed(1)} s (${(noSubsSec / durationSec).toFixed(2)}×)\n[e2e] ${withSubs}\n[e2e] ${noSubs}`,
+  );
+  expect(withSubsSec).toBeLessThan(durationSec * 1.5 + 10);
+  expect(withSubsSec).toBeLessThan(noSubsSec * 1.3 + 5);
+
+  try {
+    const subtitleDiff = meanAbsDiff(grabRegion(withSubs, 10, SUBTITLE_BODY), grabRegion(noSubs, 10, SUBTITLE_BODY));
+    const blockDiff = meanAbsDiff(grabRegion(withSubs, 1, INTRO_BLOCK), grabRegion(noSubs, 1, INTRO_BLOCK));
+    const bandDiff = meanAbsDiff(grabRegion(withSubs, 10, BODY_BAND), grabRegion(noSubs, 10, BODY_BAND));
+    console.log(`[e2e] chênh vùng: phụ đề ${subtitleDiff.toFixed(1)}, khối mở đầu ${blockDiff.toFixed(1)}, dải ảnh ${bandDiff.toFixed(1)}`);
+    expect(subtitleDiff).toBeGreaterThan(8); // có phụ đề ↔ không
+    expect(blockDiff).toBeGreaterThan(40); // xanh #1F9D55 ↔ đỏ #C0392B
+    expect(bandDiff).toBeLessThan(6); // vùng không liên quan giữ nguyên
+  } catch (error) {
+    if (!(error instanceof FfmpegMissingError)) throw error;
+    test.info().annotations.push({ type: "skip-frames", description: "không có ffmpeg" });
+    console.log("[e2e] bỏ qua so khung (không có ffmpeg)");
+  }
 });

@@ -351,3 +351,12 @@ PSNR > 45 dB là không phân biệt được bằng mắt. Khuyến nghị chuy
 - Tốc độ đọc chỉ là gợi ý trong câu lệnh: cùng câu 13 từ ở 0,85 / 1,07 / 1,3 ra 5,5 / 4,9 / 4,2 giây.
 - Tin mẫu 6 câu, giọng Kore: tạo giọng 34 s (≈ 4–7 s/câu, gói miễn phí không vấp hạn mức), tổng giọng 43,2 s; video 44,0 s dựng 19,4 s; giọng −16,65 dB, đỉnh 0,891 (bộ giới hạn làm việc đúng trần 0,89 với giọng thật), nhạc nghỉ −30,49 dB.
 - Chưa kiểm: nhiều người dùng chung một key (giới hạn lượt/ngày của gói miễn phí).
+
+## 14. Tuỳ chọn video (2026-10-16)
+
+Thay đổi so với §4.4 ("Không phụ đề"): phụ đề cháy cứng là tuỳ chọn theo từng video, mặc định bật.
+
+- Model `VideoOptions` (domain) trong `StudioData.options`; bản nháp v2 có `options`, bản nháp v1 vẫn mở được (tuỳ chọn mặc định). `RenderJob.options` mang snapshot vào worker; worker chỉ nạp font chữ + font phụ đề đang chọn (`FontCatalog`).
+- Phụ đề: rộng tối đa 820 px căn giữa, cỡ 54, cao dòng 68, ≤ 2 dòng/đoạn; thân bài đáy y 1600, mở đầu đáy y 990 (trên chip). Thời gian đoạn theo tỉ lệ ký tự trên độ dài giọng đọc của cảnh. Hàm vẽ vẫn thuần theo `sceneTime` (có bộ nhớ đệm đoạn đã chia).
+- Thumbnail đầu: `backgroundColor` = nền toàn khung cảnh mở đầu, `blockColor` = dải chuyển + khối sau tiêu đề; không đặt = `primaryColor`.
+- Số đo (Task 7, e2e nhà cung cấp giả): video 37 s, có phụ đề dựng 16,6 s (0,45×), tắt phụ đề 15,4 s (0,42×), tỉ lệ 1,08; chênh vùng phụ đề 74,6, khối mở đầu 99,8, dải ảnh 0,0.
