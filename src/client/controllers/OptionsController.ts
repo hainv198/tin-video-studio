@@ -58,6 +58,14 @@ export class OptionsController extends StateController<OptionsPanelState> {
     this.apply((o) => o.withFootageKind(kind));
   }
 
+  setGapSec(sec: number): void {
+    this.apply((o) => o.withGapSec(sec));
+  }
+
+  setLeadInSec(sec: number): void {
+    this.apply((o) => o.withLeadInSec(sec));
+  }
+
   /** Màu đang dùng của thumbnail đầu (chữ thường): màu đặt riêng, không có thì màu chủ đạo thương hiệu. */
   introColors(): IntroColors {
     const { options, brand } = this.deps.session.state;

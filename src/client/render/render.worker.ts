@@ -9,7 +9,7 @@ import { defaultTemplateRegistry } from "@/templates/registry";
 import { CanvasBackdropMaker } from "./BackdropMaker";
 import { RENDER_AUDIO_BITRATE, RENDER_VIDEO_BITRATE } from "./encodingDefaults";
 import { Mp4Encoder } from "./Mp4Encoder";
-import { planRender } from "./RenderPlan";
+import { planRender, timelineConfigFor } from "./RenderPlan";
 import { probeWorkerScope, type ProbeScope } from "./workerProbe";
 import type { FootageInput, RenderJob, WorkerMessage, WorkerRequest } from "./RenderJob";
 import { VideoRenderer, type FrameProvider, type RenderScene } from "./VideoRenderer";
@@ -46,7 +46,7 @@ async function render(job: RenderJob): Promise<void> {
   let encoder: Mp4Encoder | null = null;
   try {
     logoBitmap = job.logo ? await createImageBitmap(job.logo) : null;
-    const { timeline, voices } = planRender(job, template.defaults.timeline);
+    const { timeline, voices } = planRender(job, timelineConfigFor(template.defaults.timeline, options));
     for (const [index, s] of job.scenes.entries()) {
       const slot = timeline.slots[index];
       if (!slot) throw new Error(`Thiếu mốc thời gian cho cảnh ${s.sceneId}`);

@@ -9,6 +9,7 @@ const DEFAULT_SNAPSHOT = {
   intro: {},
   footageKind: "any",
   sceneFootageKinds: {},
+  pacing: { gapSec: 0.35, leadInSec: 0.3 },
 };
 
 describe("VideoOptions", () => {
@@ -86,6 +87,8 @@ describe("VideoOptions", () => {
       .withTextFont("roboto-condensed")
       .withIntroBackground("#112233")
       .withFootageKind("image")
+      .withGapSec(0.8)
+      .withLeadInSec(0.45)
       .withSceneFootageKind("s4", "video");
     expect(VideoOptions.restore(structuredClone(o.snapshot())).snapshot()).toEqual(o.snapshot());
   });
@@ -106,6 +109,38 @@ describe("VideoOptions", () => {
       intro: { blockColor: "#abcdef" },
       footageKind: "any",
       sceneFootageKinds: { s2: "video" },
+      pacing: { gapSec: 0.35, leadInSec: 0.3 },
     });
+  });
+
+  it("nhịp đọc: mặc định đúng hiện trạng, đổi được, bất biến", () => {
+    const a = VideoOptions.defaults();
+    expect(a.gapSec).toBe(0.35);
+    expect(a.leadInSec).toBe(0.3);
+    const b = a.withGapSec(0.6).withLeadInSec(0.5);
+    expect(b.snapshot().pacing).toEqual({ gapSec: 0.6, leadInSec: 0.5 });
+    expect(a.gapSec).toBe(0.35);
+    expect(a.withGapSec(0.1).gapSec).toBe(0.1);
+    expect(a.withGapSec(1).gapSec).toBe(1);
+    expect(a.withLeadInSec(0.1).leadInSec).toBe(0.1);
+    expect(a.withLeadInSec(1).leadInSec).toBe(1);
+  });
+
+  it("nhịp đọc ngoài khoảng hoặc không phải số: ValidationError", () => {
+    const o = VideoOptions.defaults();
+    expect(() => o.withGapSec(0.05)).toThrow(ValidationError);
+    expect(() => o.withGapSec(1.2)).toThrow("Khoảng nghỉ giữa các câu phải từ 0,10 đến 1,00 giây");
+    expect(() => o.withGapSec(Number.NaN)).toThrow(ValidationError);
+    expect(() => o.withLeadInSec(0)).toThrow("Khoảng nghỉ đầu video phải từ 0,1 đến 1,0 giây");
+    expect(() => o.withLeadInSec(2)).toThrow(ValidationError);
+  });
+
+  it("restore nhịp đọc: thiếu = mặc định, ngoài khoảng bị kẹp, không phải số = mặc định", () => {
+    expect(VideoOptions.restore({ pacing: { gapSec: 0.7, leadInSec: 0.2 } }).snapshot().pacing).toEqual({ gapSec: 0.7, leadInSec: 0.2 });
+    expect(VideoOptions.restore({ pacing: { gapSec: 9, leadInSec: -3 } }).snapshot().pacing).toEqual({ gapSec: 1, leadInSec: 0.1 });
+    expect(VideoOptions.restore({ pacing: { gapSec: "x", leadInSec: null } }).snapshot().pacing).toEqual({ gapSec: 0.35, leadInSec: 0.3 });
+    expect(VideoOptions.restore({ pacing: 5 }).snapshot().pacing).toEqual({ gapSec: 0.35, leadInSec: 0.3 });
+    // bản nháp cũ (v1/v2) không có khối pacing
+    expect(VideoOptions.restore({ subtitles: { enabled: false }, footageKind: "image" }).snapshot().pacing).toEqual({ gapSec: 0.35, leadInSec: 0.3 });
   });
 });

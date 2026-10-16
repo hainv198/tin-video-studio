@@ -28,6 +28,25 @@ describe("OptionsController", () => {
     });
   });
 
+  it("nhịp đọc: setGapSec/setLeadInSec ghi vào session, tự lưu; ngoài khoảng báo lỗi và giữ nguyên", async () => {
+    const { ctrl, session, saves, sched } = setup();
+    ctrl.setGapSec(0.7);
+    ctrl.setLeadInSec(0.5);
+    expect(session.state.options.gapSec).toBe(0.7);
+    expect(session.state.options.leadInSec).toBe(0.5);
+    sched.runAll();
+    await flush();
+    expect(saves.at(-1)?.options).toMatchObject({ pacing: { gapSec: 0.7, leadInSec: 0.5 } });
+    const before = session.state.options;
+    ctrl.setGapSec(5);
+    expect(ctrl.state.error).toBe("Khoảng nghỉ giữa các câu phải từ 0,10 đến 1,00 giây");
+    expect(session.state.options).toBe(before);
+    ctrl.setLeadInSec(0);
+    expect(ctrl.state.error).toBe("Khoảng nghỉ đầu video phải từ 0,1 đến 1,0 giây");
+    ctrl.setLeadInSec(0.4);
+    expect(ctrl.state.error).toBeNull();
+  });
+
   it("giá trị lạ: báo lỗi tiếng Việt, session giữ nguyên; thao tác đúng sau đó xoá lỗi", () => {
     const { ctrl, session } = setup();
     const before = session.state.options;

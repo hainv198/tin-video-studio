@@ -1,6 +1,12 @@
 import { Timeline, type TimelineConfig } from "@/domain/Timeline";
 import type { MonoClip } from "@/client/media/AudioMix";
+import type { VideoOptionsSnapshot } from "@/domain/VideoOptions";
 import type { RenderJob } from "./RenderJob";
+
+/** Cấu hình timeline của MỘT video: mẫu cho tailSec, tuỳ chọn video cho nhịp đọc. Nguồn duy nhất cho video, phụ đề, thời lượng. */
+export function timelineConfigFor(base: TimelineConfig, options: VideoOptionsSnapshot): TimelineConfig {
+  return { ...base, gapSec: options.pacing.gapSec, leadInSec: options.pacing.leadInSec };
+}
 
 export function planRender(job: RenderJob, timelineConfig: TimelineConfig): { timeline: Timeline; voices: MonoClip[] } {
   const bySceneId = new Map(job.narrations.map((n) => [n.sceneId, n]));

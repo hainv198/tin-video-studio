@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Studio } from "@/client/controllers/createStudio";
+import { GAP_SEC_RANGE, LEAD_IN_SEC_RANGE } from "@/domain/VideoOptions";
 import { useController } from "@/views/hooks/useController";
 
 const FOOTAGE_KINDS = [
@@ -9,6 +10,8 @@ const FOOTAGE_KINDS = [
   { id: "image", label: "Ưu tiên ảnh" },
   { id: "video", label: "Ưu tiên video" },
 ] as const;
+
+const secText = (n: number) => String(n).replace(".", ",");
 
 const SELECT = "rounded-md bg-neutral-800 px-3 py-2 disabled:opacity-50";
 
@@ -116,6 +119,31 @@ export function OptionsSidebar({ studio }: { studio: Studio }) {
             Về mặc định
           </button>
           <p className="text-xs text-neutral-500">Mặc định theo màu chủ đạo của thương hiệu.</p>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1 font-medium">Nhịp đọc</legend>
+          <label htmlFor="tvs-nghi-giua-cau">Nghỉ giữa các câu: {secText(options.gapSec)} giây</label>
+          <input
+            id="tvs-nghi-giua-cau"
+            type="range"
+            min={GAP_SEC_RANGE.min}
+            max={GAP_SEC_RANGE.max}
+            step={GAP_SEC_RANGE.step}
+            value={options.gapSec}
+            onChange={(e) => studio.options.setGapSec(Number(e.target.value))}
+          />
+          <label htmlFor="tvs-nghi-dau-video">Nghỉ đầu video: {secText(options.leadInSec)} giây</label>
+          <input
+            id="tvs-nghi-dau-video"
+            type="range"
+            min={LEAD_IN_SEC_RANGE.min}
+            max={LEAD_IN_SEC_RANGE.max}
+            step={LEAD_IN_SEC_RANGE.step}
+            value={options.leadInSec}
+            onChange={(e) => studio.options.setLeadInSec(Number(e.target.value))}
+          />
+          <p className="text-xs text-neutral-500">Kéo lớn để giọng đọc thong thả hơn; video, phụ đề và thời lượng đổi theo.</p>
         </fieldset>
 
         <fieldset className="flex flex-col gap-2">

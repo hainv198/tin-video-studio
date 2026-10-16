@@ -13,6 +13,8 @@ export interface VideoOptionsSnapshot {
   footageKind: FootageKindPreference;
   /** Lựa chọn Ảnh/Video riêng của từng cảnh (theo id cảnh). */
   sceneFootageKinds: Record<string, SceneFootageKind>;
+  /** Nhịp đọc: nghỉ giữa các câu và nghỉ đầu video (giây). */
+  pacing: { gapSec: number; leadInSec: number };
 }
 
 interface Fields {
@@ -23,7 +25,12 @@ interface Fields {
   introBlockColor: string | null;
   footageKind: FootageKindPreference;
   sceneKinds: ReadonlyMap<string, SceneFootageKind>;
+  gapSec: number;
+  leadInSec: number;
 }
+
+export const GAP_SEC_RANGE = { min: 0.1, max: 1, step: 0.05, default: 0.35 } as const;
+export const LEAD_IN_SEC_RANGE = { min: 0.1, max: 1, step: 0.05, default: 0.3 } as const;
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const FOOTAGE_KINDS: readonly FootageKindPreference[] = ["any", "image", "video"];
@@ -36,6 +43,8 @@ const DEFAULTS: Fields = {
   introBlockColor: null,
   footageKind: "any",
   sceneKinds: new Map(),
+  gapSec: GAP_SEC_RANGE.default,
+  leadInSec: LEAD_IN_SEC_RANGE.default,
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -59,6 +68,20 @@ function checkedColor(color: string | null): string | null {
   if (color === null) return null;
   if (!HEX_COLOR.test(color)) throw new ValidationError("Màu phải có dạng #RRGGBB");
   return color.toLowerCase();
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+function checkedSeconds(v: number, range: { min: number; max: number }, message: string): number {
+  if (typeof v !== "number" || !Number.isFinite(v) || v < range.min - 1e-9 || v > range.max + 1e-9) {
+    throw new ValidationError(message);
+  }
+  return round2(v);
+}
+
+function restoredSeconds(v: unknown, range: { min: number; max: number; default: number }): number {
+  if (typeof v !== "number" || !Number.isFinite(v)) return range.default;
+  return round2(Math.min(range.max, Math.max(range.min, v)));
 }
 
 function restoredColor(v: unknown): string | null {
@@ -95,6 +118,26 @@ export class VideoOptions {
 
   get footageKind(): FootageKindPreference {
     return this.f.footageKind;
+  }
+
+  get gapSec(): number {
+    return this.f.gapSec;
+  }
+
+  get leadInSec(): number {
+    return this.f.leadInSec;
+  }
+
+  withGapSec(sec: number): VideoOptions {
+    return this.with({
+      gapSec: checkedSeconds(sec, GAP_SEC_RANGE, "Khoảng nghỉ giữa các câu phải từ 0,10 đến 1,00 giây"),
+    });
+  }
+
+  withLeadInSec(sec: number): VideoOptions {
+    return this.with({
+      leadInSec: checkedSeconds(sec, LEAD_IN_SEC_RANGE, "Khoảng nghỉ đầu video phải từ 0,1 đến 1,0 giây"),
+    });
   }
 
   withSubtitlesEnabled(enabled: boolean): VideoOptions {
@@ -160,6 +203,7 @@ export class VideoOptions {
       intro,
       footageKind: this.f.footageKind,
       sceneFootageKinds: Object.fromEntries(this.f.sceneKinds),
+      pacing: { gapSec: this.f.gapSec, leadInSec: this.f.leadInSec },
     };
   }
 
@@ -168,6 +212,7 @@ export class VideoOptions {
     if (!isRecord(raw)) return VideoOptions.defaults();
     const subtitles = isRecord(raw.subtitles) ? raw.subtitles : {};
     const intro = isRecord(raw.intro) ? raw.intro : {};
+    const pacing = isRecord(raw.pacing) ? raw.pacing : {};
     const kinds = isRecord(raw.sceneFootageKinds) ? raw.sceneFootageKinds : {};
     const sceneKinds = new Map<string, SceneFootageKind>();
     for (const [sceneId, kind] of Object.entries(kinds)) if (sceneId && isSceneKind(kind)) sceneKinds.set(sceneId, kind);
@@ -179,6 +224,8 @@ export class VideoOptions {
       introBlockColor: restoredColor(intro.blockColor),
       footageKind: isFootageKind(raw.footageKind) ? raw.footageKind : DEFAULTS.footageKind,
       sceneKinds,
+      gapSec: restoredSeconds(pacing.gapSec, GAP_SEC_RANGE),
+      leadInSec: restoredSeconds(pacing.leadInSec, LEAD_IN_SEC_RANGE),
     });
   }
 

@@ -167,4 +167,11 @@ describe("RenderJobBuilder — bitrate", () => {
     expect(job.options).toEqual(options.snapshot());
     expect(structuredClone(job.options)).toEqual(options.snapshot());
   });
+
+  it("job mang nhịp đọc của video (gapSec/leadInSec) để worker dựng timeline", async () => {
+    const { builder, data } = setup();
+    const options = data.options.withGapSec(0.8).withLeadInSec(0.4);
+    const { job } = await builder.build({ ...data, options });
+    expect(job.options.pacing).toEqual({ gapSec: 0.8, leadInSec: 0.4 });
+  });
 });

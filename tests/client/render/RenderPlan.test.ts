@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_TIMELINE_CONFIG } from "@/domain/Timeline";
 import { VideoOptions } from "@/domain/VideoOptions";
-import { planRender } from "@/client/render/RenderPlan";
+import { planRender, timelineConfigFor } from "@/client/render/RenderPlan";
 import type { RenderJob } from "@/client/render/RenderJob";
 
 const job = (narrations: RenderJob["narrations"]): RenderJob => ({
@@ -43,5 +43,19 @@ describe("planRender", () => {
     expect(() => planRender(job([{ sceneId: "s1", durationSec: 1, samples: new Float32Array(1) }]), DEFAULT_TIMELINE_CONFIG)).toThrow(
       "Cảnh s2 chưa có giọng đọc",
     );
+  });
+
+  it("timelineConfigFor lấy gapSec/leadInSec từ tuỳ chọn, giữ tailSec của mẫu; đổi nhịp đổi đúng tổng thời lượng", () => {
+    const narr = [
+      { sceneId: "s1", durationSec: 2, samples: new Float32Array(1) },
+      { sceneId: "s2", durationSec: 1, samples: new Float32Array(1) },
+    ];
+    const base = planRender(job(narr), timelineConfigFor(DEFAULT_TIMELINE_CONFIG, VideoOptions.defaults().snapshot()));
+    expect(base.timeline.totalDuration).toBeCloseTo(0.3 + 2 + 0.35 + 1 + 0.6, 9);
+    const o = VideoOptions.defaults().withGapSec(0.75).withLeadInSec(0.5).snapshot();
+    expect(timelineConfigFor(DEFAULT_TIMELINE_CONFIG, o)).toEqual({ leadInSec: 0.5, gapSec: 0.75, tailSec: 0.6 });
+    const slow = planRender(job(narr), timelineConfigFor(DEFAULT_TIMELINE_CONFIG, o));
+    expect(slow.timeline.totalDuration).toBeCloseTo(0.5 + 2 + 0.75 + 1 + 0.6, 9);
+    expect(slow.voices[1]?.startSec).toBeCloseTo(0.5 + 2 + 0.75, 9);
   });
 });
