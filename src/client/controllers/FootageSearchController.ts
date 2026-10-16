@@ -3,6 +3,7 @@ import type { StockApi, StockItemDto } from "@/client/services/StockClient";
 import { isSessionExpired } from "@/client/errors/userMessage";
 import type { Footage } from "@/domain/Footage";
 import type { IdGenerator } from "@/domain/ids";
+import type { FootageKindPreference, SceneFootageKind } from "@/domain/VideoOptions";
 import type { TemplateRegistry } from "@/templates/TemplateRegistry";
 import { StateController } from "./StateController";
 import type { StudioSession } from "./StudioSession";
@@ -116,7 +117,9 @@ export class FootageSearchController extends StateController<FootageSearchState>
     const signal = this.begin(sceneId);
     this.setScene(sceneId, { query: text, loading: true, items: [], error: null, empty: false });
     try {
-      const items = await this.query(text, signal);
+      // Cảnh có lựa chọn Ảnh/Video riêng thì chỉ tìm loại đó; không có thì tìm cả hai như trước.
+      const kind = this.deps.session.state.options.sceneFootageKind(sceneId) ?? "any";
+      const items = await this.query(text, signal, kind);
       if (!this.owns(sceneId, signal)) return;
       this.setScene(sceneId, { query: text, loading: false, items, error: null, empty: items.length === 0 });
     } catch (error) {
@@ -134,6 +137,17 @@ export class FootageSearchController extends StateController<FootageSearchState>
     } catch (error) {
       this.patchScene(sceneId, { error: this.report(error) });
     }
+  }
+
+  /** Chọn Ảnh/Video cho một cảnh (null = bỏ chọn, tìm cả hai), nhớ trong bản nháp rồi tìm lại. Không đổi cảnh trám đang gán. */
+  async setSceneKind(sceneId: string, kind: SceneFootageKind | null): Promise<void> {
+    const { project } = this.deps.session.state;
+    const scene = project?.scenes.find((s) => s.id === sceneId);
+    if (!project || !scene) return;
+    this.deps.session.update((d) => ({ ...d, options: d.options.withSceneFootageKind(sceneId, kind) }));
+    const fallback = this.deps.templates.get(project.templateId).defaults.fallbackKeyword;
+    const text = this.state.byScene[sceneId]?.query || this.suggester(fallback).suggest(scene.text, 1)[0] || fallback;
+    await this.search(sceneId, text);
   }
 
   /** Dừng cả lượt: huỷ yêu cầu đang bay và không nhận thêm cảnh mới. */
@@ -163,11 +177,16 @@ export class FootageSearchController extends StateController<FootageSearchState>
 
   private async fillScene(sceneId: string, run: number): Promise<void> {
     if (run !== this.run) return;
-    const { project } = this.deps.session.state;
+    const { project, options } = this.deps.session.state;
     const scene = project?.scenes.find((s) => s.id === sceneId);
     if (!project || !scene) return;
     // cảnh người dùng đã tự tìm (đang bay hoặc đã xong) hoặc đã gán tay thì không ghi đè
     if (this.manual.has(sceneId) || this.inflight.has(sceneId) || this.deps.session.state.footage.get(sceneId)) return;
+    const explicit = options.sceneFootageKind(sceneId);
+    const preferred: FootageKindPreference = explicit ?? options.footageKind;
+    // Ưu tiên chung (không phải lựa chọn riêng của cảnh) mà không có kết quả thì lùi về loại còn lại.
+    const backup: SceneFootageKind | null =
+      explicit === null && preferred !== "any" ? (preferred === "image" ? "video" : "image") : null;
     const signal = this.begin(sceneId);
     let current = scene.text;
     try {
@@ -178,8 +197,12 @@ export class FootageSearchController extends StateController<FootageSearchState>
       this.setScene(sceneId, { query: first, loading: true, items: [], error: null, empty: false });
       for (const phrase of phrases) {
         current = phrase;
-        const items = await this.query(phrase, signal);
+        let items = await this.query(phrase, signal, preferred);
         if (!this.owns(sceneId, signal)) return;
+        if (items.length === 0 && backup) {
+          items = await this.query(phrase, signal, backup);
+          if (!this.owns(sceneId, signal)) return;
+        }
         if (items.length > 0) {
           this.setScene(sceneId, { query: phrase, loading: false, items, error: null, empty: false });
           this.pickFirstUnused(sceneId, items);
@@ -194,8 +217,16 @@ export class FootageSearchController extends StateController<FootageSearchState>
     }
   }
 
-  /** Tìm ảnh và video song song; một nguồn lỗi thì dùng nguồn còn lại, cả hai lỗi thì ném lỗi đầu. */
-  private async query(query: string, signal: AbortSignal): Promise<StockItemDto[]> {
+  /**
+   * Tìm cảnh trám. `kind` = "image"/"video": chỉ một loại. "any": ảnh và video song song;
+   * một nguồn lỗi thì dùng nguồn còn lại, cả hai lỗi thì ném lỗi đầu.
+   */
+  private async query(query: string, signal: AbortSignal, kind: FootageKindPreference): Promise<StockItemDto[]> {
+    if (kind !== "any") {
+      const result = await this.deps.stock.search(query, kind, { signal, perPage: MAX_CANDIDATES });
+      if (result.warnings.length > 0) this.addWarnings(result.warnings);
+      return result.items.slice(0, MAX_CANDIDATES);
+    }
     const [images, videos] = await Promise.allSettled([
       this.deps.stock.search(query, "image", { signal, perPage: MAX_CANDIDATES }),
       this.deps.stock.search(query, "video", { signal, perPage: MAX_CANDIDATES }),

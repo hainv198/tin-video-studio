@@ -108,4 +108,11 @@ describe("createStudio", () => {
     expect(studio.search.state.byScene).toEqual({});
     studio.dispose();
   });
+
+  it("có OptionsController dùng chung session", () => {
+    const studio = createStudio(createClientServices(env()), { schedule: () => () => {} });
+    studio.options.setTextFont("oswald");
+    expect(studio.session.state.options.textFontId).toBe("oswald");
+    studio.dispose();
+  });
 });

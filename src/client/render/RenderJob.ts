@@ -1,5 +1,6 @@
 import type { SceneRole } from "@/domain/Scene";
 import type { MusicBed } from "@/client/media/AudioMix";
+import type { VideoOptionsSnapshot } from "@/domain/VideoOptions";
 
 export interface FootageInput {
   kind: "image" | "video" | "fallback";
@@ -34,6 +35,8 @@ export interface RenderJob {
   origin: string;
   /** Bitrate hình (bps); bỏ trống dùng RENDER_VIDEO_BITRATE. */
   videoBitrate?: number;
+  /** Tuỳ chọn riêng của video: font chữ, phụ đề, màu thumbnail đầu. */
+  options: VideoOptionsSnapshot;
 }
 
 export type WorkerRequest = { type: "start"; job: RenderJob } | { type: "probe" };

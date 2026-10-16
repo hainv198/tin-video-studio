@@ -31,7 +31,7 @@ describe("DraftRepository", () => {
   it("save rồi load: thêm version và savedAt", async () => {
     const repo = new DraftRepository(new MemoryKeyValueStore(), () => new Date("2026-10-15T01:02:03.000Z"));
     await repo.save(body);
-    expect(await repo.load()).toEqual({ version: 1, savedAt: "2026-10-15T01:02:03.000Z", ...body });
+    expect(await repo.load()).toEqual({ version: 2, savedAt: "2026-10-15T01:02:03.000Z", ...body });
   });
 
   it("save ghi đè bản cũ; clear xoá hẳn", async () => {
@@ -59,7 +59,7 @@ describe("DraftRepository", () => {
     const stale = { ...body, version: 7, savedAt: "2020-01-01T00:00:00.000Z" } as unknown as DraftBody;
     await repo.save(stale);
     const loaded = await repo.load();
-    expect(loaded?.version).toBe(1);
+    expect(loaded?.version).toBe(2);
     expect(loaded?.savedAt).toBe("2026-10-15T09:00:00.000Z");
   });
 
@@ -80,5 +80,13 @@ describe("DraftRepository", () => {
     const audio = restored.narrations[0]!.snapshot().audio;
     expect(audio).toBeInstanceOf(Uint8Array);
     expect(audio).toEqual(new Uint8Array([9, 8, 7]));
+  });
+
+  it("bản nháp v1 (trước khi có tuỳ chọn video) vẫn đọc được", async () => {
+    const store = new MemoryKeyValueStore();
+    await store.set("draft", { version: 1, savedAt: "2026-10-14T00:00:00.000Z", ...body });
+    const loaded = await new DraftRepository(store).load();
+    expect(loaded?.version).toBe(1);
+    expect(loaded?.options).toBeUndefined();
   });
 });

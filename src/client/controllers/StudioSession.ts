@@ -5,6 +5,7 @@ import type { IdGenerator } from "@/domain/ids";
 import type { MusicTrack } from "@/domain/MusicTrack";
 import type { Narration } from "@/domain/Narration";
 import type { NewsProject } from "@/domain/NewsProject";
+import { VideoOptions } from "@/domain/VideoOptions";
 import type { VoiceSettings } from "@/domain/VoiceSettings";
 
 export interface BrandData {
@@ -19,6 +20,8 @@ export interface StudioData {
   footage: FootageBoard;
   music: MusicTrack | null;
   brand: BrandData;
+  /** Tuỳ chọn riêng của video đang làm (vào bản nháp, về mặc định khi dự án mới). */
+  options: VideoOptions;
 }
 
 export const EMPTY_STUDIO: StudioData = {
@@ -28,6 +31,7 @@ export const EMPTY_STUDIO: StudioData = {
   footage: FootageBoard.empty(),
   music: null,
   brand: { values: {}, logo: null },
+  options: VideoOptions.defaults(),
 };
 
 export interface SessionDeps {
@@ -39,7 +43,7 @@ export interface SessionDeps {
   onSaveError?: (error: unknown) => void;
 }
 
-/** Bỏ giọng và cảnh trám của cảnh không còn trong dự án. */
+/** Bỏ giọng, cảnh trám và lựa chọn Ảnh/Video của cảnh không còn trong dự án. */
 function prune(data: StudioData): StudioData {
   if (!data.project) return data;
   const ids = new Set(data.project.scenes.map((s) => s.id));
@@ -49,7 +53,10 @@ function prune(data: StudioData): StudioData {
   }
   let footage = data.footage;
   for (const id of footage.sceneIds()) if (!ids.has(id)) footage = footage.unassign(id);
-  return narrations === data.narrations && footage === data.footage ? data : { ...data, narrations, footage };
+  const options = data.options.keepScenes(ids);
+  return narrations === data.narrations && footage === data.footage && options === data.options
+    ? data
+    : { ...data, narrations, footage, options };
 }
 
 /** Cùng logo (tham chiếu) và cùng giá trị từng khoá. */
@@ -104,6 +111,7 @@ export class StudioSession {
       narrations: new Map(parts.narrations.map((n) => [n.sceneId, n])),
       footage: parts.footage,
       music: parts.music,
+      options: parts.options,
     });
     this.notify();
   }
@@ -147,10 +155,12 @@ export class StudioSession {
 
   private async doSave(generation: number): Promise<void> {
     if (generation !== this.generation) return;
-    const { project, voice, narrations, footage, music } = this.current;
+    const { project, voice, narrations, footage, music, options } = this.current;
     if (!project) return;
     try {
-      await this.deps.drafts.save(buildDraftBody({ project, voice, narrations: [...narrations.values()], footage, music }));
+      await this.deps.drafts.save(
+        buildDraftBody({ project, voice, narrations: [...narrations.values()], footage, music, options }),
+      );
     } catch (error) {
       this.notifySaveError(error);
     }

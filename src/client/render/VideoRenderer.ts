@@ -80,6 +80,8 @@ export class VideoRenderer {
           backdrop: backdropImage,
           sceneTime,
           sceneDuration: slot.end - slot.start,
+          voiceStart: slot.voiceStart - slot.start,
+          voiceDuration: slot.voiceEnd - slot.voiceStart,
         });
         await sink.add(t, 1 / fps);
         const frame = i + 1;

@@ -26,6 +26,19 @@ export const LAYOUT = {
   credit: { x: 110, y: 240, lineHeight: 40, fontPx: 26, rightMargin: 40, gapToLogo: 24 },
   logo: { right: 96, y: 250, size: 64, gap: 14, fontPx: 46 },
   dateTag: { h: 44, padX: 16, fontPx: 26 },
+  /** Phụ đề: căn giữa, rộng tối đa 820 (tránh cột nút TikTok bên phải), đáy ở vùng an toàn dưới (≤ 1600). Mở đầu: ngay trên chip. */
+  subtitle: {
+    centerX: 540,
+    maxWidth: 820,
+    fontPx: 54,
+    lineHeight: 68,
+    maxLines: 2,
+    bodyBottom: 1600,
+    introBottom: 990,
+    strokePx: 10,
+    shadowBlurPx: 6,
+    shadowOffsetPx: 3,
+  },
   kenBurns: { from: 1, to: 1.08 },
   blurPx: 48,
 } as const;

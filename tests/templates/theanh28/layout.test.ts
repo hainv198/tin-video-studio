@@ -61,3 +61,19 @@ describe("withAlpha", () => {
     expect(withAlpha("#1F9D55", 0.5)).toBe("rgba(31,157,85,0.5)");
   });
 });
+
+describe("LAYOUT.subtitle", () => {
+  it("phụ đề nằm trong vùng an toàn TikTok, không đè dải ảnh, tem ngày, chip, tiêu đề, dòng nguồn", () => {
+    const S = LAYOUT.subtitle;
+    const bodyTop = S.bodyBottom - S.maxLines * S.lineHeight;
+    expect(bodyTop).toBeGreaterThan(LAYOUT.body.band.y + LAYOUT.body.band.h);
+    expect(bodyTop).toBeGreaterThan(LAYOUT.body.dateTag.y + LAYOUT.dateTag.h);
+    expect(S.bodyBottom).toBeLessThanOrEqual(1600);
+    const introTop = S.introBottom - S.maxLines * S.lineHeight;
+    expect(S.introBottom).toBeLessThan(LAYOUT.intro.chip.y);
+    expect(S.introBottom).toBeLessThan(LAYOUT.intro.title.y);
+    expect(introTop).toBeGreaterThan(LAYOUT.credit.y + 2 * LAYOUT.credit.lineHeight);
+    expect(S.centerX - S.maxWidth / 2).toBeGreaterThanOrEqual(120);
+    expect(S.centerX + S.maxWidth / 2).toBeLessThanOrEqual(960);
+  });
+});

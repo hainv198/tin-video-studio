@@ -368,3 +368,79 @@ describe("FootageSearchController", () => {
     expect(ctrl.state.warnings).toEqual([]);
   });
 });
+
+describe("FootageSearchController — Ảnh/Video", () => {
+  it("autoFill với ưu tiên video: chỉ tìm video khi có kết quả", async () => {
+    const { ctrl, session, calls } = setup(
+      {
+        police: { image: [item("a1")], video: [item("v1", "video")] },
+        news: { image: [item("n1")], video: [item("w1", "video"), item("w2", "video"), item("w3", "video")] },
+      },
+      { "Công an": ["police"] },
+    );
+    session.update((d) => ({ ...d, options: d.options.withFootageKind("video") }));
+    await ctrl.autoFill();
+    expect(calls.every((c) => c.startsWith("video:"))).toBe(true);
+    expect(uri(session, "s1")).toBe("f-w1");
+    expect(uri(session, "s2")).toBe("f-v1");
+    expect(uri(session, "s3")).toBe("f-w2");
+    expect(uri(session, "s4")).toBe("f-w3");
+  });
+
+  it("autoFill với ưu tiên video mà không có video: lùi về ảnh", async () => {
+    const { ctrl, session, calls } = setup({ news: { image: [item("n1"), item("n2"), item("n3"), item("n4")] } });
+    session.update((d) => ({ ...d, options: d.options.withFootageKind("video") }));
+    await ctrl.autoFill();
+    expect(calls.slice(0, 2)).toEqual(["video:news", "image:news"]);
+    expect(uri(session, "s1")).toBe("f-n1");
+    expect(uri(session, "s4")).toBe("f-n4");
+  });
+
+  it("autoFill: cảnh có lựa chọn riêng thì chỉ tìm loại đó, không lùi", async () => {
+    const { ctrl, session, calls } = setup(
+      {
+        police: { image: [item("a1")], video: [item("v1", "video")] },
+        news: { image: [item("n1"), item("n2"), item("n3")], video: [item("w1", "video"), item("w2", "video"), item("w3", "video")] },
+      },
+      { "Công an": ["police"] },
+    );
+    session.update((d) => ({ ...d, options: d.options.withFootageKind("video").withSceneFootageKind("s2", "image") }));
+    await ctrl.autoFill();
+    expect(calls).toContain("image:police");
+    expect(calls).not.toContain("video:police");
+    expect(uri(session, "s2")).toBe("f-a1");
+  });
+
+  it("search theo loại riêng của cảnh: chỉ gọi một loại; không có loại riêng thì tìm cả hai như cũ", async () => {
+    const { ctrl, session, calls } = setup({ boat: { image: [item("b1")], video: [item("bv1", "video")] } });
+    session.update((d) => ({ ...d, options: d.options.withFootageKind("image").withSceneFootageKind("s3", "video") }));
+    await ctrl.search("s3", "boat");
+    expect(calls).toEqual(["video:boat"]);
+    expect(ctrl.state.byScene.s3?.items.map((i) => i.id)).toEqual(["bv1"]);
+    calls.length = 0;
+    await ctrl.search("s4", "boat");
+    expect([...calls].sort()).toEqual(["image:boat", "video:boat"]);
+  });
+
+  it("setSceneKind nhớ loại của cảnh trong session và tìm lại bằng từ khoá đang có; null là bỏ", async () => {
+    const { ctrl, session, calls } = setup({ boat: { image: [item("b1")], video: [item("bv1", "video")] } });
+    await ctrl.search("s3", "boat");
+    expect(ctrl.state.byScene.s3?.items.map((i) => i.id)).toEqual(["b1", "bv1"]);
+    calls.length = 0;
+    await ctrl.setSceneKind("s3", "video");
+    expect(session.state.options.sceneFootageKind("s3")).toBe("video");
+    expect(calls).toEqual(["video:boat"]);
+    expect(ctrl.state.byScene.s3?.items.map((i) => i.id)).toEqual(["bv1"]);
+    calls.length = 0;
+    await ctrl.setSceneKind("s3", null);
+    expect(session.state.options.sceneFootageKind("s3")).toBeNull();
+    expect([...calls].sort()).toEqual(["image:boat", "video:boat"]);
+  });
+
+  it("setSceneKind khi cảnh chưa có từ khoá: dùng gợi ý từ câu (cuối cùng là từ khoá chung)", async () => {
+    const { ctrl, calls } = setup({});
+    await ctrl.setSceneKind("s4", "image");
+    expect(calls).toEqual(["image:news"]);
+    expect(ctrl.state.byScene.s4?.empty).toBe(true);
+  });
+});

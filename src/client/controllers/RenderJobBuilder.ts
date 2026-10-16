@@ -42,7 +42,7 @@ export class RenderJobBuilder {
     isCancelled: () => boolean = () => false,
     options?: { videoBitrate?: number },
   ): Promise<BuiltJob> {
-    const { project, voice, narrations, footage, music, brand } = data;
+    const { project, voice, narrations, footage, music, brand, options: videoOptions } = data;
     if (!project) throw new ValidationError("Chưa có dự án");
     if (!voice || staleSceneIds(data).length > 0) throw new ValidationError("Chưa đủ giọng đọc cho mọi cảnh");
     this.deps.templates.get(project.templateId); // phong cách không tồn tại thì ném NotFoundError
@@ -102,6 +102,7 @@ export class RenderJobBuilder {
       music: musicBed,
       sampleRate: this.sampleRate,
       origin: this.deps.origin,
+      options: videoOptions.snapshot(),
       ...(videoBitrate ? { videoBitrate } : {}),
     };
     return { job, warnings };

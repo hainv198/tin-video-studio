@@ -105,6 +105,19 @@ npm run contact:sheet -- mau.mp4 dung.mp4 so-khung.png 1,8,20
 
 Ghép các khung ở giây 1, 8, 20 của hai video thành một ảnh để so mắt.
 
+## Tuỳ chọn video (thanh bên trái)
+
+Mỗi video có tuỳ chọn riêng, lưu trong bản nháp (không thuộc bộ thương hiệu), về mặc định khi bấm "Dự án mới":
+
+- **Phụ đề:** bật/tắt và chọn font (mặc định bật, font Phudu). Phụ đề cháy cứng vào video, hiện từng đoạn ≤ 2 dòng ở đáy cảnh (vùng an toàn TikTok); cảnh mở đầu hiện ngay trên chip tên kênh. Đoạn đổi theo tỉ lệ số chữ trên độ dài giọng đọc (không khớp từng từ).
+- **Font chữ tiêu đề và nhãn:** tiêu đề mở đầu, tên kênh, dòng nguồn, tem ngày (mặc định Barlow Condensed như trước).
+- **Thumbnail đầu:** màu nền và màu khối sau tiêu đề; "Về mặc định" = theo màu chủ đạo của thương hiệu.
+- **Ảnh/Video khi tự tìm:** cả hai / ưu tiên ảnh / ưu tiên video (loại ưu tiên không có kết quả thì lùi về loại còn lại). Ở bước 3, mỗi cảnh có nút "Ảnh | Video" để tìm lại chỉ một loại (bấm lại để bỏ chọn).
+
+Font (Phudu, Be Vietnam Pro, Oswald, Montserrat, Roboto Condensed, Barlow Condensed) nằm trong `public/fonts/` và `public/templates/theanh28/fonts/`, giấy phép SIL OFL (`OFL.txt` cạnh từng họ). Khi dựng chỉ tải font đang chọn. Thêm font: tải `.ttf` từ `github.com/google/fonts` vào `public/fonts/<id>/`, thêm id vào `src/domain/fontIds.ts` và mục vào `src/templates/fonts/FontCatalog.ts`; `npm test` tự kiểm font có đủ chữ tiếng Việt.
+
+So khung có/không phụ đề: `npm run contact:sheet -- co-phu-de.mp4 khong-phu-de.mp4 so-khung.png 1,6,10,20`.
+
 ## Deploy lên Vercel (từng bước)
 
 Chỉ Hải chạy các lệnh git và thao tác trên GitHub/Vercel.

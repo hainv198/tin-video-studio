@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_TIMELINE_CONFIG } from "@/domain/Timeline";
+import { VideoOptions } from "@/domain/VideoOptions";
 import { planRender } from "@/client/render/RenderPlan";
 import type { RenderJob } from "@/client/render/RenderJob";
 
@@ -16,6 +17,7 @@ const job = (narrations: RenderJob["narrations"]): RenderJob => ({
   music: null,
   sampleRate: 48000,
   origin: "http://localhost:3100",
+  options: VideoOptions.defaults().snapshot(),
 });
 
 describe("planRender", () => {

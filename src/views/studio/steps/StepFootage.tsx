@@ -21,6 +21,7 @@ function SceneCard({ studio, sceneId, index }: { studio: Studio; sceneId: string
   const current = data.footage.get(sceneId);
   const others = project.scenes.filter((s) => s.id !== sceneId);
   const pool = studio.footage.pool();
+  const kind = data.options.sceneFootageKind(sceneId);
 
   return (
     <li className="flex flex-col gap-3 rounded-lg border border-neutral-800 p-3">
@@ -37,6 +38,21 @@ function SceneCard({ studio, sceneId, index }: { studio: Studio; sceneId: string
           setDraft(null);
         }}
       >
+        <div role="group" aria-label="Loại cảnh trám" className="flex overflow-hidden rounded-md">
+          {(["image", "video"] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              aria-pressed={kind === k}
+              disabled={state?.loading}
+              title={kind === k ? "Bấm lại để tìm cả ảnh và video" : undefined}
+              className={`px-3 py-1.5 disabled:opacity-50 ${kind === k ? "bg-emerald-600 font-medium" : "bg-neutral-800"}`}
+              onClick={() => void studio.search.setSceneKind(sceneId, kind === k ? null : k)}
+            >
+              {k === "image" ? "Ảnh" : "Video"}
+            </button>
+          ))}
+        </div>
         <input
           className="min-w-40 flex-1 rounded-md bg-neutral-800 px-3 py-1.5"
           placeholder="Từ khoá tiếng Anh (ví dụ: police car)"

@@ -1,6 +1,9 @@
+import { VideoOptions } from "@/domain/VideoOptions";
+import { frameStyleFor } from "@/templates/fonts/FontCatalog";
 import { describe, expect, it } from "vitest";
 import { BrandKit } from "@/domain/BrandKit";
 import { TheAnh28Template } from "@/templates/theanh28/TheAnh28Template";
+import { LAYOUT } from "@/templates/theanh28/layout";
 import type { DrawableImage, ProjectFrame, SceneFrame } from "@/templates/VideoTemplate";
 import { RecordingCanvas } from "../../helpers/RecordingCanvas";
 
@@ -173,5 +176,117 @@ describe("TheAnh28Template — dòng nguồn tin dài", () => {
     const c = draw(project(), scene());
     expect(creditText(c)).toBe("THEO: ĐỨC PHONG - VIETNAMNET");
     expect(c.texts()).toContain("ẢNH: TỔNG HỢP");
+  });
+});
+
+describe("TheAnh28Template — font chữ theo tuỳ chọn video", () => {
+  it("không có style: mọi chữ vẫn là Barlow Condensed như cũ", () => {
+    const c = draw(project(), scene({ role: "intro" }));
+    expect(c.ops("fillText").every((x) => x.state.font.includes('"TVS Barlow Condensed"'))).toBe(true);
+    const body = draw(project(), scene({ role: "body" }));
+    expect(body.ops("fillText").every((x) => x.state.font.includes('"TVS Barlow Condensed"'))).toBe(true);
+  });
+
+  it("style chọn Oswald: tiêu đề, chip, tem ngày, dòng nguồn đều dùng Oswald với mức đậm của họ font", () => {
+    const style = frameStyleFor(VideoOptions.defaults().withTextFont("oswald").withSubtitlesEnabled(false).snapshot());
+    const c = draw(project({ style }), scene({ role: "intro" }));
+    const fonts = c.ops("fillText").map((x) => x.state.font);
+    expect(fonts.every((f) => f.includes('"TVS Oswald"'))).toBe(true);
+    expect(fonts.some((f) => f.startsWith("700 64px"))).toBe(true); // tiêu đề: đậm nhất của Oswald là 700
+    expect(fonts.some((f) => f.startsWith("600 26px"))).toBe(true); // dòng nguồn, tem ngày
+    const body = draw(project({ style }), scene({ role: "body" }));
+    expect(body.ops("fillText").every((x) => x.state.font.includes('"TVS Oswald"'))).toBe(true);
+  });
+});
+
+describe("TheAnh28Template — màu thumbnail đầu", () => {
+  const introStyle = (bg: string | null, block: string | null) =>
+    frameStyleFor(VideoOptions.defaults().withSubtitlesEnabled(false).withIntroBackground(bg).withIntroBlock(block).snapshot());
+  const fills = (c: RecordingCanvas) => c.ops("fillRect");
+  const solidBlock = (c: RecordingCanvas) => fills(c).find((x) => x.args[1] === LAYOUT.intro.gradientSolid);
+  const gradientStops = (c: RecordingCanvas) =>
+    (fills(c).find((x) => x.args[1] === LAYOUT.intro.gradientTop)?.state.fillStyle as { stops: [number, string][] }).stops;
+
+  it("không đặt màu: nền, dải chuyển, khối đều theo màu chủ đạo (như cũ)", () => {
+    const c = draw(project(), scene({ role: "intro" }));
+    expect(fills(c)[0]?.state.fillStyle).toBe("#1F9D55");
+    expect(fills(c)[0]?.args).toEqual([0, 0, 1080, 1920]);
+    expect(solidBlock(c)?.state.fillStyle).toBe("#1F9D55");
+    expect(gradientStops(c)).toEqual([
+      [0, "rgba(31,157,85,0)"],
+      [1, "#1F9D55"],
+    ]);
+  });
+
+  it("đặt cả hai màu: nền dùng màu nền, dải chuyển và khối sau tiêu đề dùng màu khối; chip vẫn màu chủ đạo", () => {
+    const c = draw(project({ style: introStyle("#112233", "#445566") }), scene({ role: "intro" }));
+    expect(fills(c)[0]?.state.fillStyle).toBe("#112233");
+    expect(solidBlock(c)?.state.fillStyle).toBe("#445566");
+    expect(gradientStops(c)).toEqual([
+      [0, "rgba(68,85,102,0)"],
+      [1, "#445566"],
+    ]);
+    expect(c.ops("fill").some((x) => x.state.fillStyle === "#1F9D55")).toBe(true); // chip tên kênh
+  });
+
+  it("chỉ đặt màu nền: khối sau tiêu đề vẫn theo màu chủ đạo", () => {
+    const c = draw(project({ style: introStyle("#112233", null) }), scene({ role: "intro" }));
+    expect(fills(c)[0]?.state.fillStyle).toBe("#112233");
+    expect(solidBlock(c)?.state.fillStyle).toBe("#1F9D55");
+  });
+
+  it("cảnh thân bài không đổi theo màu thumbnail", () => {
+    const plain = draw(project(), scene({ role: "body", image: null }));
+    const styled = draw(project({ style: introStyle("#112233", "#445566") }), scene({ role: "body", image: null }));
+    const stops = (c: RecordingCanvas) => (fills(c)[0]?.state.fillStyle as { stops: [number, string][] }).stops;
+    expect(stops(styled)).toEqual(stops(plain));
+  });
+});
+
+describe("TheAnh28Template — phụ đề", () => {
+  const subtitleStyle = (enabled = true) => frameStyleFor(VideoOptions.defaults().withSubtitlesEnabled(enabled).snapshot());
+  const subtitleTexts = (c: RecordingCanvas) => c.ops("fillText").filter((x) => x.state.font.includes('"TVS Phudu"'));
+  const S = LAYOUT.subtitle;
+
+  it("bật: câu ngắn vẽ giữa khung, đáy vùng phụ đề cảnh thân bài, viền đen trước rồi chữ trắng", () => {
+    const c = draw(project({ style: subtitleStyle() }), scene({ text: "Câu tin." }));
+    const fills = subtitleTexts(c);
+    expect(fills.map((x) => x.args)).toEqual([["Câu tin.", 540, S.bodyBottom - S.lineHeight]]);
+    expect(fills[0]?.state.font.startsWith("800 54px")).toBe(true);
+    expect(fills[0]?.state.fillStyle).toBe("#FFFFFF");
+    expect(c.ops("strokeText").map((x) => x.args)).toEqual([["Câu tin.", 540, S.bodyBottom - S.lineHeight]]);
+    const strokeAt = c.calls.findIndex((x) => x.op === "strokeText");
+    const fillAt = c.calls.findIndex((x) => x.op === "fillText" && x.args[0] === "Câu tin.");
+    expect(strokeAt).toBeLessThan(fillAt);
+  });
+
+  it("tắt phụ đề hoặc không có style: không vẽ phụ đề", () => {
+    for (const p of [project({ style: subtitleStyle(false) }), project()]) {
+      const c = draw(p, scene({ text: "Câu tin." }));
+      expect(c.ops("strokeText")).toHaveLength(0);
+      expect(c.texts()).not.toContain("Câu tin.");
+    }
+  });
+
+  it("cảnh mở đầu: phụ đề nằm trên chip tên kênh, không đè tiêu đề", () => {
+    const c = draw(project({ style: subtitleStyle() }), scene({ role: "intro", text: "Tiêu đề ngắn." }));
+    const y = subtitleTexts(c)[0]?.args[2] as number;
+    expect(y).toBe(S.introBottom - S.lineHeight);
+    expect(y + S.lineHeight).toBeLessThan(LAYOUT.intro.chip.y);
+  });
+
+  it("câu dài: chia đoạn ≤ 2 dòng và đổi đoạn theo thời gian giọng đọc (thuần theo sceneTime)", () => {
+    const text = Array.from({ length: 24 }, (_, i) => `tu${String(i).padStart(2, "0")}`).join(" ");
+    const at = (sceneTime: number) =>
+      subtitleTexts(
+        draw(project({ style: subtitleStyle() }), scene({ text, sceneTime, sceneDuration: 4.35, voiceStart: 0, voiceDuration: 4 })),
+      ).map((x) => [String(x.args[0]), x.args[2]]);
+    expect(at(0)).toEqual([
+      ["tu00 tu01 tu02 tu03 tu04 tu05", S.bodyBottom - 2 * S.lineHeight],
+      ["tu06 tu07 tu08 tu09 tu10 tu11", S.bodyBottom - S.lineHeight],
+    ]);
+    expect(at(2.5).map(([line]) => line)).toEqual(["tu12 tu13 tu14 tu15 tu16 tu17", "tu18 tu19 tu20 tu21 tu22 tu23"]);
+    expect(at(4.3)).toEqual(at(2.5));
+    expect(at(0)).toEqual(at(0)); // cùng đầu vào ra cùng hình (cache không đổi kết quả)
   });
 });
