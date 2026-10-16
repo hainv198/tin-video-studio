@@ -12,3 +12,4 @@ next-env.d.ts
 users.local.json
 .superpowers/
 AGENTS.md
+public/music/local/
