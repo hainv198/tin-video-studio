@@ -1,5 +1,5 @@
 import type { KeyValueStore } from "./KeyValueStore";
-import { DRAFT_VERSION, type DraftBody, type ProjectDraft } from "./ProjectDraft";
+import { DRAFT_VERSION, READABLE_DRAFT_VERSIONS, type DraftBody, type DraftVersion, type ProjectDraft } from "./ProjectDraft";
 
 const KEY = "draft";
 
@@ -14,12 +14,13 @@ export class DraftRepository {
     await this.store.set(KEY, draft);
   }
 
-  /** Bản nháp không đọc được hoặc sai phiên bản thì coi như chưa có (không ném). */
+  /** Bản nháp không đọc được hoặc sai phiên bản thì coi như chưa có (không ném). v1 và v2 đều đọc được. */
   async load(): Promise<ProjectDraft | null> {
     const value = await this.store.get<unknown>(KEY);
     if (typeof value !== "object" || value === null) return null;
     const draft = value as Partial<ProjectDraft>;
-    if (draft.version !== DRAFT_VERSION || typeof draft.project !== "object" || draft.project === null) return null;
+    if (!READABLE_DRAFT_VERSIONS.includes(draft.version as DraftVersion)) return null;
+    if (typeof draft.project !== "object" || draft.project === null) return null;
     return draft as ProjectDraft;
   }
 

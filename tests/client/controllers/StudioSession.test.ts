@@ -3,6 +3,7 @@ import { StudioSession } from "@/client/controllers/StudioSession";
 import type { DraftBody } from "@/client/storage/ProjectDraft";
 import { FallbackFootage } from "@/domain/Footage";
 import { sequentialIds } from "@/domain/ids";
+import { VideoOptions } from "@/domain/VideoOptions";
 import { fakeNarration, flush, makeProject, makeSession, makeSessionWithProject, manualScheduler, VOICE } from "../../helpers/studioFixtures";
 
 describe("StudioSession", () => {
@@ -239,5 +240,55 @@ describe("StudioSession", () => {
       expect(events).toEqual(["save:start", "save:end", "clear"]);
       expect(gates).toHaveLength(1);
     });
+  });
+});
+
+describe("StudioSession — tuỳ chọn video", () => {
+  it("mặc định có tuỳ chọn video; đổi khi chưa có dự án thì giữ trong bộ nhớ, không hẹn lưu", () => {
+    const { session, sched } = makeSession();
+    expect(session.state.options.snapshot()).toEqual(VideoOptions.defaults().snapshot());
+    session.update((d) => ({ ...d, options: d.options.withSubtitlesEnabled(false) }));
+    expect(session.state.options.subtitlesEnabled).toBe(false);
+    expect(sched.pending()).toBe(0);
+  });
+
+  it("tự lưu kèm tuỳ chọn video", async () => {
+    const { session, saves } = makeSessionWithProject(2);
+    session.update((d) => ({ ...d, options: d.options.withTextFont("oswald").withSceneFootageKind("s2", "video") }));
+    await session.flush();
+    expect(saves.at(-1)?.options).toMatchObject({ textFontId: "oswald", sceneFootageKinds: { s2: "video" } });
+  });
+
+  it("restore lấy tuỳ chọn từ bản nháp; bản nháp v1 không có tuỳ chọn thì dùng mặc định", async () => {
+    const a = makeSessionWithProject(2);
+    a.session.update((d) => ({ ...d, options: d.options.withSubtitleFont("oswald") }));
+    await a.session.flush();
+    const b = makeSession();
+    b.session.restore(a.saves.at(-1)!);
+    expect(b.session.state.options.subtitleFontId).toBe("oswald");
+    const v1 = { ...a.saves.at(-1)! };
+    delete v1.options;
+    const c = makeSession();
+    c.session.restore(v1);
+    expect(c.session.state.options.snapshot()).toEqual(VideoOptions.defaults().snapshot());
+  });
+
+  it("bỏ lựa chọn Ảnh/Video của cảnh không còn trong dự án", () => {
+    const { session, project } = makeSessionWithProject(3);
+    const [, s2, s3] = project.scenes;
+    session.update((d) => ({
+      ...d,
+      options: d.options.withSceneFootageKind(s2!.id, "image").withSceneFootageKind(s3!.id, "video"),
+    }));
+    session.update((d) => ({ ...d, project: d.project!.mergeWithNext(s2!.id) })); // s3 biến mất
+    expect(session.state.options.sceneFootageKind(s2!.id)).toBe("image");
+    expect(session.state.options.sceneFootageKind(s3!.id)).toBeNull();
+  });
+
+  it("reset (dự án mới) đưa tuỳ chọn về mặc định", () => {
+    const { session } = makeSessionWithProject(2);
+    session.update((d) => ({ ...d, options: d.options.withSubtitlesEnabled(false) }));
+    session.reset();
+    expect(session.state.options.subtitlesEnabled).toBe(true);
   });
 });

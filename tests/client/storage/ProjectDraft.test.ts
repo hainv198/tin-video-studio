@@ -6,6 +6,7 @@ import { MusicTrack } from "@/domain/MusicTrack";
 import { Narration } from "@/domain/Narration";
 import { NewsProject } from "@/domain/NewsProject";
 import { SentenceSplitter } from "@/domain/SentenceSplitter";
+import { VideoOptions } from "@/domain/VideoOptions";
 import { VoiceSettings } from "@/domain/VoiceSettings";
 import { ValidationError } from "@/domain/errors";
 import { buildDraftBody, restoreDraft, type DraftParts } from "@/client/storage/ProjectDraft";
@@ -91,5 +92,21 @@ describe("buildDraftBody / restoreDraft", () => {
     const body = buildDraftBody(parts());
     const bad = { ...body.narrations[0]!, audio: [1, 2, 3] as never };
     expect(() => restoreDraft({ ...body, narrations: [bad] }, sequentialIds("n"))).toThrow(ValidationError);
+  });
+});
+
+describe("buildDraftBody / restoreDraft — tuỳ chọn video", () => {
+  it("ghi tuỳ chọn video; không truyền thì ghi mặc định; round trip giữ nguyên", () => {
+    expect(buildDraftBody(parts()).options).toEqual(VideoOptions.defaults().snapshot());
+    const options = VideoOptions.defaults().withSubtitlesEnabled(false).withIntroBlock("#C0392B").withSceneFootageKind("s2", "video");
+    const back = restoreDraft(structuredClone(buildDraftBody({ ...parts(), options })), sequentialIds("n"));
+    expect(back.options.snapshot()).toEqual(options.snapshot());
+  });
+
+  it("bản nháp v1 (không có options) mở được với tuỳ chọn mặc định", () => {
+    const body = buildDraftBody(parts());
+    delete body.options;
+    const back = restoreDraft(structuredClone(body), sequentialIds("n"));
+    expect(back.options.snapshot()).toEqual(VideoOptions.defaults().snapshot());
   });
 });

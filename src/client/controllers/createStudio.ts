@@ -6,6 +6,7 @@ import { BrandController } from "./BrandController";
 import { FootageController } from "./FootageController";
 import { FootageSearchController } from "./FootageSearchController";
 import { MusicController } from "./MusicController";
+import { OptionsController } from "./OptionsController";
 import { ProjectController } from "./ProjectController";
 import { RenderController } from "./RenderController";
 import { RenderJobBuilder } from "./RenderJobBuilder";
@@ -24,6 +25,7 @@ export interface Studio {
   session: StudioSession;
   wizard: WizardController;
   brand: BrandController;
+  options: OptionsController;
   project: ProjectController;
   voice: VoiceController;
   footage: FootageController;
@@ -124,6 +126,7 @@ export function createStudio(services: ClientServices, options: StudioOptions = 
     session,
     wizard,
     brand: new BrandController({ session, templates: services.templates, brands: services.brands, onAuthLost }),
+    options: new OptionsController({ session, onAuthLost }),
     project: new ProjectController({ session, ids, onAuthLost }),
     voice,
     footage,
