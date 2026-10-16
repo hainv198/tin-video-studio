@@ -74,6 +74,11 @@ export function StepVoice({ studio }: { studio: Studio }) {
           />
         </label>
       </div>
+      {voice.fallbackNotice && (
+        <p role="status" className="rounded-md bg-amber-950 px-3 py-2 text-sm text-amber-300">
+          {voice.fallbackNotice}
+        </p>
+      )}
       {voice.voicesLoading && <p className="text-sm text-neutral-400">Đang tải danh sách giọng…</p>}
       {voice.error && (
         <p role="alert" className="text-red-400">

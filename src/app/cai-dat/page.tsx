@@ -2,9 +2,11 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SessionService } from "@/server/auth/SessionService";
+import { localConfigController } from "@/server/config/localConfig";
 import { serverContainer } from "@/server/container";
 import { validateEnv } from "@/server/env/validateEnv";
 import type { TtsVoice } from "@/server/tts/TtsProvider";
+import { ConfigPanel } from "./ConfigPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +32,7 @@ export default async function SettingsPage() {
   if (!user) redirect("/dang-nhap");
 
   const env = validateEnv(process.env);
+  const configSnapshot = localConfigController().snapshot();
 
   let voices: TtsVoice[] = [];
   let voiceError: string | null = null;
@@ -55,9 +58,11 @@ export default async function SettingsPage() {
         <h1 className="text-xl font-semibold">Cấu hình</h1>
         <p className="text-sm text-neutral-400">
           Các key nằm trong biến môi trường trên máy chủ (<code>.env.local</code> trên máy dev, Environment Variables trên
-          Vercel) và không bao giờ được hiển thị ở đây.
+          Vercel) và không bao giờ được hiển thị ở đây. Chạy trên máy bạn thì có thể dán key mới ngay bên dưới.
         </p>
       </header>
+
+      <ConfigPanel initial={configSnapshot} />
 
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Nguồn dịch vụ</h2>
