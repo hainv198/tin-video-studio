@@ -9,6 +9,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Chỉ có tác dụng khi chạy dev: cho phép mở bằng 127.0.0.1 và địa chỉ mạng nội bộ (nếu không, trang hiện chữ nhưng mọi nút đều không bấm được).
+  allowedDevOrigins: ["127.0.0.1", "192.168.*.*", "10.*.*.*"],
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
