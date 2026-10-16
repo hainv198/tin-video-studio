@@ -14,7 +14,7 @@ export default async function StudioPage() {
   if (!user) redirect("/dang-nhap");
 
   return (
-    <main className="mx-auto max-w-4xl p-6">
+    <main className="mx-auto max-w-6xl p-6">
       <header className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Tin Video Studio</h1>
         <div className="flex items-center gap-3 text-sm">

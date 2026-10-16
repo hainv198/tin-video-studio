@@ -77,12 +77,24 @@ export interface DraftState {
   count: number;
   savedAt: string | null;
   narrations: number;
+  /** Tuỳ chọn video trong bản nháp (null nếu không có). */
+  subtitleFontId: string | null;
+  textFontId: string | null;
+  sceneKindCount: number;
 }
 
 // Phản chiếu src/client/storage/IdbKeyValueStore.ts: DB "tin-video-studio" v1, store "kv".
 const READ_DRAFT_SCRIPT = () =>
-  new Promise<{ count: number; savedAt: string | null; narrations: number }>((resolve) => {
-    const unreadable = { count: -1, savedAt: null, narrations: 0 };
+  new Promise<{
+    count: number;
+    savedAt: string | null;
+    narrations: number;
+    subtitleFontId: string | null;
+    textFontId: string | null;
+    sceneKindCount: number;
+  }>((resolve) => {
+    const none = { savedAt: null, narrations: 0, subtitleFontId: null, textFontId: null, sceneKindCount: 0 };
+    const unreadable = { count: -1, ...none };
     const r = indexedDB.open("tin-video-studio", 1);
     r.onupgradeneeded = () => {
       if (!r.result.objectStoreNames.contains("kv")) r.result.createObjectStore("kv");
@@ -99,9 +111,26 @@ const READ_DRAFT_SCRIPT = () =>
       try {
         const g = db.transaction("kv", "readonly").objectStore("kv").get("draft");
         g.onsuccess = () => {
-          const d = g.result as { savedAt?: string; narrations?: unknown[] } | undefined;
+          const d = g.result as
+            | {
+                savedAt?: string;
+                narrations?: unknown[];
+                options?: { subtitles?: { fontId?: string }; textFontId?: string; sceneFootageKinds?: Record<string, string> };
+              }
+            | undefined;
           db.close();
-          resolve(d ? { count: 1, savedAt: d.savedAt ?? null, narrations: d.narrations?.length ?? 0 } : { count: 0, savedAt: null, narrations: 0 });
+          resolve(
+            d
+              ? {
+                  count: 1,
+                  savedAt: d.savedAt ?? null,
+                  narrations: d.narrations?.length ?? 0,
+                  subtitleFontId: d.options?.subtitles?.fontId ?? null,
+                  textFontId: d.options?.textFontId ?? null,
+                  sceneKindCount: Object.keys(d.options?.sceneFootageKinds ?? {}).length,
+                }
+              : { count: 0, ...none },
+          );
         };
         g.onerror = () => {
           db.close();

@@ -8,7 +8,7 @@ test("đi trọn 5 bước với nhà cung cấp giả và tải về MP4", asyn
   await discardDraftIfOffered(page);
   await fillSampleAndSplit(page);
   await goNext(page, "Chọn giọng");
-  await expect(page.getByRole("combobox").first()).toContainText("Fake");
+  await expect(page.getByRole("combobox", { name: "Giọng" })).toContainText("Fake");
   await generateVoices(page);
   await goNext(page, "Cảnh trám");
   await autoFillFootage(page);
