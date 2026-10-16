@@ -57,6 +57,11 @@ export class UserDirectory {
     return this.byName.get(normalize(username));
   }
 
+  /** Toàn bộ tài khoản theo thứ tự trong APP_USERS (có hash: chỉ dùng phía server). */
+  all(): AppUser[] {
+    return [...this.byName.values()];
+  }
+
   get size(): number {
     return this.byName.size;
   }

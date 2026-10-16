@@ -21,9 +21,14 @@ export default async function StudioPage() {
         <div className="flex items-center gap-3 text-sm">
           <span>Xin chào, {user.displayName}</span>
           {isAdmin(user) ? (
-            <Link href="/cai-dat" className="underline">
-              Cấu hình
-            </Link>
+            <>
+              <Link href="/cai-dat" className="underline">
+                Cấu hình
+              </Link>
+              <Link href="/tai-khoan" className="underline">
+                Tài khoản
+              </Link>
+            </>
           ) : null}
           <LogoutButton />
         </div>

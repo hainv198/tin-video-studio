@@ -20,6 +20,7 @@ Web app dựng video tin tức dọc 9:16 từ văn bản. Video dựng trên tr
    ```
 4. Tạo `.env.local` theo `.env.example`: `FAKE_PROVIDERS=1`, `APP_USERS=<chuỗi base64 vừa in>`, `AUTH_SECRET=<chuỗi ngẫu nhiên ≥ 32 ký tự>`.
 5. `npm run dev` rồi mở http://localhost:3100
+6. Quản lý tài khoản về sau: đăng nhập bằng tài khoản `admin`, vào **Tài khoản** (`/tai-khoan`, liên kết ở đầu trang studio và trang Cấu hình) để thêm tài khoản, đổi mật khẩu (có nút tạo mật khẩu ngẫu nhiên, chỉ hiện một lần), đổi role hoặc xoá. Màn này ghi `APP_USERS` vào `.env.local` và có hiệu lực ngay, không cần chạy lại `user:entry`/`user:encode`. Luật: tối đa 5 tài khoản, luôn còn ít nhất một `admin`, admin không tự xoá hay tự hạ role của mình. Hai lệnh dòng lệnh vẫn dùng được để tạo tài khoản đầu tiên.
 
 ## Chạy với key thật
 
@@ -132,7 +133,7 @@ Chỉ Hải chạy các lệnh git và thao tác trên GitHub/Vercel.
 3. Settings → Environment Variables (tick cả Production và Preview, vì mỗi lần push nhánh Vercel cũng build Preview và `check-env` sẽ chặn nếu thiếu), đặt: `APP_USERS`, `AUTH_SECRET`, `GOOGLE_TTS_API_KEY`, `PEXELS_API_KEY`, `PIXABAY_API_KEY`; tuỳ chọn `MINIMAX_API_KEY`, `MINIMAX_VOICES`. **Không** đặt `FAKE_PROVIDERS` và `EDGE_TTS_DEV`.
 4. Deploy. Build chạy `check-env` trước và dừng nếu thiếu hoặc sai biến.
 5. Mở `https://<app>.vercel.app/dang-nhap`, đăng nhập, dựng thử một video.
-6. Thêm người dùng: tạo lại `APP_USERS` bằng `npm run user:encode`, sửa biến trên Vercel rồi Redeploy.
+6. Thêm/sửa người dùng: vào `/tai-khoan` bằng tài khoản `admin`, thao tác như bình thường; trên Vercel màn này không ghi được nên hiện chuỗi `APP_USERS` mới kèm nút Sao chép: dán vào Vercel → Settings → Environment Variables → `APP_USERS` rồi Redeploy (mỗi lần một thay đổi, vì danh sách vẫn là bản đang chạy cho tới khi Redeploy). Cách cũ `npm run user:encode` vẫn dùng được.
 
 Lưu ý:
 - Vercel phải cài cả devDependencies khi build (`tsx` cho `prebuild`, Tailwind cho CSS). Mặc định đã vậy; **không** đặt `NPM_CONFIG_PRODUCTION`.

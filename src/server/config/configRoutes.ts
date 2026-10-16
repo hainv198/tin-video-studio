@@ -20,7 +20,7 @@ export function makeConfigGet(getDeps: () => ConfigRouteDeps): (request: Request
 }
 
 /** Chống CSRF cơ bản: bắt buộc JSON và Origin (nếu có) phải cùng host với yêu cầu. */
-function assertSameSiteJson(request: Request): void {
+export function assertSameSiteJson(request: Request): void {
   if (!(request.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) {
     throw new ValidationError("Yêu cầu phải là application/json");
   }

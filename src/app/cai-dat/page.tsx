@@ -67,9 +67,14 @@ export default async function SettingsPage() {
   return (
     <main className="mx-auto max-w-4xl space-y-8 p-6">
       <header className="space-y-2">
-        <Link href="/studio" className="text-sm underline">
-          ← Về trình dựng
-        </Link>
+        <div className="flex gap-4 text-sm">
+          <Link href="/studio" className="underline">
+            ← Về trình dựng
+          </Link>
+          <Link href="/tai-khoan" className="underline">
+            Tài khoản
+          </Link>
+        </div>
         <h1 className="text-xl font-semibold">Cấu hình</h1>
         <p className="text-sm text-neutral-400">
           Các key nằm trong biến môi trường trên máy chủ (<code>.env.local</code> trên máy dev, Environment Variables trên
