@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ConfirmButton } from "@/views/components/ConfirmButton";
 import { useController } from "@/views/hooks/useController";
 import type { ConfigKeyStatus, ConfigSnapshot } from "@/server/config/ConfigController";
 import { ConfigClient } from "./ConfigClient";
@@ -20,10 +21,6 @@ export function ConfigPanel({ initial }: { initial: ConfigSnapshot }) {
 
   async function onSave(key: string) {
     if (await controller.save(key, drafts[key] ?? "")) setDrafts((d) => ({ ...d, [key]: "" }));
-  }
-
-  async function onClear(key: string, label: string) {
-    if (window.confirm(`Xoá giá trị của "${label}"?`)) await controller.clear(key);
   }
 
   return (
@@ -77,14 +74,14 @@ export function ConfigPanel({ initial }: { initial: ConfigSnapshot }) {
                   >
                     {busy ? "Đang lưu…" : "Lưu"}
                   </button>
-                  <button
-                    type="button"
+                  <ConfirmButton
+                    label="Xoá"
+                    prompt={`Xoá giá trị của "${k.label}"?`}
+                    confirmAriaLabel={`Xác nhận xoá giá trị ${k.label}`}
                     className="rounded-md bg-neutral-800 px-3 py-1.5 text-sm disabled:opacity-50"
                     disabled={busy || !k.isSet}
-                    onClick={() => void onClear(k.key, k.label)}
-                  >
-                    Xoá
-                  </button>
+                    onConfirm={() => controller.clear(k.key)}
+                  />
                 </div>
               ) : null}
             </li>

@@ -2,6 +2,7 @@
 
 import type { Studio } from "@/client/controllers/createStudio";
 import { STEPS, canEnter, type StepId } from "@/client/controllers/readiness";
+import { ConfirmButton } from "@/views/components/ConfirmButton";
 import { useController } from "@/views/hooks/useController";
 import { OptionsSidebar } from "./components/OptionsSidebar";
 import { Stepper } from "./Stepper";
@@ -84,17 +85,15 @@ export function StudioShell({ studio }: { studio: Studio }) {
           {nextStep && !nextEnabled && BLOCKED_HINT[wizard.step] && (
             <span className="text-sm text-neutral-400">{BLOCKED_HINT[wizard.step]}</span>
           )}
-          <button
-            type="button"
-            className="ml-auto rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-300"
-            onClick={() => {
-              if (window.confirm("Bắt đầu dự án mới? Dự án hiện tại, giọng đã tạo và file tải lên sẽ bị xoá.")) {
-                void studio.wizard.newProject();
-              }
-            }}
-          >
-            Dự án mới
-          </button>
+          <span className="ml-auto">
+            <ConfirmButton
+              label="Dự án mới"
+              prompt="Bắt đầu dự án mới? Dự án hiện tại, giọng đã tạo và file tải lên sẽ bị xoá."
+              confirmAriaLabel="Xác nhận bắt đầu dự án mới"
+              className="rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-300"
+              onConfirm={() => studio.wizard.newProject()}
+            />
+          </span>
         </nav>
       </div>
     </div>

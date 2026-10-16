@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ConfirmButton } from "@/views/components/ConfirmButton";
 import { useController } from "@/views/hooks/useController";
 import type { UserRole } from "@/server/auth/UserDirectory";
 import type { UsersSnapshot } from "@/server/users/UserAdminController";
@@ -36,17 +37,6 @@ export function UsersPanel({ initial, currentUsername }: { initial: UsersSnapsho
     if (await controller.setPassword(username, password, generated)) {
       setPwTarget(null);
       setPwDraft("");
-    }
-  }
-
-  async function onToggleRole(username: string, role: UserRole) {
-    const next: UserRole = role === "admin" ? "user" : "admin";
-    if (window.confirm(`Đổi role của "${username}" thành ${ROLE_LABEL[next]}?`)) await controller.setRole(username, next);
-  }
-
-  async function onRemove(username: string) {
-    if (window.confirm(`Xoá tài khoản "${username}"? Người này sẽ bị đăng xuất và không đăng nhập lại được.`)) {
-      await controller.remove(username);
     }
   }
 
@@ -153,24 +143,24 @@ export function UsersPanel({ initial, currentUsername }: { initial: UsersSnapsho
                       >
                         Đổi mật khẩu
                       </button>
-                      <button
-                        type="button"
+                      <ConfirmButton
+                        label="Đổi role"
+                        prompt={`Đổi role của "${u.username}" thành ${ROLE_LABEL[u.role === "admin" ? "user" : "admin"]}?`}
+                        confirmAriaLabel={`Xác nhận đổi role ${u.username}`}
                         className={BUTTON}
                         disabled={busy || (isSelf && u.role === "admin")}
                         title={isSelf ? "Không thể tự hạ quyền của chính mình" : undefined}
-                        onClick={() => void onToggleRole(u.username, u.role)}
-                      >
-                        Đổi role
-                      </button>
-                      <button
-                        type="button"
+                        onConfirm={() => controller.setRole(u.username, u.role === "admin" ? "user" : "admin")}
+                      />
+                      <ConfirmButton
+                        label="Xoá"
+                        prompt={`Xoá tài khoản "${u.username}"? Người này sẽ bị đăng xuất và không đăng nhập lại được.`}
+                        confirmAriaLabel={`Xác nhận xoá tài khoản ${u.username}`}
                         className="rounded-md bg-red-900 px-3 py-1.5 text-sm disabled:opacity-50"
                         disabled={busy || isSelf}
                         title={isSelf ? "Không thể tự xoá tài khoản của chính mình" : undefined}
-                        onClick={() => void onRemove(u.username)}
-                      >
-                        Xoá
-                      </button>
+                        onConfirm={() => controller.remove(u.username)}
+                      />
                     </div>
                     {pwTarget === u.username ? (
                       <div className="flex flex-wrap gap-2">

@@ -33,8 +33,8 @@ test("dự án mới xoá bản nháp", async ({ page }) => {
   await discardDraftIfOffered(page);
   await fillSampleAndSplit(page);
   await expectDraftStored(page, 1); // đối chứng dương: bản nháp đã lưu
-  page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "Dự án mới" }).click();
+  await page.getByRole("button", { name: "Xác nhận bắt đầu dự án mới" }).click();
   await expect(page.getByRole("button", { name: "Chia cảnh" })).toBeVisible();
   await expectDraftStored(page, 0);
   await page.waitForTimeout(1200); // chốt chặn âm: tự lưu muộn không được ghi lại bản nháp
