@@ -9,7 +9,7 @@ import { defaultTemplateRegistry } from "@/templates/registry";
 import { CanvasBackdropMaker } from "./BackdropMaker";
 import { RENDER_AUDIO_BITRATE, RENDER_VIDEO_BITRATE } from "./encodingDefaults";
 import { Mp4Encoder } from "./Mp4Encoder";
-import { planRender, timelineConfigFor } from "./RenderPlan";
+import { footageSpans, planRender, timelineConfigFor } from "./RenderPlan";
 import { probeWorkerScope, type ProbeScope } from "./workerProbe";
 import type { FootageInput, RenderJob, WorkerMessage, WorkerRequest } from "./RenderJob";
 import { VideoRenderer, type FrameProvider, type RenderScene } from "./VideoRenderer";
@@ -47,10 +47,20 @@ async function render(job: RenderJob): Promise<void> {
   try {
     logoBitmap = job.logo ? await createImageBitmap(job.logo) : null;
     const { timeline, voices } = planRender(job, timelineConfigFor(template.defaults.timeline, options));
+    const owners = new Map<string, string>();
+    for (const s of job.scenes) if (s.footageFrom) owners.set(s.sceneId, s.footageFrom);
+    const spans = footageSpans(timeline, owners);
     for (const [index, s] of job.scenes.entries()) {
       const slot = timeline.slots[index];
       if (!slot) throw new Error(`Thiếu mốc thời gian cho cảnh ${s.sceneId}`);
-      const sceneDuration = slot.end - slot.start;
+      if (s.footageFrom) {
+        // Dùng tiếp cảnh trám của đoạn trước: VideoRenderer lấy khung từ chủ cảnh theo thời gian cả nhóm.
+        scenes.set(s.sceneId, { sceneId: s.sceneId, role: s.role, text: s.text, playback: { mode: "none" }, frames: null, footageFrom: s.footageFrom });
+        continue;
+      }
+      // Chủ cảnh dùng chung chiếu suốt cả nhóm: lặp/cắt video theo độ dài nhóm, không theo một đoạn.
+      const span = spans.get(s.sceneId);
+      const sceneDuration = span ? span.end - span.start : slot.end - slot.start;
       if (s.footage.kind === "fallback") {
         scenes.set(s.sceneId, { sceneId: s.sceneId, role: s.role, text: s.text, playback: { mode: "none" }, frames: null });
         continue;

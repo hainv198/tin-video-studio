@@ -1,5 +1,8 @@
+import { ValidationError } from "@/domain/errors";
 import { FONT_CHOICES } from "@/domain/fontIds";
+import { canContinueFootage, pairedContinuations } from "@/domain/footageGroups";
 import type { VideoOptions } from "@/domain/VideoOptions";
+import { footageOwners } from "./readiness";
 import { StateController } from "./StateController";
 import type { StudioSession } from "./StudioSession";
 
@@ -78,6 +81,32 @@ export class OptionsController extends StateController<OptionsPanelState> {
 
   resetVoiceTweak(): void {
     this.apply((o) => o.withoutVoiceTweak());
+  }
+
+  /** Tick/bỏ tick "Có cảnh trám riêng" của một đoạn; bỏ tick = dùng tiếp cảnh của đoạn trước. Mở đầu luôn có cảnh riêng. */
+  setSceneContinued(sceneId: string, continued: boolean): void {
+    this.apply((o) => {
+      const scenes = this.deps.session.state.project?.scenes ?? [];
+      const scene = scenes.find((s) => s.id === sceneId);
+      if (!scene) throw new ValidationError("Không tìm thấy đoạn này");
+      if (continued && !canContinueFootage(scenes, sceneId)) throw new ValidationError("Đoạn mở đầu luôn có cảnh trám riêng");
+      return o.withSceneContinued(sceneId, continued);
+    });
+  }
+
+  /** Nút nhanh: mỗi 2 đoạn thân bài dùng chung một cảnh. */
+  mergeScenesInPairs(): void {
+    this.apply((o) => o.withContinuedScenes(pairedContinuations(this.deps.session.state.project?.scenes ?? [])));
+  }
+
+  /** Nút nhanh: mỗi đoạn một cảnh (như mặc định). */
+  resetSceneGrouping(): void {
+    this.apply((o) => o.withContinuedScenes([]));
+  }
+
+  /** Đoạn có cảnh riêng mà cảnh trám của nó đang được dùng cho `sceneId`. */
+  footageOwnerOf(sceneId: string): string {
+    return footageOwners(this.deps.session.state).get(sceneId) ?? sceneId;
   }
 
   /** Màu đang dùng của thumbnail đầu (chữ thường): màu đặt riêng, không có thì màu chủ đạo thương hiệu. */

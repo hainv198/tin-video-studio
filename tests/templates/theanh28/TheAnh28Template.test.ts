@@ -112,6 +112,19 @@ describe("TheAnh28Template — cảnh thân bài", () => {
     expect(widthAt(4) / widthAt(0)).toBeCloseTo(1.08, 6);
   });
 
+  it("đoạn dùng tiếp: zoom theo thời gian cảnh trám (footageTime/footageDuration), không reset ở đầu đoạn", () => {
+    const bandWidth = (s: SceneFrame) => Number(draw(project(), s).ops("drawImage").filter((x) => x.args[0] === image.source)[1]?.args[3]);
+    const startOfGroup = bandWidth(scene({ sceneTime: 0, sceneDuration: 2, footageTime: 0, footageDuration: 4 }));
+    const midGroup = bandWidth(scene({ sceneTime: 0, sceneDuration: 2, footageTime: 2, footageDuration: 4 }));
+    const endGroup = bandWidth(scene({ sceneTime: 2, sceneDuration: 2, footageTime: 4, footageDuration: 4 }));
+    expect(midGroup / startOfGroup).toBeCloseTo(1.04, 6);
+    expect(endGroup / startOfGroup).toBeCloseTo(1.08, 6);
+    expect(bandWidth(scene({ sceneTime: 2, sceneDuration: 4, footageTime: 2, footageDuration: 4 }))).toBeCloseTo(
+      bandWidth(scene({ sceneTime: 2, sceneDuration: 4 })),
+      9,
+    );
+  });
+
   it("không có cảnh trám: không vẽ ảnh, vẫn tô nền", () => {
     const c = draw(project(), scene({ image: null }));
     expect(c.ops("drawImage")).toHaveLength(0);

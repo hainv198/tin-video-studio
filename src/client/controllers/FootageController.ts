@@ -5,6 +5,7 @@ import type { UploadRepository } from "@/client/storage/UploadRepository";
 import { userMessage } from "@/client/errors/userMessage";
 import type { Footage } from "@/domain/Footage";
 import type { IdGenerator } from "@/domain/ids";
+import { ownFootageSceneIds } from "./readiness";
 import { StateController } from "./StateController";
 import type { StudioSession } from "./StudioSession";
 
@@ -56,10 +57,8 @@ export class FootageController extends StateController<FootageState> {
     const { footages, errors } = await this.ingest(files);
     if (footages.length > 0) {
       // Đọc danh sách cảnh lúc ghi (không phải lúc bắt đầu) để tôn trọng cảnh tách/gộp trong lúc đọc file.
-      this.deps.session.update((d) => ({
-        ...d,
-        footage: d.footage.fillInOrder(d.project?.scenes.map((s) => s.id) ?? [], footages),
-      }));
+      // Đoạn dùng tiếp cảnh đoạn trước không cần cảnh riêng nên không nhận file.
+      this.deps.session.update((d) => ({ ...d, footage: d.footage.fillInOrder(ownFootageSceneIds(d), footages) }));
     }
     this.finishWith(errors);
   }

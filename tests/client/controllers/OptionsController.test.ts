@@ -90,6 +90,44 @@ describe("OptionsController", () => {
     expect(ctrl.introColors()).toEqual({ backgroundColor: "#aa0000", blockColor: "#aa0000", custom: false });
   });
 
+  it("cảnh trám riêng từng đoạn: bỏ tick thì dùng tiếp cảnh đoạn trước, tự lưu; chủ cảnh tính theo đoạn có cảnh riêng", async () => {
+    const made = makeSessionWithProject(4); // s1 mở đầu, s2…s5
+    const ctrl = new OptionsController({ session: made.session });
+    expect(ctrl.footageOwnerOf("s3")).toBe("s3");
+    ctrl.setSceneContinued("s3", true);
+    ctrl.setSceneContinued("s4", true);
+    expect(made.session.state.options.isSceneContinued("s3")).toBe(true);
+    expect(ctrl.footageOwnerOf("s4")).toBe("s2");
+    expect(ctrl.footageOwnerOf("s5")).toBe("s5");
+    made.sched.runAll();
+    await flush();
+    expect(made.saves.at(-1)?.options).toMatchObject({ continuedSceneIds: ["s3", "s4"] });
+    ctrl.setSceneContinued("s3", false);
+    expect(ctrl.footageOwnerOf("s4")).toBe("s3");
+  });
+
+  it("đoạn mở đầu hoặc đoạn lạ không bỏ tick được: báo lỗi, giữ nguyên", () => {
+    const { ctrl, session } = setup();
+    const before = session.state.options;
+    ctrl.setSceneContinued("s1", true);
+    expect(ctrl.state.error).toBe("Đoạn mở đầu luôn có cảnh trám riêng");
+    ctrl.setSceneContinued("khong-co", true);
+    expect(ctrl.state.error).toBe("Không tìm thấy đoạn này");
+    expect(session.state.options).toBe(before);
+    ctrl.setSceneContinued("s2", true);
+    expect(ctrl.state.error).toBeNull();
+  });
+
+  it("nút nhanh: gộp mỗi 2 đoạn một cảnh, rồi đặt lại mỗi đoạn một cảnh", () => {
+    const made = makeSessionWithProject(4);
+    const ctrl = new OptionsController({ session: made.session });
+    ctrl.setSceneContinued("s2", true);
+    ctrl.mergeScenesInPairs();
+    expect([...made.session.state.options.continuedSceneIds]).toEqual(["s3", "s5"]);
+    ctrl.resetSceneGrouping();
+    expect(made.session.state.options.continuedSceneIds.size).toBe(0);
+  });
+
   it("danh sách font cho giao diện", () => {
     const { ctrl } = setup();
     expect(ctrl.fontChoices.map((f) => f.id)).toContain("phudu");

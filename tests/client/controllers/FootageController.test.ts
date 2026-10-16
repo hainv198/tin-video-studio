@@ -37,6 +37,13 @@ describe("FootageController", () => {
     expect(ctrl.state.busy).toBe(false);
   });
 
+  it("addFiles bỏ qua đoạn dùng tiếp cảnh đoạn trước", async () => {
+    const { ctrl, session } = setup(3); // s1..s4
+    session.update((d) => ({ ...d, options: d.options.withSceneContinued("s2", true) }));
+    await ctrl.addFiles([img("a.jpg"), img("b.jpg")]);
+    expect(session.state.footage.sceneIds()).toEqual(["s1", "s3"]);
+  });
+
   it("không ghi đè cảnh đã có cảnh trám; file thừa chỉ vào kho", async () => {
     const { ctrl, session } = setup(2); // s1..s3
     session.update((d) => ({ ...d, footage: d.footage.assign("s2", new FallbackFootage("keep")) }));

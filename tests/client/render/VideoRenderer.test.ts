@@ -210,4 +210,68 @@ describe("VideoRenderer", () => {
     }).render();
     expect(calls).toBe(0);
   });
+
+  it("mặc định: thời gian cảnh trám trùng thời gian đoạn", async () => {
+    const { renderer, template } = setup();
+    await renderer.render();
+    for (const f of template.frames) {
+      expect(f.footageTime).toBe(f.sceneTime);
+      expect(f.footageDuration).toBe(f.sceneDuration);
+    }
+  });
+
+  describe("đoạn dùng tiếp cảnh đoạn trước", () => {
+    // a: 0 → 1,35 ; b: 1,35 → 2,2 ; c: 2,2 → 3,3 (33 khung ở 10 fps)
+    function shared(ownerPlayback: RenderScene["playback"]) {
+      const timeline = Timeline.build([
+        { sceneId: "a", durationSec: 0.7 },
+        { sceneId: "b", durationSec: 0.5 },
+        { sceneId: "c", durationSec: 0.5 },
+      ]);
+      const ownerFrames = new CountingFrames();
+      const otherFrames = new CountingFrames();
+      const scenes = new Map<string, RenderScene>([
+        ["a", { sceneId: "a", role: "body", text: "A", playback: ownerPlayback, frames: ownerFrames }],
+        ["b", { sceneId: "b", role: "body", text: "B", playback: { mode: "none" }, frames: null, footageFrom: "a" }],
+        ["c", { sceneId: "c", role: "body", text: "C", playback: { mode: "still" }, frames: otherFrames }],
+      ]);
+      const template = new LogTemplate();
+      const renderer = new VideoRenderer({ template, ctx: new RecordingCanvas().asCanvas(), project, timeline, scenes, fps: 10, sink: new Sink() });
+      return { renderer, template, ownerFrames, otherFrames, timeline };
+    }
+
+    it("dùng chung ảnh của chủ cảnh; thời gian cảnh trám liên tục qua biên đoạn, phụ đề/thời gian đoạn vẫn theo từng đoạn", async () => {
+      const { renderer, template, ownerFrames } = shared({ mode: "still" });
+      await renderer.render();
+      const atBoundary = template.frames[13]!; // t = 1,3 (đoạn a)
+      const after = template.frames[14]!; // t = 1,4 (đoạn b)
+      expect(after.text).toBe("B");
+      expect(after.image).toBe(ownerFrames.image);
+      expect(after.sceneTime).toBeCloseTo(0.05, 9);
+      expect(after.sceneDuration).toBeCloseTo(0.85, 9);
+      expect(after.footageTime).toBeCloseTo(1.4, 9);
+      expect(after.footageDuration).toBeCloseTo(2.2, 9);
+      expect(atBoundary.footageDuration).toBeCloseTo(2.2, 9);
+      const group = template.frames.slice(0, 22).map((f) => (f.footageTime ?? 0) / (f.footageDuration ?? 1));
+      for (let i = 1; i < group.length; i++) expect(group[i]!).toBeGreaterThan(group[i - 1]!);
+      expect(template.frames[22]!.footageTime).toBeCloseTo(0, 9); // đoạn c có cảnh riêng: bắt đầu lại
+      expect(template.frames[22]!.image).not.toBe(ownerFrames.image);
+    });
+
+    it("video của chủ cảnh đọc khung tiếp nối theo thời gian nhóm, không tua về đầu; chỉ nhả khi hết nhóm", async () => {
+      const { renderer, ownerFrames, otherFrames } = shared({ mode: "clip", sourceDurationSec: 10 });
+      let releasesWhenCStarted = -1;
+      const original = otherFrames.frameAt.bind(otherFrames);
+      otherFrames.frameAt = async (t: number) => {
+        if (otherFrames.asked.length === 0) releasesWhenCStarted = ownerFrames.releases;
+        return original(t);
+      };
+      await renderer.render();
+      expect(ownerFrames.asked).toHaveLength(22);
+      for (let i = 1; i < ownerFrames.asked.length; i++) expect(ownerFrames.asked[i]!).toBeGreaterThan(ownerFrames.asked[i - 1]!);
+      expect(ownerFrames.asked[14]).toBeCloseTo(1.4, 9);
+      expect(releasesWhenCStarted).toBe(1);
+      expect(ownerFrames.releases).toBe(1);
+    });
+  });
 });

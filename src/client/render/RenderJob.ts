@@ -13,6 +13,8 @@ export interface RenderSceneInput {
   role: SceneRole;
   text: string;
   footage: FootageInput;
+  /** Đoạn không có cảnh trám riêng: id đoạn chủ cảnh (đứng trước) mà ảnh/video được dùng tiếp; `footage` khi đó bỏ qua. */
+  footageFrom?: string;
 }
 
 export interface NarrationInput {

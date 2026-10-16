@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TIMELINE_CONFIG } from "@/domain/Timeline";
+import { DEFAULT_TIMELINE_CONFIG, Timeline } from "@/domain/Timeline";
 import { VideoOptions } from "@/domain/VideoOptions";
-import { planRender, timelineConfigFor } from "@/client/render/RenderPlan";
+import { footageSpans, planRender, timelineConfigFor } from "@/client/render/RenderPlan";
 import type { RenderJob } from "@/client/render/RenderJob";
 
 const job = (narrations: RenderJob["narrations"]): RenderJob => ({
@@ -57,5 +57,32 @@ describe("planRender", () => {
     const slow = planRender(job(narr), timelineConfigFor(DEFAULT_TIMELINE_CONFIG, o));
     expect(slow.timeline.totalDuration).toBeCloseTo(0.5 + 2 + 0.75 + 1 + 0.6, 9);
     expect(slow.voices[1]?.startSec).toBeCloseTo(0.5 + 2 + 0.75, 9);
+  });
+});
+
+describe("footageSpans", () => {
+  // a: 0 → 1,35 ; b: 1,35 → 2,2 ; c: 2,2 → 3,3
+  const timeline = Timeline.build([
+    { sceneId: "a", durationSec: 0.7 },
+    { sceneId: "b", durationSec: 0.5 },
+    { sceneId: "c", durationSec: 0.5 },
+  ]);
+
+  it("mặc định: mỗi đoạn một khoảng cảnh trám đúng bằng khe của nó", () => {
+    const spans = footageSpans(timeline, new Map());
+    for (const slot of timeline.slots) {
+      expect(spans.get(slot.sceneId)).toEqual({ ownerId: slot.sceneId, start: slot.start, end: slot.end });
+    }
+  });
+
+  it("đoạn dùng tiếp chung một khoảng với chủ cảnh: từ đầu chủ cảnh tới hết đoạn cuối của nhóm", () => {
+    const spans = footageSpans(timeline, new Map([["b", "a"], ["c", "a"]]));
+    const end = timeline.slots[2]!.end;
+    expect(spans.get("a")).toEqual({ ownerId: "a", start: 0, end });
+    expect(spans.get("b")).toEqual({ ownerId: "a", start: 0, end });
+    expect(spans.get("c")).toEqual({ ownerId: "a", start: 0, end });
+    const partial = footageSpans(timeline, new Map([["b", "a"]]));
+    expect(partial.get("b")).toEqual({ ownerId: "a", start: 0, end: timeline.slots[1]!.end });
+    expect(partial.get("c")).toEqual({ ownerId: "c", start: timeline.slots[2]!.start, end: timeline.slots[2]!.end });
   });
 });

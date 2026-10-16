@@ -17,6 +17,8 @@ export interface VideoOptionsSnapshot {
   pacing: { gapSec: number; leadInSec: number };
   /** Tinh chỉnh giọng sau khi tạo (xử lý ở máy khi dựng, không làm giọng thành cũ): tốc độ giữ cao độ và tông theo nửa cung. */
   voiceTweak: { tempo: number; pitchSemitones: number };
+  /** Đoạn không có cảnh trám riêng: dùng tiếp cảnh của đoạn trước (theo id cảnh). Rỗng = mỗi đoạn một cảnh. */
+  continuedSceneIds: string[];
 }
 
 interface Fields {
@@ -27,6 +29,7 @@ interface Fields {
   introBlockColor: string | null;
   footageKind: FootageKindPreference;
   sceneKinds: ReadonlyMap<string, SceneFootageKind>;
+  continued: ReadonlySet<string>;
   gapSec: number;
   leadInSec: number;
   tempo: number;
@@ -49,6 +52,7 @@ const DEFAULTS: Fields = {
   introBlockColor: null,
   footageKind: "any",
   sceneKinds: new Map(),
+  continued: new Set(),
   gapSec: GAP_SEC_RANGE.default,
   leadInSec: LEAD_IN_SEC_RANGE.default,
   tempo: TEMPO_RANGE.default,
@@ -223,10 +227,43 @@ export class VideoOptions {
     return this.sceneFootageKind(sceneId) ?? this.f.footageKind;
   }
 
+  /** Đoạn dùng tiếp cảnh trám của đoạn trước (không có cảnh riêng). Quy tắc mở đầu/đoạn đầu nằm ở `resolveFootageSource`. */
+  get continuedSceneIds(): ReadonlySet<string> {
+    return this.f.continued;
+  }
+
+  isSceneContinued(sceneId: string): boolean {
+    return this.f.continued.has(sceneId);
+  }
+
+  withSceneContinued(sceneId: string, continued: boolean): VideoOptions {
+    if (!sceneId) throw new ValidationError("Cảnh thiếu id");
+    if (this.f.continued.has(sceneId) === continued) return this;
+    const next = new Set(this.f.continued);
+    if (continued) next.add(sceneId);
+    else next.delete(sceneId);
+    return this.with({ continued: next });
+  }
+
+  /** Đặt lại cả tập đoạn dùng tiếp (nút nhanh "Gộp"/"Mỗi đoạn một cảnh"). */
+  withContinuedScenes(sceneIds: Iterable<string>): VideoOptions {
+    const next = new Set<string>();
+    for (const id of sceneIds) {
+      if (!id) throw new ValidationError("Cảnh thiếu id");
+      next.add(id);
+    }
+    return this.with({ continued: next });
+  }
+
   /** Bỏ lựa chọn của cảnh không còn trong dự án; không đổi gì thì trả chính nó. */
   keepScenes(sceneIds: ReadonlySet<string>): VideoOptions {
-    if ([...this.f.sceneKinds.keys()].every((id) => sceneIds.has(id))) return this;
-    return this.with({ sceneKinds: new Map([...this.f.sceneKinds].filter(([id]) => sceneIds.has(id))) });
+    const kindsOk = [...this.f.sceneKinds.keys()].every((id) => sceneIds.has(id));
+    const continuedOk = [...this.f.continued].every((id) => sceneIds.has(id));
+    if (kindsOk && continuedOk) return this;
+    return this.with({
+      sceneKinds: kindsOk ? this.f.sceneKinds : new Map([...this.f.sceneKinds].filter(([id]) => sceneIds.has(id))),
+      continued: continuedOk ? this.f.continued : new Set([...this.f.continued].filter((id) => sceneIds.has(id))),
+    });
   }
 
   snapshot(): VideoOptionsSnapshot {
@@ -241,6 +278,7 @@ export class VideoOptions {
       sceneFootageKinds: Object.fromEntries(this.f.sceneKinds),
       pacing: { gapSec: this.f.gapSec, leadInSec: this.f.leadInSec },
       voiceTweak: this.voiceTweak,
+      continuedSceneIds: [...this.f.continued],
     };
   }
 
@@ -254,6 +292,8 @@ export class VideoOptions {
     const kinds = isRecord(raw.sceneFootageKinds) ? raw.sceneFootageKinds : {};
     const sceneKinds = new Map<string, SceneFootageKind>();
     for (const [sceneId, kind] of Object.entries(kinds)) if (sceneId && isSceneKind(kind)) sceneKinds.set(sceneId, kind);
+    const continuedRaw: unknown[] = Array.isArray(raw.continuedSceneIds) ? raw.continuedSceneIds : [];
+    const continued = new Set(continuedRaw.filter((id): id is string => typeof id === "string" && id !== ""));
     return new VideoOptions({
       subtitlesEnabled: typeof subtitles.enabled === "boolean" ? subtitles.enabled : DEFAULTS.subtitlesEnabled,
       subtitleFontId: isFontId(subtitles.fontId) ? subtitles.fontId : DEFAULTS.subtitleFontId,
@@ -262,6 +302,7 @@ export class VideoOptions {
       introBlockColor: restoredColor(intro.blockColor),
       footageKind: isFootageKind(raw.footageKind) ? raw.footageKind : DEFAULTS.footageKind,
       sceneKinds,
+      continued,
       gapSec: restoredSeconds(pacing.gapSec, GAP_SEC_RANGE),
       leadInSec: restoredSeconds(pacing.leadInSec, LEAD_IN_SEC_RANGE),
       tempo: restoredSeconds(tweak.tempo, TEMPO_RANGE),

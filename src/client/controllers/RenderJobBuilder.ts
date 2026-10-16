@@ -11,7 +11,7 @@ import type { UploadRepository } from "@/client/storage/UploadRepository";
 import { ValidationError } from "@/domain/errors";
 import type { Footage } from "@/domain/Footage";
 import type { TemplateRegistry } from "@/templates/TemplateRegistry";
-import { staleSceneIds } from "./readiness";
+import { footageOwners, staleSceneIds } from "./readiness";
 import type { StudioData } from "./StudioSession";
 
 export interface RenderJobBuilderDeps {
@@ -53,6 +53,7 @@ export class RenderJobBuilder {
     const total = sceneCount + (music ? 1 : 0);
     const narrationInputs: NarrationInput[] = [];
     const sceneInputs: RenderSceneInput[] = [];
+    const owners = footageOwners(data);
 
     for (const [index, scene] of project.scenes.entries()) {
       if (isCancelled()) throw new RenderCancelledError();
@@ -69,6 +70,12 @@ export class RenderJobBuilder {
         durationSec: samples.length / decoded.sampleRate,
         samples,
       });
+      const owner = owners.get(scene.id) ?? scene.id;
+      if (owner !== scene.id) {
+        // Dùng tiếp cảnh của đoạn trước: không nạp cảnh riêng (nếu đang giữ) để khỏi tải thừa.
+        sceneInputs.push({ sceneId: scene.id, role: scene.role, text: scene.text, footage: { kind: "fallback" }, footageFrom: owner });
+        continue;
+      }
       sceneInputs.push({
         sceneId: scene.id,
         role: scene.role,

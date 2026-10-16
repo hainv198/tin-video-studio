@@ -11,6 +11,7 @@ const DEFAULT_SNAPSHOT = {
   sceneFootageKinds: {},
   pacing: { gapSec: 0.35, leadInSec: 0.3 },
   voiceTweak: { tempo: 1, pitchSemitones: 0 },
+  continuedSceneIds: [],
 };
 
 describe("VideoOptions", () => {
@@ -112,7 +113,37 @@ describe("VideoOptions", () => {
       sceneFootageKinds: { s2: "video" },
       pacing: { gapSec: 0.35, leadInSec: 0.3 },
       voiceTweak: { tempo: 1, pitchSemitones: 0 },
+      continuedSceneIds: [],
     });
+  });
+
+  it("đoạn dùng tiếp cảnh đoạn trước: mặc định rỗng, bật/tắt theo id, bất biến, id rỗng báo lỗi", () => {
+    const a = VideoOptions.defaults();
+    expect(a.isSceneContinued("s3")).toBe(false);
+    expect(a.continuedSceneIds.size).toBe(0);
+    const b = a.withSceneContinued("s3", true).withSceneContinued("s4", true);
+    expect(b.isSceneContinued("s3")).toBe(true);
+    expect([...b.continuedSceneIds]).toEqual(["s3", "s4"]);
+    expect(a.isSceneContinued("s3")).toBe(false);
+    expect(b.withSceneContinued("s3", false).snapshot().continuedSceneIds).toEqual(["s4"]);
+    expect(b.withSceneContinued("s3", true)).toBe(b);
+    expect(a.withSceneContinued("s9", false)).toBe(a);
+    expect(() => a.withSceneContinued("", true)).toThrow("Cảnh thiếu id");
+  });
+
+  it("withContinuedScenes đặt lại cả tập; keepScenes bỏ cả đoạn dùng tiếp đã mất", () => {
+    const o = VideoOptions.defaults().withSceneContinued("s2", true).withContinuedScenes(["s3", "s5", "s3"]);
+    expect(o.snapshot().continuedSceneIds).toEqual(["s3", "s5"]);
+    expect(o.withContinuedScenes([]).continuedSceneIds.size).toBe(0);
+    expect(o.keepScenes(new Set(["s1", "s3", "s5"]))).toBe(o);
+    expect(o.keepScenes(new Set(["s3"])).snapshot().continuedSceneIds).toEqual(["s3"]);
+  });
+
+  it("restore đoạn dùng tiếp: round trip; thiếu/sai kiểu = rỗng; bỏ phần tử không phải chuỗi", () => {
+    const o = VideoOptions.defaults().withSceneContinued("s3", true);
+    expect(VideoOptions.restore(structuredClone(o.snapshot())).isSceneContinued("s3")).toBe(true);
+    expect(VideoOptions.restore({ continuedSceneIds: "s3" }).continuedSceneIds.size).toBe(0);
+    expect(VideoOptions.restore({ continuedSceneIds: ["s3", 4, "", null, "s3"] }).snapshot().continuedSceneIds).toEqual(["s3"]);
   });
 
   it("nhịp đọc: mặc định đúng hiện trạng, đổi được, bất biến", () => {

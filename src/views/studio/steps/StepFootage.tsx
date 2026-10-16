@@ -2,10 +2,24 @@
 
 import { useState } from "react";
 import type { Studio } from "@/client/controllers/createStudio";
+import { footageOwners, missingFootageSceneIds } from "@/client/controllers/readiness";
+import { canContinueFootage } from "@/domain/footageGroups";
 import { useController } from "@/views/hooks/useController";
 import { FootagePreview } from "../components/FootagePreview";
 
 const ACCEPT = "image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,.mov";
+
+/** Nhãn đoạn như trên thẻ: "Mở đầu" cho đoạn đầu, "Cảnh k" cho các đoạn sau. */
+const sceneLabel = (index: number) => (index === 0 ? "Mở đầu" : `Cảnh ${index}`);
+
+function OwnFootageToggle({ studio, sceneId, checked }: { studio: Studio; sceneId: string; checked: boolean }) {
+  return (
+    <label className="flex w-fit cursor-pointer items-center gap-2 text-sm">
+      <input type="checkbox" checked={checked} onChange={(e) => studio.options.setSceneContinued(sceneId, !e.target.checked)} />
+      Có cảnh trám riêng
+    </label>
+  );
+}
 
 function SceneCard({ studio, sceneId, index }: { studio: Studio; sceneId: string; index: number }) {
   const data = useController(studio.session);
@@ -18,17 +32,38 @@ function SceneCard({ studio, sceneId, index }: { studio: Studio; sceneId: string
   const base = state?.query ?? "";
   const shown = draft && draft.base === base ? draft.text : base;
   if (!project || !scene) return null;
+  const owners = footageOwners(data);
+  const ownerId = owners.get(sceneId) ?? sceneId;
+  const canContinue = canContinueFootage(project.scenes, sceneId);
+  const heading = (
+    <div className="text-sm">
+      <span className="text-neutral-500">{sceneLabel(index)}: </span>
+      {scene.text}
+    </div>
+  );
+
+  if (ownerId !== sceneId) {
+    // Không có cảnh riêng: thu gọn, ảnh/video của chủ cảnh chạy tiếp qua đoạn này.
+    const ownerIndex = project.scenes.findIndex((s) => s.id === ownerId);
+    return (
+      <li className="flex flex-col gap-2 rounded-lg border border-dashed border-neutral-800 p-3">
+        {heading}
+        <OwnFootageToggle studio={studio} sceneId={sceneId} checked={false} />
+        <p className="text-sm text-neutral-400">Dùng tiếp cảnh của {sceneLabel(ownerIndex)}</p>
+      </li>
+    );
+  }
+
   const current = data.footage.get(sceneId);
-  const others = project.scenes.filter((s) => s.id !== sceneId);
+  // Chỉ hoán đổi với đoạn có cảnh riêng (cảnh của đoạn dùng tiếp đang ẩn).
+  const others = project.scenes.filter((s) => s.id !== sceneId && owners.get(s.id) === s.id);
   const pool = studio.footage.pool();
   const kind = data.options.sceneFootageKind(sceneId);
 
   return (
     <li className="flex flex-col gap-3 rounded-lg border border-neutral-800 p-3">
-      <div className="text-sm">
-        <span className="text-neutral-500">{index === 0 ? "Mở đầu" : `Cảnh ${index}`}: </span>
-        {scene.text}
-      </div>
+      {heading}
+      {canContinue && <OwnFootageToggle studio={studio} sceneId={sceneId} checked />}
       <FootagePreview studio={studio} footage={current} />
       <form
         className="flex flex-wrap items-center gap-2 text-sm"
@@ -150,6 +185,8 @@ export function StepFootage({ studio }: { studio: Studio }) {
   const search = useController(studio.search);
   const project = data.project;
   if (!project) return null;
+  const ownCount = [...footageOwners(data)].filter(([id, owner]) => id === owner).length;
+  const missing = missingFootageSceneIds(data).length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -188,6 +225,18 @@ export function StepFootage({ studio }: { studio: Studio }) {
         )}
         {footage.busy && <span className="text-sm text-neutral-400">Đang xử lý file…</span>}
       </div>
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <button type="button" className="rounded-md bg-neutral-800 px-3 py-1.5" onClick={() => studio.options.mergeScenesInPairs()}>
+          Gộp: mỗi 2 đoạn một cảnh
+        </button>
+        <button type="button" className="rounded-md bg-neutral-800 px-3 py-1.5" onClick={() => studio.options.resetSceneGrouping()}>
+          Mỗi đoạn một cảnh
+        </button>
+        <span className="text-neutral-400">
+          {ownCount}/{project.scenes.length} đoạn có cảnh trám riêng{missing > 0 ? ` · còn ${missing} cảnh trống` : ""}
+        </span>
+      </div>
+
       {footage.error && (
         <p role="alert" className="text-sm text-red-400">
           {footage.error}

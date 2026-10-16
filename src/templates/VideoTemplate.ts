@@ -63,6 +63,12 @@ export interface SceneFrame {
   /** Giây tính từ đầu cảnh. */
   sceneTime: number;
   sceneDuration: number;
+  /**
+   * Giây tính từ lúc cảnh trám bắt đầu chiếu và tổng thời gian chiếu nó. Khác sceneTime/sceneDuration khi nhiều đoạn
+   * liền nhau dùng chung một cảnh trám (hiệu ứng chuyển động phải liên tục qua biên đoạn). Bỏ trống = theo đoạn.
+   */
+  footageTime?: number;
+  footageDuration?: number;
   /** Giây (tính từ đầu cảnh) giọng đọc bắt đầu; bỏ trống = 0. */
   voiceStart?: number;
   /** Độ dài giọng đọc của cảnh; bỏ trống = cả cảnh. */

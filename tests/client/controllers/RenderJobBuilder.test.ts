@@ -86,6 +86,19 @@ describe("RenderJobBuilder", () => {
     expect(project.scenes).toHaveLength(3);
   });
 
+  it("đoạn dùng tiếp: không nạp cảnh riêng (kể cả đang giữ), trỏ footageFrom về chủ cảnh; mặc định không có footageFrom", async () => {
+    const { builder, data } = setup();
+    const stock = new ImageFootage("g1", { origin: "pexels", uri: "https://cdn/x.jpg" }, 100, 100);
+    const lost = uploadToFootage("g3", "upload-khong-co", "image", { width: 100, height: 100 });
+    const base = { ...data, footage: data.footage.assign("s2", stock).assign("s3", lost) };
+    const plain = await builder.build({ ...base, footage: base.footage.unassign("s3") });
+    expect(plain.job.scenes.every((s) => !("footageFrom" in s))).toBe(true);
+    const { job, warnings } = await builder.build({ ...base, options: base.options.withSceneContinued("s3", true) });
+    expect(warnings).toEqual([]);
+    expect(job.scenes[1]).not.toHaveProperty("footageFrom");
+    expect(job.scenes[2]).toMatchObject({ sceneId: "s3", footage: { kind: "fallback" }, footageFrom: "s2" });
+  });
+
   it("cảnh chưa gán cảnh trám dùng nền mặc định, không cảnh báo", async () => {
     const { builder, data } = setup();
     const { job, warnings } = await builder.build({ ...data, footage: data.footage.assign("s2", new FallbackFootage("x")) });
