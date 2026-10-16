@@ -68,25 +68,64 @@ export function StepMusic({ studio }: { studio: Studio }) {
           {music.error}
         </p>
       )}
-      <ul className="flex flex-col gap-2">
-        <li className="flex items-center gap-3 rounded-lg border border-neutral-800 p-3 text-sm">
-          <label className="flex flex-1 items-center gap-2">
-            <input type="radio" name="music" checked={selected === null} onChange={() => studio.music.none()} />
-            Không dùng nhạc
+      <p className="text-sm text-neutral-400">Bấm vào ô để nghe thử (bấm lần nữa để dừng), tick “Chọn” để dùng bài đó.</p>
+      <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+        <li>
+          <label
+            className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border p-2 text-center text-xs focus-within:ring-2 focus-within:ring-emerald-500 ${
+              selected === null ? "border-emerald-500 bg-emerald-950/40" : "border-neutral-800 hover:bg-neutral-900"
+            }`}
+          >
+            <span aria-hidden className="text-2xl">
+              🔇
+            </span>
+            <input type="radio" name="music" className="sr-only" checked={selected === null} onChange={() => studio.music.none()} />
+            <span>Không dùng nhạc</span>
+            {selected === null && <span className="text-xs text-emerald-400">✓ Đang chọn</span>}
           </label>
         </li>
-        {tracks.map((track) => (
-          <li key={track.id} className="flex items-center gap-3 rounded-lg border border-neutral-800 p-3 text-sm">
-            <label className="flex flex-1 items-center gap-2">
-              <input type="radio" name="music" checked={selected?.id === track.id} onChange={() => studio.music.choose(track)} />
-              {track.title}
-              {track.origin === "upload" && <span className="text-xs text-neutral-500">(của bạn)</span>}
-            </label>
-            <button type="button" className="rounded-md bg-neutral-800 px-3 py-1" onClick={() => void toggle(track.id)}>
-              {playingId === track.id ? "Dừng" : "Nghe thử"}
-            </button>
-          </li>
-        ))}
+        {tracks.map((track) => {
+          const isSelected = selected?.id === track.id;
+          const isPlaying = playingId === track.id;
+          return (
+            <li
+              key={track.id}
+              className={`flex aspect-square flex-col overflow-hidden rounded-lg border ${
+                isSelected ? "border-emerald-500 ring-1 ring-emerald-500" : "border-neutral-800"
+              }`}
+            >
+              <button
+                type="button"
+                aria-label={`${isPlaying ? "Dừng" : "Nghe thử"}: ${track.title}`}
+                aria-pressed={isPlaying}
+                className={`flex flex-1 flex-col items-center justify-center gap-0.5 p-1.5 text-center hover:bg-neutral-900 focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                  isPlaying ? "bg-emerald-950/40" : ""
+                }`}
+                onClick={() => void toggle(track.id)}
+              >
+                <span aria-hidden className="text-2xl">
+                  {isPlaying ? "⏸" : "▶"}
+                </span>
+                <span className="line-clamp-3 text-xs leading-tight">{track.title}</span>
+                {track.origin === "upload" && <span className="text-xs text-neutral-500">(của bạn)</span>}
+              </button>
+              <label
+                className={`flex cursor-pointer items-center justify-center gap-2 border-t px-1 py-1 text-[11px] focus-within:ring-2 focus-within:ring-emerald-500 ${
+                  isSelected ? "border-emerald-500 bg-emerald-900/50 text-emerald-200" : "border-neutral-800 bg-neutral-900"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="music"
+                  aria-label={track.title}
+                  checked={isSelected}
+                  onChange={() => studio.music.choose(track)}
+                />
+                {isSelected ? "✓ Đang chọn" : "Chọn"}
+              </label>
+            </li>
+          );
+        })}
       </ul>
       <label className="w-fit cursor-pointer rounded-md bg-neutral-800 px-4 py-2 text-sm hover:bg-neutral-700 focus-within:ring-2 focus-within:ring-emerald-500">
         {music.busy ? "Đang xử lý…" : "Tải nhạc của bạn lên (MP3, WAV, M4A)"}
