@@ -131,14 +131,15 @@ function buildGemini(env: Record<string, string | undefined>): GeminiTtsService 
   return new GeminiTtsService({ apiKey, model: env.GEMINI_MODEL?.trim() || undefined });
 }
 
-let cached: ServerContainer | undefined;
+/** Next tách module theo route nên cache phải nằm trên globalThis, nếu không reset ở route cấu hình không tới được route khác. */
+const globalCache = globalThis as typeof globalThis & { __tvsServerContainer?: ServerContainer };
 
 export function serverContainer(): ServerContainer {
-  cached ??= buildServerContainer(process.env);
-  return cached;
+  globalCache.__tvsServerContainer ??= buildServerContainer(process.env);
+  return globalCache.__tvsServerContainer;
 }
 
 /** Bỏ container đang cache để lần gọi sau dựng lại theo process.env mới (dùng sau khi lưu cấu hình). */
 export function resetServerContainer(): void {
-  cached = undefined;
+  globalCache.__tvsServerContainer = undefined;
 }
