@@ -12,7 +12,7 @@ export function makeVoicesGet(getDeps: () => TtsRouteDeps): (request: Request) =
   return withAuth(
     () => getDeps().auth,
     async () =>
-      Response.json({ voices: await getDeps().tts.voices() }, { headers: { "Cache-Control": "private, max-age=3600" } }),
+      Response.json({ voices: await getDeps().tts.voices() }, { headers: { "Cache-Control": "no-store" } }),
   );
 }
 

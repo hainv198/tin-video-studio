@@ -24,6 +24,14 @@ describe("GET /api/tts/voices", () => {
     expect(res.status).toBe(200);
     expect((await res.json()).voices).toHaveLength(2);
   });
+
+  it("không cho trình duyệt cache danh sách giọng (đổi cấu hình phải thấy ngay)", async () => {
+    const { deps, cookieFor } = await setup();
+    const res = await makeVoicesGet(deps)(
+      new Request("http://localhost/api/tts/voices", { headers: { cookie: await cookieFor("hai") } }),
+    );
+    expect(res.headers.get("cache-control")).toBe("no-store");
+  });
 });
 
 describe("POST /api/tts", () => {
