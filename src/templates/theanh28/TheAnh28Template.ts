@@ -49,19 +49,22 @@ export class TheAnh28Template extends VideoTemplate {
 
   protected drawIntro(ctx: Canvas2D, project: ProjectFrame, scene: SceneFrame): void {
     const color = this.color(project);
+    // Màu riêng của thumbnail đầu (tuỳ chọn video); không đặt thì theo màu chủ đạo thương hiệu.
+    const background = project.style?.intro.backgroundColor ?? color;
+    const block = project.style?.intro.blockColor ?? color;
     const { width, height } = LAYOUT.frame;
     const L = LAYOUT.intro;
 
-    ctx.fillStyle = color;
+    ctx.fillStyle = background;
     ctx.fillRect(0, 0, width, height);
     if (scene.image) this.drawClipped(ctx, scene.image, L.image, this.progress(scene));
 
     const gradient = ctx.createLinearGradient(0, L.gradientTop, 0, L.gradientSolid);
-    gradient.addColorStop(0, withAlpha(color, 0));
-    gradient.addColorStop(1, color);
+    gradient.addColorStop(0, withAlpha(block, 0));
+    gradient.addColorStop(1, block);
     ctx.fillStyle = gradient;
     ctx.fillRect(0, L.gradientTop, width, L.gradientSolid - L.gradientTop);
-    ctx.fillStyle = color;
+    ctx.fillStyle = block;
     ctx.fillRect(0, L.gradientSolid, width, height - L.gradientSolid);
 
     this.drawDotPattern(ctx);
