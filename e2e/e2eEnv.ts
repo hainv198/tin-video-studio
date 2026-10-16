@@ -17,7 +17,7 @@ export function ensureE2eEnv(): void {
   if (process.env.APP_USERS && process.env.E2E_PASSWORD) return; // worker thừa hưởng env từ tiến trình chính
   const password = process.env.E2E_PASSWORD ?? `e2e-${randomBytes(9).toString("base64url")}`;
   const passwordHash = bcrypt.hashSync(password, 4);
-  const json = JSON.stringify([{ username: "e2e", passwordHash, displayName: "Người thử" }]);
+  const json = JSON.stringify([{ username: "e2e", passwordHash, displayName: "Người thử", role: "admin" }]);
   UserDirectory.fromEnv(json); // kiểm định dạng như lúc chạy thật
   process.env.E2E_PASSWORD = password;
   process.env.APP_USERS = Buffer.from(json, "utf8").toString("base64");

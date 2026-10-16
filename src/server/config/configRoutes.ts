@@ -1,5 +1,6 @@
 import { ValidationError } from "@/domain/errors";
 import type { AuthController } from "@/server/auth/AuthController";
+import { requireAdmin } from "@/server/auth/roles";
 import { withAuth } from "@/server/http/withAuth";
 import type { ConfigController } from "./ConfigController";
 
@@ -11,7 +12,10 @@ export interface ConfigRouteDeps {
 export function makeConfigGet(getDeps: () => ConfigRouteDeps): (request: Request) => Promise<Response> {
   return withAuth(
     () => getDeps().auth,
-    async () => Response.json(getDeps().config.snapshot(), { headers: { "Cache-Control": "no-store" } }),
+    async (_request, user) => {
+      requireAdmin(user);
+      return Response.json(getDeps().config.snapshot(), { headers: { "Cache-Control": "no-store" } });
+    },
   );
 }
 
@@ -36,7 +40,8 @@ function assertSameSiteJson(request: Request): void {
 export function makeConfigPost(getDeps: () => ConfigRouteDeps): (request: Request) => Promise<Response> {
   return withAuth(
     () => getDeps().auth,
-    async (request) => {
+    async (request, user) => {
+      requireAdmin(user);
       assertSameSiteJson(request);
       const body: unknown = await request.json().catch(() => {
         throw new ValidationError("Yêu cầu cấu hình không hợp lệ");

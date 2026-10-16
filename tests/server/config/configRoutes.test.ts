@@ -39,6 +39,31 @@ describe("GET /api/config", () => {
   });
 });
 
+describe("phân quyền admin", () => {
+  it("GET: user thường nhận 403 và không lộ trạng thái key", async () => {
+    const { deps, cookieFor } = await setup({ GEMINI_API_KEY: "BIMAT-3" });
+    const res = await makeConfigGet(deps)(
+      new Request("http://localhost/api/config", { headers: { cookie: await cookieFor("lan") } }),
+    );
+    expect(res.status).toBe(403);
+    const text = await res.text();
+    expect(text).toContain("Chỉ quản trị viên được thay đổi cấu hình");
+    expect(text).not.toContain("GEMINI_API_KEY");
+    expect(JSON.parse(text).error.code).toBe("FORBIDDEN");
+  });
+
+  it("POST: user thường nhận 403 và không ghi gì", async () => {
+    const { deps, cookieFor, apply } = await setup();
+    const res = await post(
+      makeConfigPost(deps),
+      { set: { GEMINI_API_KEY: "x" } },
+      { "content-type": "application/json", cookie: await cookieFor("lan"), origin: "http://localhost:3100" },
+    );
+    expect(res.status).toBe(403);
+    expect(apply).not.toHaveBeenCalled();
+  });
+});
+
 describe("POST /api/config", () => {
   it("cần phiên đăng nhập", async () => {
     const { deps, apply } = await setup();

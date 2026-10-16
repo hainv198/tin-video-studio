@@ -1,22 +1,16 @@
 import { readFileSync } from "node:fs";
 import { BcryptPasswordHasher } from "../src/server/auth/PasswordHasher";
 import { UserDirectory } from "../src/server/auth/UserDirectory";
-
-const USAGE = [
-  "Cách dùng:",
-  '  npm run user:entry -- <tên-đăng-nhập> "<Tên hiển thị>" <mật khẩu ≥ 8 ký tự>',
-  "  npm run user:encode -- users.local.json",
-].join("\n");
+import { buildEntry, USAGE } from "./lib/userEntry";
 
 async function entry(args: string[]): Promise<void> {
-  const [username, displayName, password] = args;
-  if (!username || !displayName || !password || password.length < 8) {
+  const result = await buildEntry(args, new BcryptPasswordHasher());
+  if (!result) {
     console.error(USAGE);
     process.exitCode = 1;
     return;
   }
-  const passwordHash = await new BcryptPasswordHasher().hash(password);
-  console.log(JSON.stringify({ username: username.trim().toLowerCase(), passwordHash, displayName: displayName.trim() }));
+  console.log(JSON.stringify(result));
 }
 
 function encode(args: string[]): void {

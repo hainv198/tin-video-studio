@@ -9,7 +9,12 @@ export const TEST_PASSWORD = "matkhau-thu-123";
 export async function makeTestAuth() {
   const hasher = new BcryptPasswordHasher(4);
   const passwordHash = await hasher.hash(TEST_PASSWORD);
-  const users = UserDirectory.fromEnv(JSON.stringify([{ username: "hai", passwordHash, displayName: "Hải" }]));
+  const users = UserDirectory.fromEnv(
+    JSON.stringify([
+      { username: "hai", passwordHash, displayName: "Hải", role: "admin" },
+      { username: "lan", passwordHash, displayName: "Lan" },
+    ]),
+  );
   const sessions = new SessionService(TEST_SECRET);
   const auth = new AuthController(users, hasher, sessions);
   const cookieFor = async (username: string) =>

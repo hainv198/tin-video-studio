@@ -1,4 +1,4 @@
-export type ErrorCode = "VALIDATION" | "AUTH" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "QUOTA" | "UPSTREAM";
+export type ErrorCode = "VALIDATION" | "AUTH" | "FORBIDDEN" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "QUOTA" | "UPSTREAM";
 
 export class DomainError extends Error {
   constructor(
@@ -19,6 +19,12 @@ export class ValidationError extends DomainError {
 export class AuthError extends DomainError {
   constructor(message = "Sai tên đăng nhập hoặc mật khẩu") {
     super(message, "AUTH");
+  }
+}
+
+export class ForbiddenError extends DomainError {
+  constructor(message: string) {
+    super(message, "FORBIDDEN");
   }
 }
 

@@ -10,8 +10,9 @@ Web app dựng video tin tức dọc 9:16 từ văn bản. Video dựng trên tr
 1. `npm install`
 2. Tạo tài khoản:
    ```bash
-   npm run user:entry -- hai "Hải" <mật-khẩu-ít-nhất-8-ký-tự>
+   npm run user:entry -- hai "Hải" <mật-khẩu-ít-nhất-8-ký-tự> admin
    ```
+   Tham số cuối là role, tuỳ chọn: `admin` (xem và sửa màn Cấu hình/key) hoặc `user` (chỉ dựng video). Bỏ trống = `user`. Cần ít nhất một tài khoản `admin` để vào màn Cấu hình; tài khoản cũ không có trường `role` vẫn chạy bình thường nhưng là `user`. Đổi role: thêm/sửa `"role"` trong `users.local.json`, đóng gói lại `APP_USERS` rồi khởi động lại (role được tra mỗi lần, không cần đăng nhập lại).
    Chép dòng JSON in ra vào file `users.local.json` dạng mảng `[ {...}, {...} ]` (tối đa 5 dòng). File này không commit.
 3. Đóng gói:
    ```bash
@@ -143,7 +144,7 @@ Lưu ý:
 | Biến | Bắt buộc? | Cách tạo |
 |---|---|---|
 | `AUTH_SECRET` | Có | Chuỗi ngẫu nhiên ≥ 32 ký tự: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
-| `APP_USERS` | Có | Base64 của mảng JSON 1–5 tài khoản: `npm run user:entry` rồi `npm run user:encode` |
+| `APP_USERS` | Có | Base64 của mảng JSON 1–5 tài khoản: `npm run user:entry` rồi `npm run user:encode`. Mỗi tài khoản có `role` tuỳ chọn `admin`/`user` (mặc định `user`) |
 | `GOOGLE_TTS_API_KEY` | Có (khi không `FAKE_PROVIDERS`) | Google Cloud Console, bật Cloud Text-to-Speech, tạo API key |
 | `PEXELS_API_KEY` | Có (khi không `FAKE_PROVIDERS`) | Đăng ký tại pexels.com/api |
 | `PIXABAY_API_KEY` | Có (khi không `FAKE_PROVIDERS`) | Đăng ký tại pixabay.com/api/docs |

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { isAdmin } from "@/server/auth/roles";
 import { SessionService } from "@/server/auth/SessionService";
 import { serverContainer } from "@/server/container";
 import { LogoutButton } from "@/views/auth/LogoutButton";
@@ -19,9 +20,11 @@ export default async function StudioPage() {
         <h1 className="text-xl font-semibold">Tin Video Studio</h1>
         <div className="flex items-center gap-3 text-sm">
           <span>Xin chào, {user.displayName}</span>
-          <Link href="/cai-dat" className="underline">
-            Cấu hình
-          </Link>
+          {isAdmin(user) ? (
+            <Link href="/cai-dat" className="underline">
+              Cấu hình
+            </Link>
+          ) : null}
           <LogoutButton />
         </div>
       </header>

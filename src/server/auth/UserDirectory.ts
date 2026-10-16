@@ -1,15 +1,19 @@
 import { z } from "zod";
 
+export type UserRole = "admin" | "user";
+
 export interface AppUser {
   username: string;
   passwordHash: string;
   displayName: string;
+  role: UserRole;
 }
 
 const UserSchema = z.object({
   username: z.string().regex(/^[a-z0-9._-]{3,32}$/),
   passwordHash: z.string().startsWith("$2"),
   displayName: z.string().trim().min(1).max(60),
+  role: z.enum(["admin", "user"]).default("user"),
 });
 
 const normalize = (username: string) => username.trim().toLowerCase();
@@ -36,7 +40,7 @@ export class UserDirectory {
     }
 
     const result = z.array(UserSchema).min(1).safeParse(parsed);
-    if (!result.success) throw new Error("APP_USERS sai định dạng (cần username, passwordHash, displayName)");
+    if (!result.success) throw new Error("APP_USERS sai định dạng (cần username, passwordHash, displayName; role tuỳ chọn là admin hoặc user)");
     if (result.data.length > UserDirectory.MAX_USERS) {
       throw new Error(`APP_USERS tối đa ${UserDirectory.MAX_USERS} tài khoản`);
     }

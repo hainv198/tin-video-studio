@@ -26,7 +26,14 @@ describe("AuthController", () => {
     const { auth, sessions } = await makeTestAuth();
     const token = await sessions.issue({ username: "hai", displayName: "Hải" });
     expect((await auth.authenticate(token)).username).toBe("hai");
+    expect((await auth.authenticate(token)).role).toBe("admin");
     const ghost = await sessions.issue({ username: "da-xoa", displayName: "X" });
     await expect(auth.authenticate(ghost)).rejects.toThrow("Phiên đăng nhập đã hết hạn");
+  });
+
+  it("authenticate lấy role từ danh bạ mỗi lần, không từ token", async () => {
+    const { auth, sessions } = await makeTestAuth();
+    const lan = await sessions.issue({ username: "lan", displayName: "Lan" });
+    expect((await auth.authenticate(lan)).role).toBe("user");
   });
 });

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { ADMIN_ONLY_MESSAGE, isAdmin } from "@/server/auth/roles";
 import { SessionService } from "@/server/auth/SessionService";
 import { localConfigController } from "@/server/config/localConfig";
 import { serverContainer } from "@/server/container";
@@ -30,6 +31,20 @@ export default async function SettingsPage() {
   const container = serverContainer();
   const user = await container.auth.authenticate(token).catch(() => null);
   if (!user) redirect("/dang-nhap");
+
+  if (!isAdmin(user)) {
+    return (
+      <main className="mx-auto max-w-4xl space-y-4 p-6">
+        <Link href="/studio" className="text-sm underline">
+          ← Về trình dựng
+        </Link>
+        <h1 className="text-xl font-semibold">Cấu hình</h1>
+        <p role="alert" className="text-sm text-red-400">
+          {ADMIN_ONLY_MESSAGE}
+        </p>
+      </main>
+    );
+  }
 
   const env = validateEnv(process.env);
   const configSnapshot = localConfigController().snapshot();

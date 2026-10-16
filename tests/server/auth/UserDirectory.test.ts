@@ -29,6 +29,20 @@ describe("UserDirectory.fromEnv", () => {
     expect(() => UserDirectory.fromEnv(b64([user("hai"), user("hai")]))).toThrow("APP_USERS bị trùng tài khoản hai");
   });
 
+  it("role: admin và user hợp lệ, thiếu role = user, APP_USERS cũ vẫn đọc được", () => {
+    const dir = UserDirectory.fromEnv(
+      b64([{ ...user("hai"), role: "admin" }, { ...user("lan"), role: "user" }, user("minh")]),
+    );
+    expect(dir.find("hai")?.role).toBe("admin");
+    expect(dir.find("lan")?.role).toBe("user");
+    expect(dir.find("minh")?.role).toBe("user");
+  });
+
+  it("role lạ là lỗi định dạng", () => {
+    expect(() => UserDirectory.fromEnv(b64([{ ...user("hai"), role: "root" }]))).toThrow("APP_USERS sai định dạng");
+    expect(() => UserDirectory.fromEnv(b64([{ ...user("hai"), role: "ADMIN" }]))).toThrow("APP_USERS sai định dạng");
+  });
+
   it("báo lỗi rõ khi thiếu hoặc sai định dạng", () => {
     expect(() => UserDirectory.fromEnv(undefined)).toThrow("APP_USERS chưa được cấu hình");
     expect(() => UserDirectory.fromEnv("không-phải-base64-json")).toThrow("APP_USERS không đọc được");
