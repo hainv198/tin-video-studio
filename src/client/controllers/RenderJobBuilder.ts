@@ -1,6 +1,7 @@
 import { AudioDecodeService, RENDER_SAMPLE_RATE, type DecodedAudio } from "@/client/media/AudioDecodeService";
 import type { MusicBed } from "@/client/media/AudioMix";
 import { trimSilence } from "@/client/media/audioTrim";
+import { applyVoiceTweak } from "@/client/media/voiceTweak";
 import { parseUploadUri } from "@/client/media/footageFactory";
 import { RenderCancelledError } from "@/client/render/errors";
 import type { FootageInput, NarrationInput, RenderJob, RenderSceneInput } from "@/client/render/RenderJob";
@@ -61,10 +62,12 @@ export class RenderJobBuilder {
       const decoded = this.checkRate(await this.deps.decoder.decode(narration.audio.slice().buffer as ArrayBuffer));
       // Cắt lặng ở mỗi lần dựng; độ dài gửi cho bộ dựng là độ dài đã cắt.
       const trimmed = trimSilence(AudioDecodeService.toMono(decoded.channels), decoded.sampleRate);
+      // Tinh chỉnh tốc độ/tông sau khi cắt lặng (mặc định trả nguyên mảng); timeline, phụ đề và chuẩn hoá âm lượng chạy trên mẫu đã xử lý.
+      const samples = applyVoiceTweak(trimmed.samples, decoded.sampleRate, videoOptions.voiceTweak);
       narrationInputs.push({
         sceneId: scene.id,
-        durationSec: trimmed.samples.length / decoded.sampleRate,
-        samples: trimmed.samples,
+        durationSec: samples.length / decoded.sampleRate,
+        samples,
       });
       sceneInputs.push({
         sceneId: scene.id,

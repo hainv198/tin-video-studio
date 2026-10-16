@@ -66,6 +66,20 @@ export class OptionsController extends StateController<OptionsPanelState> {
     this.apply((o) => o.withLeadInSec(sec));
   }
 
+  /** Tốc độ tinh chỉnh sau khi tạo giọng (xử lý ở máy, không phải tạo lại giọng). */
+  setTempo(tempo: number): void {
+    this.apply((o) => o.withTempo(tempo));
+  }
+
+  /** Tông tinh chỉnh sau khi tạo giọng, theo nửa cung. */
+  setPitch(semitones: number): void {
+    this.apply((o) => o.withPitchSemitones(semitones));
+  }
+
+  resetVoiceTweak(): void {
+    this.apply((o) => o.withoutVoiceTweak());
+  }
+
   /** Màu đang dùng của thumbnail đầu (chữ thường): màu đặt riêng, không có thì màu chủ đạo thương hiệu. */
   introColors(): IntroColors {
     const { options, brand } = this.deps.session.state;

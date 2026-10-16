@@ -15,6 +15,8 @@ export interface VideoOptionsSnapshot {
   sceneFootageKinds: Record<string, SceneFootageKind>;
   /** Nhịp đọc: nghỉ giữa các câu và nghỉ đầu video (giây). */
   pacing: { gapSec: number; leadInSec: number };
+  /** Tinh chỉnh giọng sau khi tạo (xử lý ở máy khi dựng, không làm giọng thành cũ): tốc độ giữ cao độ và tông theo nửa cung. */
+  voiceTweak: { tempo: number; pitchSemitones: number };
 }
 
 interface Fields {
@@ -27,10 +29,14 @@ interface Fields {
   sceneKinds: ReadonlyMap<string, SceneFootageKind>;
   gapSec: number;
   leadInSec: number;
+  tempo: number;
+  pitchSemitones: number;
 }
 
 export const GAP_SEC_RANGE = { min: 0.1, max: 1, step: 0.05, default: 0.35 } as const;
 export const LEAD_IN_SEC_RANGE = { min: 0.1, max: 1, step: 0.05, default: 0.3 } as const;
+export const TEMPO_RANGE = { min: 0.8, max: 1.4, step: 0.01, default: 1 } as const;
+export const PITCH_SEMITONES_RANGE = { min: -4, max: 4, step: 0.5, default: 0 } as const;
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const FOOTAGE_KINDS: readonly FootageKindPreference[] = ["any", "image", "video"];
@@ -45,6 +51,8 @@ const DEFAULTS: Fields = {
   sceneKinds: new Map(),
   gapSec: GAP_SEC_RANGE.default,
   leadInSec: LEAD_IN_SEC_RANGE.default,
+  tempo: TEMPO_RANGE.default,
+  pitchSemitones: PITCH_SEMITONES_RANGE.default,
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -71,6 +79,8 @@ function checkedColor(color: string | null): string | null {
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+/** Làm tròn về bước 0,5 nửa cung; `+ 0` bỏ −0. */
+const roundHalf = (n: number) => Math.round(n * 2) / 2 + 0;
 
 function checkedSeconds(v: number, range: { min: number; max: number }, message: string): number {
   if (typeof v !== "number" || !Number.isFinite(v) || v < range.min - 1e-9 || v > range.max + 1e-9) {
@@ -82,6 +92,11 @@ function checkedSeconds(v: number, range: { min: number; max: number }, message:
 function restoredSeconds(v: unknown, range: { min: number; max: number; default: number }): number {
   if (typeof v !== "number" || !Number.isFinite(v)) return range.default;
   return round2(Math.min(range.max, Math.max(range.min, v)));
+}
+
+function restoredPitch(v: unknown): number {
+  if (typeof v !== "number" || !Number.isFinite(v)) return PITCH_SEMITONES_RANGE.default;
+  return roundHalf(Math.min(PITCH_SEMITONES_RANGE.max, Math.max(PITCH_SEMITONES_RANGE.min, v)));
 }
 
 function restoredColor(v: unknown): string | null {
@@ -138,6 +153,27 @@ export class VideoOptions {
     return this.with({
       leadInSec: checkedSeconds(sec, LEAD_IN_SEC_RANGE, "Khoảng nghỉ đầu video phải từ 0,1 đến 1,0 giây"),
     });
+  }
+
+  /** Tốc độ và tông tinh chỉnh sau khi tạo giọng (không thuộc VoiceSettings nên không làm giọng thành cũ). */
+  get voiceTweak(): { tempo: number; pitchSemitones: number } {
+    return { tempo: this.f.tempo, pitchSemitones: this.f.pitchSemitones };
+  }
+
+  withTempo(tempo: number): VideoOptions {
+    return this.with({ tempo: checkedSeconds(tempo, TEMPO_RANGE, "Tốc độ tinh chỉnh phải từ 0,80 đến 1,40") });
+  }
+
+  withPitchSemitones(semitones: number): VideoOptions {
+    const r = PITCH_SEMITONES_RANGE;
+    if (typeof semitones !== "number" || !Number.isFinite(semitones) || semitones < r.min || semitones > r.max) {
+      throw new ValidationError("Tông giọng phải từ −4 đến +4 nửa cung");
+    }
+    return this.with({ pitchSemitones: roundHalf(semitones) });
+  }
+
+  withoutVoiceTweak(): VideoOptions {
+    return this.with({ tempo: TEMPO_RANGE.default, pitchSemitones: PITCH_SEMITONES_RANGE.default });
   }
 
   withSubtitlesEnabled(enabled: boolean): VideoOptions {
@@ -204,6 +240,7 @@ export class VideoOptions {
       footageKind: this.f.footageKind,
       sceneFootageKinds: Object.fromEntries(this.f.sceneKinds),
       pacing: { gapSec: this.f.gapSec, leadInSec: this.f.leadInSec },
+      voiceTweak: this.voiceTweak,
     };
   }
 
@@ -213,6 +250,7 @@ export class VideoOptions {
     const subtitles = isRecord(raw.subtitles) ? raw.subtitles : {};
     const intro = isRecord(raw.intro) ? raw.intro : {};
     const pacing = isRecord(raw.pacing) ? raw.pacing : {};
+    const tweak = isRecord(raw.voiceTweak) ? raw.voiceTweak : {};
     const kinds = isRecord(raw.sceneFootageKinds) ? raw.sceneFootageKinds : {};
     const sceneKinds = new Map<string, SceneFootageKind>();
     for (const [sceneId, kind] of Object.entries(kinds)) if (sceneId && isSceneKind(kind)) sceneKinds.set(sceneId, kind);
@@ -226,6 +264,8 @@ export class VideoOptions {
       sceneKinds,
       gapSec: restoredSeconds(pacing.gapSec, GAP_SEC_RANGE),
       leadInSec: restoredSeconds(pacing.leadInSec, LEAD_IN_SEC_RANGE),
+      tempo: restoredSeconds(tweak.tempo, TEMPO_RANGE),
+      pitchSemitones: restoredPitch(tweak.pitchSemitones),
     });
   }
 

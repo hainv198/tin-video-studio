@@ -47,6 +47,23 @@ describe("OptionsController", () => {
     expect(ctrl.state.error).toBeNull();
   });
 
+  it("tinh chỉnh giọng: setTempo/setPitch ghi vào session, tự lưu; reset về mặc định", async () => {
+    const { ctrl, session, saves, sched } = setup();
+    ctrl.setTempo(1.25);
+    ctrl.setPitch(-2);
+    expect(session.state.options.voiceTweak).toEqual({ tempo: 1.25, pitchSemitones: -2 });
+    sched.runAll();
+    await flush();
+    expect(saves.at(-1)?.options).toMatchObject({ voiceTweak: { tempo: 1.25, pitchSemitones: -2 } });
+    const before = session.state.options;
+    ctrl.setTempo(2);
+    expect(ctrl.state.error).toBe("Tốc độ tinh chỉnh phải từ 0,80 đến 1,40");
+    expect(session.state.options).toBe(before);
+    ctrl.resetVoiceTweak();
+    expect(ctrl.state.error).toBeNull();
+    expect(session.state.options.voiceTweak).toEqual({ tempo: 1, pitchSemitones: 0 });
+  });
+
   it("giá trị lạ: báo lỗi tiếng Việt, session giữ nguyên; thao tác đúng sau đó xoá lỗi", () => {
     const { ctrl, session } = setup();
     const before = session.state.options;

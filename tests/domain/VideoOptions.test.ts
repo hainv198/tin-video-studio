@@ -10,6 +10,7 @@ const DEFAULT_SNAPSHOT = {
   footageKind: "any",
   sceneFootageKinds: {},
   pacing: { gapSec: 0.35, leadInSec: 0.3 },
+  voiceTweak: { tempo: 1, pitchSemitones: 0 },
 };
 
 describe("VideoOptions", () => {
@@ -110,6 +111,7 @@ describe("VideoOptions", () => {
       footageKind: "any",
       sceneFootageKinds: { s2: "video" },
       pacing: { gapSec: 0.35, leadInSec: 0.3 },
+      voiceTweak: { tempo: 1, pitchSemitones: 0 },
     });
   });
 
@@ -142,5 +144,35 @@ describe("VideoOptions", () => {
     expect(VideoOptions.restore({ pacing: 5 }).snapshot().pacing).toEqual({ gapSec: 0.35, leadInSec: 0.3 });
     // bản nháp cũ (v1/v2) không có khối pacing
     expect(VideoOptions.restore({ subtitles: { enabled: false }, footageKind: "image" }).snapshot().pacing).toEqual({ gapSec: 0.35, leadInSec: 0.3 });
+  });
+
+  it("tinh chỉnh giọng: mặc định tempo 1, tông 0; đổi được, làm tròn theo bước, bất biến", () => {
+    const a = VideoOptions.defaults();
+    expect(a.voiceTweak).toEqual({ tempo: 1, pitchSemitones: 0 });
+    const b = a.withTempo(1.234).withPitchSemitones(2.4);
+    expect(b.voiceTweak).toEqual({ tempo: 1.23, pitchSemitones: 2.5 });
+    expect(b.snapshot().voiceTweak).toEqual({ tempo: 1.23, pitchSemitones: 2.5 });
+    expect(a.voiceTweak).toEqual({ tempo: 1, pitchSemitones: 0 });
+    expect(a.withTempo(0.8).voiceTweak.tempo).toBe(0.8);
+    expect(a.withTempo(1.4).voiceTweak.tempo).toBe(1.4);
+    expect(a.withPitchSemitones(-4).voiceTweak.pitchSemitones).toBe(-4);
+    expect(b.withoutVoiceTweak().voiceTweak).toEqual({ tempo: 1, pitchSemitones: 0 });
+  });
+
+  it("tinh chỉnh giọng ngoài khoảng hoặc không phải số: ValidationError", () => {
+    const o = VideoOptions.defaults();
+    expect(() => o.withTempo(0.7)).toThrow("Tốc độ tinh chỉnh phải từ 0,80 đến 1,40");
+    expect(() => o.withTempo(1.5)).toThrow(ValidationError);
+    expect(() => o.withTempo(Number.NaN)).toThrow(ValidationError);
+    expect(() => o.withPitchSemitones(4.5)).toThrow("Tông giọng phải từ −4 đến +4 nửa cung");
+    expect(() => o.withPitchSemitones(Number.POSITIVE_INFINITY)).toThrow(ValidationError);
+  });
+
+  it("restore tinh chỉnh giọng: thiếu = mặc định, ngoài khoảng bị kẹp, không phải số = mặc định", () => {
+    expect(VideoOptions.restore({ voiceTweak: { tempo: 1.2, pitchSemitones: -1.5 } }).voiceTweak).toEqual({ tempo: 1.2, pitchSemitones: -1.5 });
+    expect(VideoOptions.restore({ voiceTweak: { tempo: 9, pitchSemitones: -9 } }).voiceTweak).toEqual({ tempo: 1.4, pitchSemitones: -4 });
+    expect(VideoOptions.restore({ voiceTweak: { tempo: "x", pitchSemitones: null } }).voiceTweak).toEqual({ tempo: 1, pitchSemitones: 0 });
+    expect(VideoOptions.restore({ voiceTweak: 3 }).voiceTweak).toEqual({ tempo: 1, pitchSemitones: 0 });
+    expect(VideoOptions.restore({ pacing: { gapSec: 0.5 } }).voiceTweak).toEqual({ tempo: 1, pitchSemitones: 0 });
   });
 });

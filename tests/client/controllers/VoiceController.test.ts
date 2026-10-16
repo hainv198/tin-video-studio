@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { VoiceController } from "@/client/controllers/VoiceController";
-import { stepReady } from "@/client/controllers/readiness";
+import { staleSceneIds, stepReady } from "@/client/controllers/readiness";
 import { ApiError } from "@/client/services/apiError";
 import { VoiceSettings } from "@/domain/VoiceSettings";
 import type { TtsApi } from "@/client/services/TtsClient";
-import { makeSessionWithProject } from "../../helpers/studioFixtures";
+import { fakeNarration, makeSessionWithProject } from "../../helpers/studioFixtures";
 
 function setup(opts: { hold?: Promise<void> } = {}) {
   const made = makeSessionWithProject(2); // s1 mở đầu, s2, s3
@@ -134,6 +134,40 @@ describe("VoiceController", () => {
     expect(blob?.type).toBe("audio/mpeg");
     expect(calls).toEqual(["Tiêu đề bản tin"]);
     expect(ctrl.state.previewing).toBe(false);
+  });
+
+  it("previewVoice có tinh chỉnh: dùng giọng đã tạo của câu tiêu đề, không gọi TTS, trả WAV đã xử lý", async () => {
+    const { ctrl, calls, session, decoder } = setup();
+    const voice = session.state.voice!;
+    const intro = session.state.project!.introScene;
+    session.update((d) => ({
+      ...d,
+      narrations: new Map(d.narrations).set(intro.id, fakeNarration(intro, voice)),
+      options: d.options.withTempo(1.25),
+    }));
+    const blob = await ctrl.previewVoice();
+    expect(calls).toEqual([]);
+    expect(decoder.decode).toHaveBeenCalledTimes(1);
+    expect(blob?.type).toBe("audio/wav");
+    expect(blob?.size).toBe(44 + 2 * Math.round(48 / 1.25));
+    expect(ctrl.state.previewing).toBe(false);
+  });
+
+  it("previewVoice có tinh chỉnh mà câu tiêu đề chưa có giọng: đọc thử qua TTS rồi xử lý ở máy", async () => {
+    const { ctrl, calls, session, decoder } = setup();
+    session.update((d) => ({ ...d, options: d.options.withPitchSemitones(2) }));
+    const blob = await ctrl.previewVoice();
+    expect(calls).toEqual(["Tiêu đề bản tin"]);
+    expect(decoder.decode).toHaveBeenCalledTimes(1);
+    expect(blob?.type).toBe("audio/wav");
+  });
+
+  it("tinh chỉnh tốc độ/tông sau khi tạo giọng không làm câu nào thành cũ", async () => {
+    const { ctrl, session } = setup();
+    await ctrl.generate();
+    expect(staleSceneIds(session.state)).toEqual([]);
+    session.update((d) => ({ ...d, options: d.options.withTempo(1.3).withPitchSemitones(-2) }));
+    expect(staleSceneIds(session.state)).toEqual([]);
   });
 
   it("chưa có dự án hoặc giọng thì báo lỗi, không gọi TTS", async () => {

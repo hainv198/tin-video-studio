@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { RenderJobBuilder } from "@/client/controllers/RenderJobBuilder";
 import { EMPTY_STUDIO, type StudioData } from "@/client/controllers/StudioSession";
 import { uploadToFootage } from "@/client/media/footageFactory";
+import { trimSilence } from "@/client/media/audioTrim";
 import { RenderCancelledError } from "@/client/render/errors";
 import { FallbackFootage, ImageFootage } from "@/domain/Footage";
 import { MusicTrack } from "@/domain/MusicTrack";
@@ -173,5 +174,36 @@ describe("RenderJobBuilder — bitrate", () => {
     const options = data.options.withGapSec(0.8).withLeadInSec(0.4);
     const { job } = await builder.build({ ...data, options });
     expect(job.options.pacing).toEqual({ gapSec: 0.8, leadInSec: 0.4 });
+  });
+
+  it("tinh chỉnh tempo 1,25: giọng xử lý sau khi cắt lặng, durationSec ≈ /1,25 và job mang mẫu đã xử lý", async () => {
+    const { builder, data } = setup();
+    const plain = (await builder.build(data)).job.narrations[0]!;
+    const options = data.options.withTempo(1.25);
+    const { job } = await builder.build({ ...data, options });
+    const n = job.narrations[0]!;
+    expect(n.samples).not.toBe(plain.samples);
+    expect(n.samples.length).toBeLessThan(plain.samples.length);
+    expect(n.durationSec).toBeCloseTo(n.samples.length / SR, 10);
+    expect(Math.abs(n.durationSec - plain.durationSec / 1.25) / (plain.durationSec / 1.25)).toBeLessThan(0.02);
+    expect(job.options.voiceTweak).toEqual({ tempo: 1.25, pitchSemitones: 0 });
+  });
+
+  it("đổi tông (giữ tốc độ): độ dài giữ nguyên, mẫu khác bản gốc", async () => {
+    const { builder, data } = setup();
+    const plain = (await builder.build(data)).job.narrations[0]!;
+    const { job } = await builder.build({ ...data, options: data.options.withPitchSemitones(3) });
+    const n = job.narrations[0]!;
+    expect(Math.abs(n.samples.length - plain.samples.length) / plain.samples.length).toBeLessThan(0.02);
+    expect(Array.from(n.samples.subarray(2000, 2100))).not.toEqual(Array.from(plain.samples.subarray(2000, 2100)));
+  });
+
+  it("tinh chỉnh mặc định: mẫu và độ dài y hệt cũ (chỉ cắt lặng)", async () => {
+    const { builder, data } = setup();
+    const { job } = await builder.build(data);
+    const n = job.narrations[0]!;
+    const expected = trimSilence(voiceChannel(), SR).samples;
+    expect(n.durationSec).toBe(expected.length / SR);
+    expect(Array.from(n.samples)).toEqual(Array.from(expected));
   });
 });
