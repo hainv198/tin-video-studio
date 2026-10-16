@@ -160,4 +160,11 @@ describe("RenderJobBuilder — bitrate", () => {
     expect((await heavy.build(data, undefined, undefined, { videoBitrate: 5_000_000 })).job.videoBitrate).toBe(5_000_000);
     expect((await heavy.build(data)).job.videoBitrate).toBe(8_000_000);
   });
+  it("job kèm tuỳ chọn video của dự án (dữ liệu thuần, structuredClone được)", async () => {
+    const { builder, data } = setup();
+    const options = data.options.withSubtitlesEnabled(false).withTextFont("oswald").withIntroBlock("#C0392B");
+    const { job } = await builder.build({ ...data, options });
+    expect(job.options).toEqual(options.snapshot());
+    expect(structuredClone(job.options)).toEqual(options.snapshot());
+  });
 });

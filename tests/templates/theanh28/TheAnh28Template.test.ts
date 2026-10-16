@@ -1,3 +1,5 @@
+import { VideoOptions } from "@/domain/VideoOptions";
+import { frameStyleFor } from "@/templates/fonts/FontCatalog";
 import { describe, expect, it } from "vitest";
 import { BrandKit } from "@/domain/BrandKit";
 import { TheAnh28Template } from "@/templates/theanh28/TheAnh28Template";
@@ -173,5 +175,25 @@ describe("TheAnh28Template — dòng nguồn tin dài", () => {
     const c = draw(project(), scene());
     expect(creditText(c)).toBe("THEO: ĐỨC PHONG - VIETNAMNET");
     expect(c.texts()).toContain("ẢNH: TỔNG HỢP");
+  });
+});
+
+describe("TheAnh28Template — font chữ theo tuỳ chọn video", () => {
+  it("không có style: mọi chữ vẫn là Barlow Condensed như cũ", () => {
+    const c = draw(project(), scene({ role: "intro" }));
+    expect(c.ops("fillText").every((x) => x.state.font.includes('"TVS Barlow Condensed"'))).toBe(true);
+    const body = draw(project(), scene({ role: "body" }));
+    expect(body.ops("fillText").every((x) => x.state.font.includes('"TVS Barlow Condensed"'))).toBe(true);
+  });
+
+  it("style chọn Oswald: tiêu đề, chip, tem ngày, dòng nguồn đều dùng Oswald với mức đậm của họ font", () => {
+    const style = frameStyleFor(VideoOptions.defaults().withTextFont("oswald").withSubtitlesEnabled(false).snapshot());
+    const c = draw(project({ style }), scene({ role: "intro" }));
+    const fonts = c.ops("fillText").map((x) => x.state.font);
+    expect(fonts.every((f) => f.includes('"TVS Oswald"'))).toBe(true);
+    expect(fonts.some((f) => f.startsWith("700 64px"))).toBe(true); // tiêu đề: đậm nhất của Oswald là 700
+    expect(fonts.some((f) => f.startsWith("600 26px"))).toBe(true); // dòng nguồn, tem ngày
+    const body = draw(project({ style }), scene({ role: "body" }));
+    expect(body.ops("fillText").every((x) => x.state.font.includes('"TVS Oswald"'))).toBe(true);
   });
 });

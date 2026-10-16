@@ -1,8 +1,10 @@
 import { BrandKit } from "@/domain/BrandKit";
 import { VideoFootage } from "@/domain/Footage";
+import { VideoOptions } from "@/domain/VideoOptions";
 import { mixProgram } from "@/client/media/AudioMix";
 import { loadFonts, type FontSink } from "@/client/media/FontLoader";
 import { ImageFrameProvider, VideoFrameProvider } from "@/client/media/MediaFrameProvider";
+import { fontFacesFor, frameStyleFor } from "@/templates/fonts/FontCatalog";
 import { defaultTemplateRegistry } from "@/templates/registry";
 import { CanvasBackdropMaker } from "./BackdropMaker";
 import { RENDER_AUDIO_BITRATE, RENDER_VIDEO_BITRATE } from "./encodingDefaults";
@@ -32,7 +34,10 @@ async function render(job: RenderJob): Promise<void> {
   scope.postMessage({ type: "progress", stage: "loading" });
   if (!scope.fonts) throw new Error("Trình duyệt không hỗ trợ nạp font trong worker");
   const template = defaultTemplateRegistry().get(job.templateId);
-  await loadFonts(template.fonts, scope.fonts, job.origin);
+  // Khoan dung: job thiếu/sai tuỳ chọn thì dùng mặc định. Chỉ nạp font video này cần.
+  const options = VideoOptions.restore(job.options).snapshot();
+  await loadFonts(fontFacesFor(options), scope.fonts, job.origin);
+  const style = frameStyleFor(options);
   const brand = BrandKit.create(template.id, template.brandFields, job.brandValues);
 
   const providers: FrameProvider[] = [];
@@ -94,6 +99,7 @@ async function render(job: RenderJob): Promise<void> {
         ...job.project,
         brand,
         logo: logoBitmap ? { source: logoBitmap, width: logoBitmap.width, height: logoBitmap.height } : null,
+        style,
       },
       timeline,
       scenes,

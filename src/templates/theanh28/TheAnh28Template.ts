@@ -1,14 +1,26 @@
 import type { BrandFieldSpec } from "@/domain/BrandKit";
 import { DEFAULT_TIMELINE_CONFIG } from "@/domain/Timeline";
 import type { Canvas2D } from "../Canvas2D";
-import { VideoTemplate, type DrawableImage, type FontFaceSpec, type ProjectFrame, type SceneFrame, type TemplateDefaults } from "../VideoTemplate";
+import {
+  cssFont,
+  VideoTemplate,
+  type DrawableImage,
+  type FontFaceSpec,
+  type FontStyle,
+  type ProjectFrame,
+  type SceneFrame,
+  type TemplateDefaults,
+} from "../VideoTemplate";
 import { coverRect, kenBurnsRect, LAYOUT, withAlpha, wrapText, type Rect } from "./layout";
 
 export const THEANH28_FONT_FAMILY = "TVS Barlow Condensed";
 const DEFAULT_COLOR = "#1F9D55";
 const WHITE = "#FFFFFF";
+/** Font chữ khi dự án không có tuỳ chọn riêng: giữ đúng hình ảnh trước khi có tuỳ chọn video. */
+const DEFAULT_TEXT_FONT: FontStyle = { family: THEANH28_FONT_FAMILY, semiBold: 600, bold: 800 };
 
-const font = (weight: number, px: number) => `${weight} ${px}px "${THEANH28_FONT_FAMILY}", "Arial Narrow", sans-serif`;
+type Weight = "semiBold" | "bold";
+
 const upper = (s: string) => s.toLocaleUpperCase("vi");
 
 export class TheAnh28Template extends VideoTemplate {
@@ -54,11 +66,11 @@ export class TheAnh28Template extends VideoTemplate {
 
     this.drawDotPattern(ctx);
     this.drawChip(ctx, project);
-    this.drawDateTag(ctx, project.publishDateText, L.dateTag.x, L.dateTag.y);
+    this.drawDateTag(ctx, project, project.publishDateText, L.dateTag.x, L.dateTag.y);
 
     const fontPx = Number(project.brand.get("titleFontPx") ?? L.title.fontPx);
     const lineHeight = Math.round(fontPx * (L.title.lineHeight / L.title.fontPx));
-    ctx.font = font(800, fontPx);
+    ctx.font = this.font(project, "bold", fontPx);
     ctx.fillStyle = WHITE;
     ctx.textBaseline = "top";
     ctx.textAlign = "left";
@@ -94,7 +106,7 @@ export class TheAnh28Template extends VideoTemplate {
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, width, height);
     }
-    this.drawDateTag(ctx, project.publishDateText, B.dateTag.x, B.dateTag.y);
+    this.drawDateTag(ctx, project, project.publishDateText, B.dateTag.x, B.dateTag.y);
   }
 
   protected drawOverlay(ctx: Canvas2D, project: ProjectFrame, scene: SceneFrame): void {
@@ -103,7 +115,7 @@ export class TheAnh28Template extends VideoTemplate {
     const limit =
       (scene.role === "body" ? this.cornerLogoBox(ctx, project).badgeX - C.gapToLogo : LAYOUT.frame.width - C.rightMargin) -
       C.x;
-    ctx.font = font(600, C.fontPx);
+    ctx.font = this.font(project, "semiBold", C.fontPx);
     ctx.fillStyle = WHITE;
     ctx.textBaseline = "top";
     ctx.textAlign = "left";
@@ -111,6 +123,10 @@ export class TheAnh28Template extends VideoTemplate {
     const lines = project.sourceCredit ? [`THEO: ${upper(project.sourceCredit)}`, "ẢNH: TỔNG HỢP"] : ["ẢNH: TỔNG HỢP"];
     lines.forEach((line, i) => ctx.fillText(wrapText(line, limit, measure, 1)[0] ?? "", C.x, C.y + i * C.lineHeight));
     if (scene.role === "body") this.drawCornerLogo(ctx, project);
+  }
+
+  private font(project: ProjectFrame, weight: Weight, px: number): string {
+    return cssFont(project.style?.textFont ?? DEFAULT_TEXT_FONT, weight, px);
   }
 
   private color(project: ProjectFrame): string {
@@ -163,7 +179,7 @@ export class TheAnh28Template extends VideoTemplate {
       ctx.fillStyle = WHITE;
       ctx.fillRect(x, y, size, size);
       ctx.fillStyle = color;
-      ctx.font = font(800, Math.round(size * 0.55));
+      ctx.font = this.font(project, "bold", Math.round(size * 0.55));
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(this.channelName(project).charAt(0), x + size / 2, y + size / 2);
@@ -174,7 +190,7 @@ export class TheAnh28Template extends VideoTemplate {
   private drawChip(ctx: Canvas2D, project: ProjectFrame): void {
     const K = LAYOUT.intro.chip;
     const name = this.channelName(project);
-    ctx.font = font(800, K.fontPx);
+    ctx.font = this.font(project, "bold", K.fontPx);
     const textW = ctx.measureText(name).width;
     const w = K.padX + K.logoSize + K.gap + textW + K.padX;
     ctx.fillStyle = this.color(project);
@@ -185,17 +201,17 @@ export class TheAnh28Template extends VideoTemplate {
     ctx.fill();
     ctx.stroke();
     this.drawLogoBadge(ctx, project, K.x + K.padX, K.y + (K.h - K.logoSize) / 2, K.logoSize);
-    ctx.font = font(800, K.fontPx);
+    ctx.font = this.font(project, "bold", K.fontPx);
     ctx.fillStyle = WHITE;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText(name, K.x + K.padX + K.logoSize + K.gap, K.y + K.h / 2);
   }
 
-  private drawDateTag(ctx: Canvas2D, dateText: string, x: number, y: number): void {
+  private drawDateTag(ctx: Canvas2D, project: ProjectFrame, dateText: string, x: number, y: number): void {
     const D = LAYOUT.dateTag;
     const text = `NGÀY ĐĂNG: ${dateText}`;
-    ctx.font = font(600, D.fontPx);
+    ctx.font = this.font(project, "semiBold", D.fontPx);
     const w = ctx.measureText(text).width + D.padX * 2;
     ctx.fillStyle = "rgba(0,0,0,0.45)";
     ctx.fillRect(x, y, w, D.h);
@@ -209,7 +225,7 @@ export class TheAnh28Template extends VideoTemplate {
   private cornerLogoBox(ctx: Canvas2D, project: ProjectFrame): { name: string; textX: number; badgeX: number } {
     const G = LAYOUT.logo;
     const name = this.channelName(project);
-    ctx.font = font(800, G.fontPx);
+    ctx.font = this.font(project, "bold", G.fontPx);
     const textX = LAYOUT.frame.width - G.right - ctx.measureText(name).width;
     return { name, textX, badgeX: textX - G.gap - G.size };
   }
@@ -218,7 +234,7 @@ export class TheAnh28Template extends VideoTemplate {
     const G = LAYOUT.logo;
     const { name, textX, badgeX } = this.cornerLogoBox(ctx, project);
     this.drawLogoBadge(ctx, project, badgeX, G.y, G.size);
-    ctx.font = font(800, G.fontPx);
+    ctx.font = this.font(project, "bold", G.fontPx);
     ctx.fillStyle = WHITE;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";

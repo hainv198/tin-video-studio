@@ -15,6 +15,27 @@ export interface FontFaceSpec {
   weight: string;
 }
 
+/** Một họ font đã nạp và hai mức đậm dùng trong video. */
+export interface FontStyle {
+  family: string;
+  /** Dòng nguồn tin, tem ngày. */
+  semiBold: number;
+  /** Tiêu đề, tên kênh, phụ đề. */
+  bold: number;
+}
+
+/** Tuỳ chọn riêng của video đã quy về dữ liệu vẽ. */
+export interface FrameStyle {
+  textFont: FontStyle;
+  subtitles: { enabled: boolean; font: FontStyle };
+  /** Màu riêng của cảnh mở đầu; null = theo màu chủ đạo thương hiệu. */
+  intro: { backgroundColor: string | null; blockColor: string | null };
+}
+
+export function cssFont(font: FontStyle, weight: "semiBold" | "bold", px: number): string {
+  return `${font[weight]} ${px}px "${font.family}", "Arial Narrow", sans-serif`;
+}
+
 export interface TemplateDefaults {
   width: number;
   height: number;
@@ -29,6 +50,8 @@ export interface ProjectFrame {
   publishDateText: string;
   brand: BrandKit;
   logo: DrawableImage | null;
+  /** Tuỳ chọn riêng của video. Bỏ trống = như trước khi có tuỳ chọn (font mặc định của phong cách, không phụ đề, màu chủ đạo). */
+  style?: FrameStyle;
 }
 
 export interface SceneFrame {
