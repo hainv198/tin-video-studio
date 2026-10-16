@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { UpstreamError, ValidationError } from "@/domain/errors";
-import type { SynthesisRequest, SynthesisResult, TtsProvider, TtsVoice } from "./TtsProvider";
+import type { RoutedTtsProvider } from "./RoutingTtsProvider";
+import type { SynthesisRequest, SynthesisResult, TtsVoice } from "./TtsProvider";
 
 const run = promisify(execFile);
 const VOICES: TtsVoice[] = [
@@ -30,12 +31,16 @@ export function ratePercent(speakingRate: number): string {
  * Giọng Microsoft Edge qua lệnh edge-tts cài trên máy, CHỈ để nghe thử khi phát triển.
  * Dịch vụ này không chính thức và có thể bị chặn bất cứ lúc nào, nên không dùng cho bản deploy.
  */
-export class EdgeCliTtsProvider implements TtsProvider {
+export class EdgeCliTtsProvider implements RoutedTtsProvider {
   private readonly runner: EdgeRunner;
 
   constructor(options: EdgeCliOptions = {}) {
     const bin = options.bin || "edge-tts";
     this.runner = options.runner ?? (async (args) => void (await run(bin, args, { timeout: 60_000, windowsHide: true })));
+  }
+
+  owns(voiceName: string): boolean {
+    return VOICES.some((v) => v.name === voiceName);
   }
 
   async listVoices(languageCode: string): Promise<TtsVoice[]> {

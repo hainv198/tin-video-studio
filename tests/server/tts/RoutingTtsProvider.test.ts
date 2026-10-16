@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RoutingTtsProvider, type RoutedTtsProvider } from "@/server/tts/RoutingTtsProvider";
 import { ValidationError } from "@/domain/errors";
+import { EdgeCliTtsProvider } from "@/server/tts/EdgeCliTtsProvider";
 
 function provider(prefix: string, opts: { failList?: boolean } = {}) {
   const synthesize = vi.fn(async () => ({ audio: new Uint8Array([1]), mimeType: "audio/mpeg" }));
@@ -51,6 +52,16 @@ describe("RoutingTtsProvider", () => {
     await r.synthesize({ text: "a", voiceName: "vi-VN-Neural2-A", speakingRate: 1 });
     expect(mm.synthesize).toHaveBeenCalledTimes(1);
     expect(gg.synthesize).toHaveBeenCalledTimes(1);
+  });
+
+  it("giọng Edge được chuyển đúng tới EdgeCliTtsProvider khi chạy cùng nhà cung cấp khác", async () => {
+    const run = vi.fn(async () => {});
+    const edge = new EdgeCliTtsProvider({ runner: run });
+    const gg = provider("gemini-");
+    const r = new RoutingTtsProvider([gg.p, edge]);
+    await expect(r.synthesize({ text: "a", voiceName: "vi-VN-NamMinhNeural", speakingRate: 1 })).rejects.toThrow("Giọng Edge");
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(gg.synthesize).not.toHaveBeenCalled();
   });
 
   it("không ai nhận tên giọng thì ValidationError", async () => {

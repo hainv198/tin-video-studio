@@ -40,14 +40,15 @@ export function buildServerContainer(env: Record<string, string | undefined>): S
   const auth = new AuthController(users, new BcryptPasswordHasher(), sessions);
 
   // Giọng nền: giả lập khi dev; Google Cloud khi có key. Không có Google thì Gemini/MiniMax đứng một mình được.
+  const edgeDev = env.EDGE_TTS_DEV === "1";
   const baseTts: TtsProvider | undefined = usingFakes
-    ? env.EDGE_TTS_DEV === "1"
+    ? edgeDev
       ? new EdgeCliTtsProvider({ bin: env.EDGE_TTS_BIN })
       : new FakeTtsProvider()
     : env.GOOGLE_TTS_API_KEY?.trim()
       ? new GoogleTtsService(env.GOOGLE_TTS_API_KEY.trim())
       : undefined;
-  const ttsProvider = composeTts(baseTts, env);
+  const ttsProvider = composeTts(baseTts, env, !usingFakes && edgeDev ? new EdgeCliTtsProvider({ bin: env.EDGE_TTS_BIN }) : undefined);
   // Cảnh trám: dùng nguồn nào có key (Pexels đang tạm ngừng cấp key mới, nên chỉ Pixabay cũng chạy được).
   const stockProviders: StockProvider[] = usingFakes ? [new FakeStockProvider()] : buildStockProviders(env);
 
@@ -70,9 +71,12 @@ function buildStockProviders(env: Record<string, string | undefined>): StockProv
   return providers;
 }
 
-/** vclip, MiniMax và Gemini đều tuỳ chọn. Thứ tự danh sách giọng: vclip, MiniMax (giọng clone), Gemini, rồi giọng nền (nếu có). */
-function composeTts(base: TtsProvider | undefined, env: Record<string, string | undefined>): TtsProvider {
-  const candidates: Array<RoutedTtsProvider | undefined> = [buildVclip(env), buildMiniMax(env), buildGemini(env)];
+/**
+ * vclip, MiniMax, Gemini và Edge (chỉ dev, tự động chuyển khi Gemini hết lượt) đều tuỳ chọn.
+ * Thứ tự danh sách giọng: vclip, MiniMax (giọng clone), Gemini, Edge, rồi giọng nền (nếu có).
+ */
+function composeTts(base: TtsProvider | undefined, env: Record<string, string | undefined>, edge?: RoutedTtsProvider): TtsProvider {
+  const candidates: Array<RoutedTtsProvider | undefined> = [buildVclip(env), buildMiniMax(env), buildGemini(env), edge];
   const optional = candidates.filter((p): p is RoutedTtsProvider => p !== undefined);
   if (!base && optional.length === 0) {
     throw new Error("Cần một nguồn giọng: VCLIP_API_KEY + VCLIP_VOICES, GEMINI_API_KEY, GOOGLE_TTS_API_KEY hoặc MiniMax");
@@ -132,4 +136,9 @@ let cached: ServerContainer | undefined;
 export function serverContainer(): ServerContainer {
   cached ??= buildServerContainer(process.env);
   return cached;
+}
+
+/** Bỏ container đang cache để lần gọi sau dựng lại theo process.env mới (dùng sau khi lưu cấu hình). */
+export function resetServerContainer(): void {
+  cached = undefined;
 }

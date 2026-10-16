@@ -14,6 +14,11 @@ export function userMessage(error: unknown, fallback = "Có lỗi xảy ra, th�
   return fallback;
 }
 
+/** Máy chủ báo hết hạn mức giọng đọc (429, mã QUOTA). */
+export function isQuotaExhausted(error: unknown): boolean {
+  return error instanceof ApiError && error.code === "QUOTA";
+}
+
 export function isSessionExpired(error: unknown): boolean {
   return error instanceof ApiError && error.status === 401;
 }

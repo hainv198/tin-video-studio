@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { VoiceController } from "@/client/controllers/VoiceController";
 import { stepReady } from "@/client/controllers/readiness";
 import { ApiError } from "@/client/services/apiError";
+import { VoiceSettings } from "@/domain/VoiceSettings";
 import type { TtsApi } from "@/client/services/TtsClient";
 import { makeSessionWithProject } from "../../helpers/studioFixtures";
 
@@ -168,5 +169,120 @@ describe("VoiceController", () => {
     expect(ctrl.state.error).toBeNull();
     expect(ctrl.state.progress).toBeNull();
     expect(ctrl.state.generating).toBe(false);
+  });
+});
+
+describe("VoiceController: tự chuyển sang giọng Edge khi hết lượt", () => {
+  const NOTICE = "Gemini đã hết lượt, đã chuyển cả tin sang giọng Edge (miễn phí, chỉ trên máy này)";
+  const VOICES = [
+    { name: "vi-VN-Gemini-Kore", gender: "FEMALE", tier: "Gemini" },
+    { name: "vi-VN-Gemini-Charon", gender: "MALE", tier: "Gemini" },
+    { name: "vi-VN-HoaiMyNeural", gender: "FEMALE", tier: "Edge" },
+    { name: "vi-VN-NamMinhNeural", gender: "MALE", tier: "Edge" },
+  ];
+
+  async function setupQuota(opts: { voices?: typeof VOICES; start?: string; edgeFails?: boolean } = {}) {
+    const made = makeSessionWithProject(2);
+    const used: string[] = [];
+    const tts: TtsApi = {
+      voices: async () => opts.voices ?? VOICES,
+      synthesize: async (_text, voiceName) => {
+        used.push(voiceName);
+        if (!voiceName.endsWith("Neural") || opts.edgeFails) throw new ApiError(429, "QUOTA", "Hết hạn mức giọng đọc hôm nay, liên hệ Hải");
+        return new Uint8Array([1, 2, 3, 4]).buffer;
+      },
+    };
+    const decoder = { decode: vi.fn(async () => ({ channels: [new Float32Array(48)], sampleRate: 48000, durationSec: 1.5 })) };
+    const ctrl = new VoiceController({ session: made.session, tts, decoder });
+    await ctrl.loadVoices();
+    made.session.update((d) => ({ ...d, voice: VoiceSettings.create(opts.start ?? "vi-VN-Gemini-Kore", 1.2) }));
+    return { ...made, ctrl, used };
+  }
+
+  it("Gemini hết lượt: chuyển cả tin sang Edge cùng giới tính, giữ tốc độ, đọc lại toàn bộ và báo notice", async () => {
+    const { ctrl, session, used } = await setupQuota({ start: "vi-VN-Gemini-Charon" });
+    await ctrl.generate();
+    expect(session.state.voice?.voiceName).toBe("vi-VN-NamMinhNeural");
+    expect(session.state.voice?.speakingRate).toBe(1.2);
+    expect(ctrl.state.fallbackNotice).toBe(NOTICE);
+    expect(session.state.narrations.size).toBe(3);
+    expect([...session.state.narrations.values()].every((n) => n.voice.voiceName === "vi-VN-NamMinhNeural")).toBe(true);
+    expect(used.filter((v) => v === "vi-VN-NamMinhNeural")).toHaveLength(3);
+    expect(ctrl.state.failed).toEqual({});
+    expect(ctrl.state.error).toBeNull();
+    expect(ctrl.state.generating).toBe(false);
+    expect(ctrl.state.progress).toBeNull();
+  });
+
+  it("giọng nữ chuyển sang Edge nữ", async () => {
+    const { ctrl, session } = await setupQuota();
+    await ctrl.generate();
+    expect(session.state.voice?.voiceName).toBe("vi-VN-HoaiMyNeural");
+  });
+
+  it("không có Edge cùng giới tính thì lấy giọng Edge đầu tiên", async () => {
+    const voices = VOICES.filter((v) => v.name !== "vi-VN-NamMinhNeural");
+    const { ctrl, session } = await setupQuota({ voices, start: "vi-VN-Gemini-Charon" });
+    await ctrl.generate();
+    expect(session.state.voice?.voiceName).toBe("vi-VN-HoaiMyNeural");
+  });
+
+  it("chỉ tự chuyển một lần mỗi lượt: Edge cũng hết lượt thì báo lỗi, không lặp vô hạn", async () => {
+    const { ctrl, used } = await setupQuota({ edgeFails: true });
+    await ctrl.generate();
+    expect(used.filter((v) => v.endsWith("Neural"))).toHaveLength(3);
+    expect(used.filter((v) => v.startsWith("vi-VN-Gemini"))).toHaveLength(1);
+    expect(Object.keys(ctrl.state.failed)).toHaveLength(3);
+    expect(ctrl.state.generating).toBe(false);
+  });
+
+  it("đang dùng giọng Edge mà hết lượt thì không chuyển", async () => {
+    const { ctrl, session, used } = await setupQuota({ start: "vi-VN-HoaiMyNeural", edgeFails: true });
+    await ctrl.generate();
+    expect(session.state.voice?.voiceName).toBe("vi-VN-HoaiMyNeural");
+    expect(ctrl.state.fallbackNotice).toBeNull();
+    expect(used).toHaveLength(3);
+  });
+
+  it("không có giọng Edge trong danh sách thì giữ hành vi cũ: báo lỗi hết lượt", async () => {
+    const voices = VOICES.filter((v) => v.tier !== "Edge");
+    const { ctrl, session } = await setupQuota({ voices });
+    await ctrl.generate();
+    expect(session.state.voice?.voiceName).toBe("vi-VN-Gemini-Kore");
+    expect(ctrl.state.fallbackNotice).toBeNull();
+    expect(Object.values(ctrl.state.failed)[0]).toBe("Hết hạn mức giọng đọc hôm nay, liên hệ Hải");
+  });
+
+  it("selectVoice thủ công xoá notice", async () => {
+    const { ctrl } = await setupQuota();
+    await ctrl.generate();
+    expect(ctrl.state.fallbackNotice).not.toBeNull();
+    ctrl.selectVoice("vi-VN-Gemini-Kore");
+    expect(ctrl.state.fallbackNotice).toBeNull();
+  });
+
+  it("reset xoá notice", async () => {
+    const { ctrl } = await setupQuota();
+    await ctrl.generate();
+    ctrl.reset();
+    expect(ctrl.state.fallbackNotice).toBeNull();
+  });
+
+  it("previewVoice cũng chuyển sang Edge một lần rồi nghe thử bằng giọng Edge", async () => {
+    const { ctrl, session, used } = await setupQuota();
+    const blob = await ctrl.previewVoice();
+    expect(blob).not.toBeNull();
+    expect(used).toEqual(["vi-VN-Gemini-Kore", "vi-VN-HoaiMyNeural"]);
+    expect(session.state.voice?.voiceName).toBe("vi-VN-HoaiMyNeural");
+    expect(session.state.voice?.speakingRate).toBe(1.2);
+    expect(ctrl.state.fallbackNotice).toBe(NOTICE);
+    expect(ctrl.state.error).toBeNull();
+  });
+
+  it("previewVoice: Edge cũng lỗi thì báo lỗi, không lặp", async () => {
+    const { ctrl, used } = await setupQuota({ edgeFails: true });
+    expect(await ctrl.previewVoice()).toBeNull();
+    expect(used).toHaveLength(2);
+    expect(ctrl.state.error).toBe("Hết hạn mức giọng đọc hôm nay, liên hệ Hải");
   });
 });

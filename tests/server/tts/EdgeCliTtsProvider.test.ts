@@ -55,4 +55,12 @@ describe("EdgeCliTtsProvider", () => {
     ).rejects.toThrow("Không có giọng vi-VN-Khac-A");
     expect(runner).not.toHaveBeenCalled();
   });
+
+  it("owns chỉ nhận hai giọng Edge", () => {
+    const p = new EdgeCliTtsProvider({ runner: async () => {} });
+    expect(p.owns("vi-VN-HoaiMyNeural")).toBe(true);
+    expect(p.owns("vi-VN-NamMinhNeural")).toBe(true);
+    expect(p.owns("gemini-Kore")).toBe(false);
+    expect(p.owns("vi-VN-Neural2-A")).toBe(false);
+  });
 });

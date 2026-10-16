@@ -138,4 +138,21 @@ describe("buildServerContainer", () => {
       "EDGE_TTS_DEV chỉ dùng khi phát triển trên máy",
     );
   });
+
+  it("EDGE_TTS_DEV=1 với nguồn thật: Edge chạy cùng Gemini, Gemini đứng trước; thiếu EDGE_TTS_DEV thì không có Edge", async () => {
+    const real = { ...base, GEMINI_API_KEY: "gm", PIXABAY_API_KEY: "x" };
+    const withEdge = buildServerContainer({ ...real, EDGE_TTS_DEV: "1" });
+    const names = (await withEdge.tts.voices()).map((v) => v.name);
+    expect(names.slice(-2)).toEqual(["vi-VN-HoaiMyNeural", "vi-VN-NamMinhNeural"]);
+    expect(names.length).toBeGreaterThan(2);
+    expect(names[0]).not.toMatch(/Neural$/);
+    const without = (await buildServerContainer(real).tts.voices()).map((v) => v.name);
+    expect(without).not.toContain("vi-VN-HoaiMyNeural");
+    expect(() => buildServerContainer({ ...real, EDGE_TTS_DEV: "1", NODE_ENV: "production" })).toThrow("EDGE_TTS_DEV");
+  });
+
+  it("EDGE_TTS_DEV=1 đứng một mình (không key giọng nào khác) vẫn dựng được", async () => {
+    const c = buildServerContainer({ ...base, PIXABAY_API_KEY: "x", EDGE_TTS_DEV: "1" });
+    expect((await c.tts.voices()).map((v) => v.name)).toEqual(["vi-VN-HoaiMyNeural", "vi-VN-NamMinhNeural"]);
+  });
 });
