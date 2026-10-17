@@ -6,6 +6,7 @@ import { toDateInput } from "@/client/controllers/dateText";
 import { SAMPLE_NEWS } from "@/client/sample/sampleNews";
 import { useController } from "@/views/hooks/useController";
 import { BrandPanel } from "../components/BrandPanel";
+import { PreviewPanel } from "../components/PreviewPanel";
 
 export function StepNews({ studio }: { studio: Studio }) {
   const data = useController(studio.session);
@@ -22,73 +23,76 @@ export function StepNews({ studio }: { studio: Studio }) {
 
   if (!project) {
     return (
-      <div className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold">Nhập tin</h2>
-        <label className="flex flex-col gap-1 text-sm">
-          Nội dung tin (dán vào đây)
-          <textarea
-            className="min-h-48 rounded-md bg-neutral-800 px-3 py-2"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Mỗi câu sẽ thành một cảnh."
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Tiêu đề (để trống thì lấy câu đầu tiên)
-          <input className="rounded-md bg-neutral-800 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
-        </label>
-        <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(220px,300px)]">
+        <div className="order-2 flex min-w-0 flex-col gap-4 lg:order-1">
+          <h2 className="text-lg font-semibold">Nhập tin</h2>
           <label className="flex flex-col gap-1 text-sm">
-            Theo: nguồn tin (tối đa 80 ký tự)
-            <input
-              className="rounded-md bg-neutral-800 px-3 py-2"
-              value={credit}
-              maxLength={80}
-              onChange={(e) => setCredit(e.target.value)}
-              placeholder="Đức Phong - VietNamNet"
+            Nội dung tin (dán vào đây)
+            <textarea
+              className="min-h-48 rounded-md bg-neutral-800 px-3 py-2"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Mỗi câu sẽ thành một cảnh."
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            Ngày đăng
-            <input type="date" className="rounded-md bg-neutral-800 px-3 py-2" value={date} onChange={(e) => setDate(e.target.value)} />
+            Tiêu đề (để trống thì lấy câu đầu tiên)
+            <input className="rounded-md bg-neutral-800 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="flex flex-col gap-1 text-sm">
+              Theo: nguồn tin (tối đa 80 ký tự)
+              <input
+                className="rounded-md bg-neutral-800 px-3 py-2"
+                value={credit}
+                maxLength={80}
+                onChange={(e) => setCredit(e.target.value)}
+                placeholder="Đức Phong - VietNamNet"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              Ngày đăng
+              <input type="date" className="rounded-md bg-neutral-800 px-3 py-2" value={date} onChange={(e) => setDate(e.target.value)} />
+            </label>
+          </div>
+          <label className="flex flex-col gap-1 text-sm">
+            Phong cách video
+            <select className="rounded-md bg-neutral-800 px-3 py-2" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {templateId && <BrandPanel studio={studio} templateId={templateId} />}
+          {projectState.error && (
+            <p role="alert" className="text-red-400">
+              {projectState.error}
+            </p>
+          )}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              className="rounded-md bg-emerald-600 px-4 py-2 font-medium"
+              onClick={() => studio.project.createFromForm({ text, title, sourceCredit: credit, publishDateText: date, templateId })}
+            >
+              Chia cảnh
+            </button>
+            <button
+              type="button"
+              className="rounded-md bg-neutral-800 px-4 py-2"
+              onClick={() => {
+                setText(SAMPLE_NEWS.text);
+                setCredit(SAMPLE_NEWS.sourceCredit);
+                setDate(toDateInput(SAMPLE_NEWS.publishDate));
+              }}
+            >
+              Điền tin mẫu
+            </button>
+          </div>
         </div>
-        <label className="flex flex-col gap-1 text-sm">
-          Phong cách video
-          <select className="rounded-md bg-neutral-800 px-3 py-2" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {templateId && <BrandPanel studio={studio} templateId={templateId} />}
-        {projectState.error && (
-          <p role="alert" className="text-red-400">
-            {projectState.error}
-          </p>
-        )}
-        <div className="flex gap-3">
-          <button
-            type="button"
-            className="rounded-md bg-emerald-600 px-4 py-2 font-medium"
-            onClick={() => studio.project.createFromForm({ text, title, sourceCredit: credit, publishDateText: date, templateId })}
-          >
-            Chia cảnh
-          </button>
-          <button
-            type="button"
-            className="rounded-md bg-neutral-800 px-4 py-2"
-            onClick={() => {
-              setText(SAMPLE_NEWS.text);
-              setCredit(SAMPLE_NEWS.sourceCredit);
-              setDate(toDateInput(SAMPLE_NEWS.publishDate));
-            }}
-          >
-            Điền tin mẫu
-          </button>
-        </div>
+        <PreviewPanel studio={studio} form={{ text, title, sourceCredit: credit, publishDateText: date, templateId }} />
       </div>
     );
   }
