@@ -68,6 +68,11 @@ export function validateEnv(env: Record<string, string | undefined>): EnvCheck {
   }
 
   if (env.GEMINI_API_KEY?.trim()) summary.push("Gemini: đã đặt");
+  summary.push(
+    env.GEMINI_TEXT_API_KEY?.trim()
+      ? "AI gợi ý từ khoá cảnh trám: đã đặt"
+      : "AI gợi ý từ khoá cảnh trám: chưa đặt GEMINI_TEXT_API_KEY, dùng từ điển",
+  );
 
   return problems.length ? { ok: false, problems } : { ok: true, summary };
 }

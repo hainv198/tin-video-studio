@@ -258,6 +258,7 @@ export function StepFootage({ studio }: { studio: Studio }) {
           {footage.error}
         </p>
       )}
+      {search.keywordNote && <p className="text-xs text-neutral-500">{search.keywordNote}</p>}
       {search.warnings.map((w) => (
         <p key={w} className="text-sm text-amber-400">
           {w}

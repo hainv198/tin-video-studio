@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { FootageSearchController, type KeywordSource } from "@/client/controllers/FootageSearchController";
+import { FootageSearchController, type KeywordAi, type KeywordSource } from "@/client/controllers/FootageSearchController";
 import { ApiError } from "@/client/services/apiError";
 import type { StockApi, StockItemDto, StockSearchResponse } from "@/client/services/StockClient";
 import { sequentialIds } from "@/domain/ids";
@@ -55,6 +55,7 @@ const keywords =
 interface SetupOptions {
   concurrency?: number;
   templates?: Pick<ReturnType<typeof defaultTemplateRegistry>, "get">;
+  ai?: KeywordAi;
 }
 
 function setup(plan: Plan, rules: Record<string, string[]> = {}, hook?: Hook, options: SetupOptions = {}) {
@@ -70,6 +71,7 @@ function setup(plan: Plan, rules: Record<string, string[]> = {}, hook?: Hook, op
     ids: sequentialIds("f"),
     concurrency: options.concurrency ?? 1,
     onAuthLost: authLost,
+    aiKeywords: options.ai,
   });
   return { ...made, ctrl, calls, authLost };
 }
@@ -453,5 +455,103 @@ describe("FootageSearchController — Ảnh/Video", () => {
     await ctrl.setSceneKind("s4", "image");
     expect(calls).toEqual(["image:news"]);
     expect(ctrl.state.byScene.s4?.empty).toBe(true);
+  });
+});
+
+describe("FootageSearchController + từ khoá AI", () => {
+  const aiOf = (impl: KeywordAi["suggest"]) => ({ suggest: vi.fn(impl) });
+
+  it("AI thành công: gọi một lần cho mọi cảnh, dùng từ khoá AI (hiện trong ô từ khoá) thay cho từ điển", async () => {
+    const ai = aiOf(async () => [["anchor desk"], ["police car", "crime tape"], ["city street"], ["traffic jam"]]);
+    const { ctrl, session, calls } = setup(
+      {
+        "anchor desk": { image: [item("t1")] },
+        "police car": { image: [item("p1")] },
+        "city street": { image: [item("c1")] },
+        "traffic jam": { image: [item("j1")] },
+      },
+      { "Công an": ["police"] },
+      undefined,
+      { ai },
+    );
+    await ctrl.autoFill();
+    expect(ai.suggest).toHaveBeenCalledTimes(1);
+    const [title, sentences] = ai.suggest.mock.calls[0]!;
+    expect(title).toBe(session.state.project!.displayTitle);
+    expect(sentences).toEqual(session.state.project!.scenes.map((s) => s.text));
+    expect(ctrl.state.byScene.s2?.query).toBe("police car");
+    expect(uri(session, "s1")).toBe("f-t1");
+    expect(uri(session, "s2")).toBe("f-p1");
+    expect(uri(session, "s3")).toBe("f-c1");
+    expect(uri(session, "s4")).toBe("f-j1");
+    expect(calls.some((c) => c.endsWith(":police"))).toBe(false);
+    expect(ctrl.state.keywordNote).toBeNull();
+  });
+
+  it("AI lỗi (503/429/mạng): lùi về từ điển, không báo lỗi, chỉ ghi chú nhẹ", async () => {
+    const ai = aiOf(async () => Promise.reject(new ApiError(503, "KEYWORDS_DISABLED", "Chưa cấu hình AI gợi ý từ khoá")));
+    const { ctrl, session, authLost } = setup(
+      { police: { image: [item("a1")] }, news: { image: [item("n1"), item("n2"), item("n3")] } },
+      { "Công an": ["police"] },
+      undefined,
+      { ai },
+    );
+    await ctrl.autoFill();
+    expect(uri(session, "s2")).toBe("f-a1");
+    expect(ctrl.state.byScene.s2?.query).toBe("police");
+    expect(Object.values(ctrl.state.byScene).every((s) => s.error === null)).toBe(true);
+    expect(ctrl.state.warnings).toEqual([]);
+    expect(ctrl.state.keywordNote).toBe("Đang dùng từ khoá từ điển");
+    expect(authLost).not.toHaveBeenCalled();
+  });
+
+  it("AI trả rỗng cho một câu thì câu đó dùng từ điển; AI hết kết quả thì lùi về từ khoá chung", async () => {
+    const ai = aiOf(async () => [["nothing here"], [], ["nothing here"], ["nothing here"]]);
+    const { ctrl, session } = setup(
+      { police: { image: [item("a1")] }, news: { image: [item("n1"), item("n2"), item("n3")] } },
+      { "Công an": ["police"] },
+      undefined,
+      { ai },
+    );
+    await ctrl.autoFill();
+    expect(ctrl.state.byScene.s2?.query).toBe("police");
+    expect(uri(session, "s2")).toBe("f-a1");
+    expect(ctrl.state.byScene.s1?.query).toBe("news");
+    expect(uri(session, "s1")).toBe("f-n1");
+  });
+
+  it("bỏ qua đoạn dùng tiếp: không gửi câu đó cho AI", async () => {
+    const ai = aiOf(async (_title, sentences) => sentences.map((_s, i) => [`q${i}`]));
+    const { ctrl, session } = setup({ q0: { image: [item("a")] }, q1: { image: [item("b")] }, q2: { image: [item("c")] } }, {}, undefined, { ai });
+    session.update((d) => ({ ...d, options: d.options.withSceneContinued("s3", true) }));
+    await ctrl.autoFill();
+    const sentences = ai.suggest.mock.calls[0]![1];
+    expect(sentences).toHaveLength(3);
+    expect(sentences).not.toContain(session.state.project!.scenes[2]!.text);
+    expect(ctrl.state.byScene.s3).toBeUndefined();
+    expect(uri(session, "s4")).toBe("f-c");
+  });
+
+  it("chống lặp ảnh: không gán cùng provider+id cho hai cảnh; kết quả đã dùng thì lấy kết quả kế, hết thì thử từ khoá kế", async () => {
+    const alt = { ...item("x1"), fullUrl: "f-x1-khac" }; // cùng provider+id, khác URL
+    const ai = aiOf(async () => [["same"], ["same"], ["same", "other"], ["dup", "fresh"]]);
+    const { ctrl, session } = setup(
+      {
+        same: { image: [item("x1"), item("x2")] },
+        other: { image: [item("y1")] },
+        dup: { image: [alt] },
+        fresh: { image: [item("z1")] },
+      },
+      {},
+      undefined,
+      { ai },
+    );
+    await ctrl.autoFill();
+    expect(uri(session, "s1")).toBe("f-x1");
+    expect(uri(session, "s2")).toBe("f-x2");
+    expect(uri(session, "s3")).toBe("f-y1");
+    expect(ctrl.state.byScene.s3?.query).toBe("other");
+    expect(uri(session, "s4")).toBe("f-z1");
+    expect(ctrl.state.byScene.s4?.query).toBe("fresh");
   });
 });

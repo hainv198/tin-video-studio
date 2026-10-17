@@ -34,6 +34,12 @@ describe("buildServerContainer", () => {
     expect(names.every((n: string) => n.startsWith("vi-VN-Gemini-"))).toBe(true);
   });
 
+  it("gợi ý từ khoá AI chỉ bật khi có GEMINI_TEXT_API_KEY (không dùng GEMINI_API_KEY), tắt khi giả lập", () => {
+    expect(buildServerContainer({ ...base, ...realKeys, GEMINI_API_KEY: "gm" }).keywords).toBeUndefined();
+    expect(buildServerContainer({ ...base, ...realKeys, GEMINI_TEXT_API_KEY: "gt" }).keywords).toBeDefined();
+    expect(buildServerContainer({ ...base, FAKE_PROVIDERS: "1", GEMINI_TEXT_API_KEY: "gt" }).keywords).toBeUndefined();
+  });
+
   it("cấm giả lập trên production của Vercel", () => {
     expect(() => buildServerContainer({ ...base, FAKE_PROVIDERS: "1", VERCEL_ENV: "production" })).toThrow(
       "FAKE_PROVIDERS không được bật trên production",

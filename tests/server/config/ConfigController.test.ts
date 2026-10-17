@@ -11,6 +11,16 @@ function make(env: Record<string, string | undefined> = {}, overrides: { onAppli
 }
 
 describe("ConfigController.snapshot", () => {
+  it("có khoá GEMINI_TEXT_API_KEY (gợi ý từ khoá cảnh trám), tách khỏi GEMINI_API_KEY", () => {
+    const { controller } = make({ GEMINI_TEXT_API_KEY: "BIMAT-TEXT" });
+    const snap = controller.snapshot();
+    const text = snap.keys.find((k) => k.key === "GEMINI_TEXT_API_KEY");
+    expect(text).toMatchObject({ label: "Gemini (gợi ý từ khoá cảnh trám)", kind: "secret", isSet: true });
+    expect(text?.hint).toContain("aistudio.google.com");
+    expect(snap.keys.find((k) => k.key === "GEMINI_API_KEY")?.isSet).toBe(false);
+    expect(JSON.stringify(snap)).not.toContain("BIMAT-TEXT");
+  });
+
   it("liệt kê đúng whitelist, không lộ giá trị", () => {
     const { controller } = make({ GEMINI_API_KEY: "BIMAT-123", MINIMAX_VOICES: "BIMAT-VOICES", EDGE_TTS_DEV: "1" });
     const snap = controller.snapshot();

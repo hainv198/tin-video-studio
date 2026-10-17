@@ -1,4 +1,5 @@
 import { stockItemToFootage } from "@/client/media/footageFactory";
+import type { KeywordAiApi } from "@/client/services/KeywordClient";
 import type { StockApi, StockItemDto } from "@/client/services/StockClient";
 import { isSessionExpired } from "@/client/errors/userMessage";
 import type { Footage } from "@/domain/Footage";
@@ -13,6 +14,9 @@ export interface KeywordSource {
   suggest(sentence: string, maxQueries?: number): string[];
 }
 
+/** Gợi ý từ khoá bằng AI cho nhiều câu một lượt (POST /api/keywords). */
+export type KeywordAi = KeywordAiApi;
+
 export interface SceneSearch {
   query: string;
   loading: boolean;
@@ -25,12 +29,16 @@ export interface FootageSearchState {
   byScene: Record<string, SceneSearch>;
   autoRunning: boolean;
   warnings: string[];
+  /** Ghi chú nhẹ khi AI gợi ý từ khoá không dùng được và đang lùi về từ điển. */
+  keywordNote: string | null;
 }
 
 export interface FootageSearchDeps {
   session: StudioSession;
   stock: StockApi;
   keywords: (fallback: string) => KeywordSource;
+  /** Tuỳ chọn: lỗi hoặc thiếu thì dùng từ điển như cũ. */
+  aiKeywords?: KeywordAi;
   templates: Pick<TemplateRegistry, "get">;
   ids: IdGenerator;
   concurrency?: number;
@@ -40,6 +48,7 @@ export interface FootageSearchDeps {
 const MAX_CANDIDATES = 8;
 const MAX_PHRASES = 3;
 const PARTIAL_SOURCE_WARNING = "Một nguồn cảnh trám đang lỗi, chỉ dùng nguồn còn lại";
+export const DICTIONARY_NOTE = "Đang dùng từ khoá từ điển";
 
 /** Gộp xen kẽ ảnh và video (ảnh trước), bỏ trùng, tối đa `limit`. */
 export function interleave(images: StockItemDto[], videos: StockItemDto[], limit = MAX_CANDIDATES): StockItemDto[] {
@@ -76,6 +85,8 @@ async function runPool<T>(items: readonly T[], limit: number, fn: (t: T) => Prom
 
 const isAbort = (error: unknown) => error instanceof DOMException && error.name === "AbortError";
 
+const itemKey = (it: StockItemDto) => `${it.provider}:${it.id}`;
+
 function uriOf(footage: Footage | undefined): string | null {
   if (!footage) return null;
   const snap = footage.snapshot();
@@ -87,10 +98,13 @@ export class FootageSearchController extends StateController<FootageSearchState>
   private readonly inflight = new Map<string, AbortController>();
   private readonly suggesters = new Map<string, KeywordSource>();
   private readonly manual = new Set<string>(); // cảnh người dùng tự tìm từ lúc autoFill bắt đầu
+  private readonly claimed = new Set<string>(); // provider:id đã gán trong lượt tự điền, chống lặp ảnh
+  private aiQueries = new Map<string, string[]>();
+  private aiAbort: AbortController | null = null;
   private run = 0;
 
   constructor(private readonly deps: FootageSearchDeps) {
-    super({ byScene: {}, autoRunning: false, warnings: [] }, deps.onAuthLost);
+    super({ byScene: {}, autoRunning: false, warnings: [], keywordNote: null }, deps.onAuthLost);
   }
 
   async autoFill(): Promise<void> {
@@ -100,8 +114,12 @@ export class FootageSearchController extends StateController<FootageSearchState>
     if (!this.deps.session.state.project) return;
     // Chỉ đoạn có cảnh trám riêng; đoạn dùng tiếp cảnh đoạn trước không cần tìm.
     const todo = missingFootageSceneIds(this.deps.session.state);
-    this.patch({ autoRunning: true, warnings: [] });
+    this.claimed.clear();
+    this.aiQueries = new Map();
+    this.patch({ autoRunning: true, warnings: [], keywordNote: null });
     try {
+      await this.loadAiQueries(todo, run);
+      if (run !== this.run) return;
       await runPool(todo, this.deps.concurrency ?? 3, (sceneId) => this.fillScene(sceneId, run));
     } finally {
       this.patch({ autoRunning: false });
@@ -134,6 +152,7 @@ export class FootageSearchController extends StateController<FootageSearchState>
     try {
       const footage = stockItemToFootage(item, this.deps.ids());
       this.deps.session.update((d) => ({ ...d, footage: d.footage.assign(sceneId, footage) }));
+      this.claimed.add(itemKey(item));
       this.patchScene(sceneId, { error: null });
     } catch (error) {
       this.patchScene(sceneId, { error: this.report(error) });
@@ -154,6 +173,8 @@ export class FootageSearchController extends StateController<FootageSearchState>
   /** Dừng cả lượt: huỷ yêu cầu đang bay và không nhận thêm cảnh mới. */
   cancel(): void {
     this.run++;
+    this.aiAbort?.abort();
+    this.aiAbort = null;
     const pending = [...this.inflight.keys()];
     for (const controller of this.inflight.values()) controller.abort();
     this.inflight.clear();
@@ -173,7 +194,41 @@ export class FootageSearchController extends StateController<FootageSearchState>
   reset(): void {
     this.cancel();
     this.manual.clear();
-    this.patch({ byScene: {}, warnings: [], autoRunning: false });
+    this.patch({ byScene: {}, warnings: [], autoRunning: false, keywordNote: null });
+  }
+
+  /** Một lượt gọi AI cho mọi đoạn cần cảnh riêng; lỗi gì cũng lùi về từ điển, không báo lỗi. */
+  private async loadAiQueries(sceneIds: readonly string[], run: number): Promise<void> {
+    const ai = this.deps.aiKeywords;
+    const project = this.deps.session.state.project;
+    if (!ai || !project || sceneIds.length === 0) return;
+    const scenes = sceneIds.flatMap((id) => project.scenes.filter((s) => s.id === id));
+    const controller = new AbortController();
+    this.aiAbort = controller;
+    try {
+      const lists = await ai.suggest(
+        project.displayTitle,
+        scenes.map((s) => s.text),
+        controller.signal,
+      );
+      if (run !== this.run) return;
+      const map = new Map<string, string[]>();
+      scenes.forEach((scene, i) => {
+        const queries = (lists[i] ?? []).map((q) => q.trim()).filter(Boolean);
+        if (queries.length > 0) map.set(scene.id, queries);
+      });
+      this.aiQueries = map;
+    } catch (error) {
+      if (run === this.run && !isAbort(error)) this.patch({ keywordNote: DICTIONARY_NOTE });
+    } finally {
+      if (this.aiAbort === controller) this.aiAbort = null;
+    }
+  }
+
+  private phrasesFor(sceneId: string, text: string, fallback: string): string[] {
+    const ai = this.aiQueries.get(sceneId);
+    if (!ai) return this.suggester(fallback).suggest(text, MAX_PHRASES);
+    return ai.includes(fallback) ? ai : [...ai, fallback];
   }
 
   private async fillScene(sceneId: string, run: number): Promise<void> {
@@ -194,10 +249,11 @@ export class FootageSearchController extends StateController<FootageSearchState>
     let current = scene.text;
     try {
       const fallback = this.deps.templates.get(project.templateId).defaults.fallbackKeyword;
-      const phrases = this.suggester(fallback).suggest(scene.text, MAX_PHRASES);
+      const phrases = this.phrasesFor(sceneId, scene.text, fallback);
       const first = phrases[0] ?? fallback;
       current = first;
       this.setScene(sceneId, { query: first, loading: true, items: [], error: null, empty: false });
+      let firstHit: { phrase: string; items: StockItemDto[] } | null = null;
       for (const phrase of phrases) {
         current = phrase;
         let items = await this.query(phrase, signal, preferred);
@@ -206,11 +262,20 @@ export class FootageSearchController extends StateController<FootageSearchState>
           items = await this.query(phrase, signal, backup);
           if (!this.owns(sceneId, signal)) return;
         }
-        if (items.length > 0) {
+        if (items.length === 0) continue;
+        firstHit ??= { phrase, items };
+        // Kết quả nào cũng đã dùng ở cảnh khác thì thử cụm kế để tránh lặp ảnh.
+        if (this.deps.session.state.footage.get(sceneId) || this.firstUnused(items)) {
           this.setScene(sceneId, { query: phrase, loading: false, items, error: null, empty: false });
           this.pickFirstUnused(sceneId, items);
           return;
         }
+      }
+      if (firstHit) {
+        // Hết cụm mà vẫn trùng: chấp nhận dùng lại kết quả đầu còn hơn để trống.
+        this.setScene(sceneId, { query: firstHit.phrase, loading: false, items: firstHit.items, error: null, empty: false });
+        this.pickFirstUnused(sceneId, firstHit.items);
+        return;
       }
       this.setScene(sceneId, { query: first, loading: false, items: [], error: null, empty: true });
     } catch (error) {
@@ -248,11 +313,16 @@ export class FootageSearchController extends StateController<FootageSearchState>
     return merged;
   }
 
-  private pickFirstUnused(sceneId: string, items: StockItemDto[]): void {
+  /** Kết quả đầu chưa gán cho cảnh nào (so cả URL trên bảng lẫn provider+id đã gán trong lượt). */
+  private firstUnused(items: StockItemDto[]): StockItemDto | undefined {
     const board = this.deps.session.state.footage;
-    if (board.get(sceneId)) return; // người dùng đã gán cảnh này trong lúc chờ
     const used = new Set(board.sceneIds().map((id) => uriOf(board.get(id))));
-    const pick = items.find((it) => !used.has(it.fullUrl)) ?? items[0];
+    return items.find((it) => !used.has(it.fullUrl) && !this.claimed.has(itemKey(it)));
+  }
+
+  private pickFirstUnused(sceneId: string, items: StockItemDto[]): void {
+    if (this.deps.session.state.footage.get(sceneId)) return; // người dùng đã gán cảnh này trong lúc chờ
+    const pick = this.firstUnused(items) ?? items[0];
     if (pick) this.choose(sceneId, pick);
   }
 

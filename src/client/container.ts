@@ -3,6 +3,7 @@ import { BrowserMediaProbe, type MediaProbe } from "@/client/media/MediaProbe";
 import { browserSupport, type SupportReport } from "@/client/render/BrowserSupport";
 import { RenderClient } from "@/client/render/RenderClient";
 import { networkSafeFetch } from "@/client/services/apiError";
+import { KeywordClient, type KeywordAiApi } from "@/client/services/KeywordClient";
 import { defaultKeywordSuggester, type KeywordSuggester } from "@/client/services/KeywordSuggester";
 import { MusicLibrary } from "@/client/services/MusicLibrary";
 import { StockClient, type StockApi } from "@/client/services/StockClient";
@@ -29,6 +30,7 @@ export interface ClientServices {
   tts: TtsApi;
   stock: StockApi;
   keywords: KeywordSuggester;
+  keywordAi: KeywordAiApi;
   music: MusicLibrary;
   tracks: TrackSource;
   drafts: DraftRepository;
@@ -51,6 +53,7 @@ export function createClientServices(env: ClientEnv): ClientServices {
     tts: new TtsClient(env.fetch),
     stock: new StockClient(env.fetch),
     keywords: defaultKeywordSuggester(),
+    keywordAi: new KeywordClient(env.fetch),
     music: new MusicLibrary(env.fetch),
     tracks: new TrackSource(env.fetch, uploads),
     drafts: new DraftRepository(store),

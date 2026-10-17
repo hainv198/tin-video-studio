@@ -18,6 +18,12 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
     kind: "secret",
   },
   {
+    key: "GEMINI_TEXT_API_KEY",
+    label: "Gemini (gợi ý từ khoá cảnh trám)",
+    hint: "Lấy ở Google AI Studio (aistudio.google.com) → Get API key. Chỉ dùng để gợi ý từ khoá, không bật giọng Gemini.",
+    kind: "secret",
+  },
+  {
     key: "PIXABAY_API_KEY",
     label: "Pixabay (cảnh trám)",
     hint: "Đăng ký miễn phí ở pixabay.com, key hiện ở trang tài liệu API.",

@@ -71,7 +71,15 @@ export function createStudio(services: ClientServices, options: StudioOptions = 
     return source;
   };
 
-  const search = new FootageSearchController({ session, stock: services.stock, keywords, templates: services.templates, ids, onAuthLost });
+  const search = new FootageSearchController({
+    session,
+    stock: services.stock,
+    keywords,
+    aiKeywords: services.keywordAi,
+    templates: services.templates,
+    ids,
+    onAuthLost,
+  });
   const render = new RenderController({
     session,
     builder,

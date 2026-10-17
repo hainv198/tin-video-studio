@@ -2,6 +2,7 @@ import { AuthController } from "./auth/AuthController";
 import { BcryptPasswordHasher } from "./auth/PasswordHasher";
 import { SessionService } from "./auth/SessionService";
 import { UserDirectory } from "./auth/UserDirectory";
+import { GeminiKeywordService } from "./keywords/GeminiKeywordService";
 import { FakeStockProvider } from "./stock/FakeStockProvider";
 import { PexelsService } from "./stock/PexelsService";
 import { PixabayService } from "./stock/PixabayService";
@@ -25,6 +26,8 @@ export interface ServerContainer {
   usingFakes: boolean;
   tts: TtsController;
   stock: StockController;
+  /** Gợi ý từ khoá cảnh trám bằng AI; undefined khi chưa có GEMINI_TEXT_API_KEY (client lùi về từ điển). */
+  keywords: GeminiKeywordService | undefined;
 }
 
 export function buildServerContainer(env: Record<string, string | undefined>): ServerContainer {
@@ -60,6 +63,7 @@ export function buildServerContainer(env: Record<string, string | undefined>): S
     usingFakes,
     tts: new TtsController(ttsProvider),
     stock: new StockController(stockProviders),
+    keywords: usingFakes ? undefined : buildKeywords(env),
   };
 }
 
@@ -129,6 +133,13 @@ function buildGemini(env: Record<string, string | undefined>): GeminiTtsService 
   const apiKey = env.GEMINI_API_KEY?.trim();
   if (!apiKey) return undefined;
   return new GeminiTtsService({ apiKey, model: env.GEMINI_MODEL?.trim() || undefined });
+}
+
+/** Chỉ dùng GEMINI_TEXT_API_KEY (không dùng GEMINI_API_KEY, vì biến đó bật giọng Gemini). */
+function buildKeywords(env: Record<string, string | undefined>): GeminiKeywordService | undefined {
+  const apiKey = env.GEMINI_TEXT_API_KEY?.trim();
+  if (!apiKey) return undefined;
+  return new GeminiKeywordService({ apiKey, model: env.GEMINI_TEXT_MODEL?.trim() || undefined });
 }
 
 /** Next tách module theo route nên cache phải nằm trên globalThis, nếu không reset ở route cấu hình không tới được route khác. */

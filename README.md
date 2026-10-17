@@ -64,6 +64,16 @@ Có cấu hình MiniMax thì giọng clone dùng được cả khi `FAKE_PROVIDE
 
 Lưu ý: gói miễn phí có giới hạn lượt gọi mỗi phút và mỗi ngày; hết lượt app báo "Gemini đã hết lượt tạo giọng, thử lại sau". Tốc độ đọc chỉ là gợi ý trong lời nhắc (nhanh hơn khi từ 1,15, chậm hơn khi từ 0,9 trở xuống), không chính xác như giọng Google.
 
+## Gợi ý từ khoá cảnh trám bằng AI (Gemini, tuỳ chọn)
+
+Bấm "Tự tìm cảnh còn trống" thì app gửi một lượt tiêu đề + các câu cần cảnh riêng (bỏ đoạn "dùng tiếp") lên `POST /api/keywords`; Gemini đề ra 2–3 từ khoá tiếng Anh tả cảnh nhìn thấy được cho từng câu, khác nhau giữa các câu. Từ khoá hiện trong ô từ khoá của từng cảnh để sửa và "Tìm lại". Khi tự điền, app không gán cùng một ảnh/video (cùng nguồn + id) cho hai cảnh: kết quả đã dùng thì lấy kết quả kế, hết thì thử từ khoá kế.
+
+1. Lấy key ở https://aistudio.google.com (không cần thẻ).
+2. Dán vào `.env.local` (hoặc màn Cấu hình `/cai-dat`, hoặc Vercel) dòng `GEMINI_TEXT_API_KEY=<key>`. Tuỳ chọn `GEMINI_TEXT_MODEL` (mặc định `gemini-2.5-flash`).
+3. Biến này tách khỏi `GEMINI_API_KEY` (biến kia bật giọng Gemini). Có thể dán cùng một key cho cả hai.
+
+Chưa có key, hết lượt (429) hoặc AI lỗi thì app lặng lẽ dùng từ điển cố định như trước và ghi chú nhẹ "Đang dùng từ khoá từ điển". Khi `FAKE_PROVIDERS=1` tính năng này tắt.
+
 ## API (đều cần đăng nhập, trừ đăng nhập)
 
 | Route | Việc |
@@ -73,6 +83,7 @@ Lưu ý: gói miễn phí có giới hạn lượt gọi mỗi phút và mỗi n
 | `GET /api/tts/voices` | danh sách giọng `vi-VN` |
 | `POST /api/tts` | `{ text, voiceName, speakingRate }` → âm thanh |
 | `GET /api/stock/search?q=&kind=image\|video&page=&perPage=` | cảnh trám gộp Pexels + Pixabay |
+| `POST /api/keywords` | `{ title?, sentences: string[] }` (≤ 20 câu, mỗi câu ≤ 500 ký tự) → `{ suggestions: [{ queries }] }`; chưa có `GEMINI_TEXT_API_KEY` thì 503 |
 
 ## Kiểm tra
 
@@ -152,6 +163,7 @@ Lưu ý:
 | `VCLIP_API_KEY`, `VCLIP_VOICES` | Không (phải có đủ cặp) | Xem mục giọng vclip.io |
 | `MINIMAX_API_KEY`, `MINIMAX_VOICES` | Không (phải có đủ cặp) | Xem mục giọng clone MiniMax |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | Không | Xem mục giọng Gemini; model mặc định `gemini-2.5-flash-preview-tts` |
+| `GEMINI_TEXT_API_KEY`, `GEMINI_TEXT_MODEL` | Không | Xem mục gợi ý từ khoá bằng AI; tách khỏi `GEMINI_API_KEY`; model mặc định `gemini-2.5-flash` |
 | `MINIMAX_MODEL`, `MINIMAX_BASE_URL` | Không | Mặc định `speech-2.8-hd` và `https://api.minimax.io` |
 | `FAKE_PROVIDERS` | Không, chỉ máy dev | `1` = giọng và cảnh trám giả lập; bật trên production là lỗi |
 | `EDGE_TTS_DEV` | Không, chỉ máy dev | `1` = nghe thử giọng Edge qua `edge-tts`; bật khi deploy là lỗi |

@@ -82,6 +82,17 @@ describe("validateEnv", () => {
     const off = validateEnv({ ...base, FAKE_PROVIDERS: "1" });
     expect(off.ok ? off.summary.join("\n") : "").not.toContain("Gemini");
   });
+
+  it("GEMINI_TEXT_API_KEY tuỳ chọn: có thì ghi đã đặt (không lộ key), thiếu chỉ nhắc nhẹ, không lỗi", () => {
+    const on = validateEnv({ ...base, FAKE_PROVIDERS: "1", GEMINI_TEXT_API_KEY: "gt-bi-mat" });
+    expect(on.ok).toBe(true);
+    const text = on.ok ? on.summary.join("\n") : "";
+    expect(text).toContain("AI gợi ý từ khoá cảnh trám: đã đặt");
+    expect(text).not.toContain("gt-bi-mat");
+    const off = validateEnv({ ...base, FAKE_PROVIDERS: "1" });
+    expect(off.ok).toBe(true);
+    expect(off.ok ? off.summary.join("\n") : "").toContain("AI gợi ý từ khoá cảnh trám: chưa đặt GEMINI_TEXT_API_KEY, dùng từ điển");
+  });
 });
 
 describe("validateEnv — Vercel Preview", () => {
