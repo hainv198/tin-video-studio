@@ -128,6 +128,11 @@ export function StepVoice({ studio }: { studio: Studio }) {
           {voice.fallbackNotice}
         </p>
       )}
+      {voice.stoppedNotice && (
+        <p role="status" className="text-sm text-neutral-400">
+          {voice.stoppedNotice}
+        </p>
+      )}
       {voice.voicesLoading && <p className="text-sm text-neutral-400">Đang tải danh sách giọng…</p>}
       {voice.error && (
         <p role="alert" className="text-red-400">

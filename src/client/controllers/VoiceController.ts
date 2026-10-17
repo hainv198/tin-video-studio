@@ -19,9 +19,12 @@ export interface VoiceState {
   previewing: boolean;
   /** Có chữ khi tool đã tự chuyển cả tin sang giọng Edge vì giọng chính hết lượt. */
   fallbackNotice: string | null;
+  /** Có chữ ngay sau khi người dùng bấm Dừng; xoá ở lần thao tác kế. */
+  stoppedNotice: string | null;
 }
 
 export const FALLBACK_NOTICE = "Gemini đã hết lượt, đã chuyển cả tin sang giọng Edge (miễn phí, chỉ trên máy này)";
+export const STOPPED_NOTICE = "Đã dừng. Các câu đã tạo được giữ lại.";
 const EDGE_TIER = "Edge";
 
 export interface VoiceControllerDeps {
@@ -40,11 +43,14 @@ const INITIAL: VoiceState = {
   failed: {},
   previewing: false,
   fallbackNotice: null,
+  stoppedNotice: null,
 };
 
 /** Bước 2: chọn giọng, tốc độ, tạo giọng riêng cho từng câu. */
 export class VoiceController extends StateController<VoiceState> {
-  private cancelRequested = false;
+  /** Lượt tạo giọng/thử lại đang chạy; null khi rảnh hoặc đã bị Dừng (lượt cũ tự bỏ kết quả). */
+  private active: AbortController | null = null;
+  private previewCtl: AbortController | null = null;
   /** Tăng mỗi lần reset: kết quả của lượt đọc bắt đầu ở dự án cũ bị bỏ. */
   private epoch = 0;
 
@@ -101,16 +107,18 @@ export class VoiceController extends StateController<VoiceState> {
       return;
     }
     const todo = staleSceneIds(this.deps.session.state);
-    this.cancelRequested = false;
+    const run = new AbortController();
+    this.active = run;
     const epoch = this.epoch;
-    this.patch({ generating: true, error: null, failed: {}, progress: { done: 0, total: todo.length } });
+    this.patch({ generating: true, error: null, failed: {}, stoppedNotice: null, progress: { done: 0, total: todo.length } });
     let restart = false;
     try {
       let done = 0;
       for (const sceneId of todo) {
-        if (this.cancelRequested) break;
-        const outcome = await this.runScene(sceneId, epoch);
-        if (outcome === "quota" && allowFallback && epoch === this.epoch && !this.cancelRequested && this.switchToEdge()) {
+        if (this.active !== run) break;
+        const outcome = await this.runScene(sceneId, epoch, run);
+        if (this.active !== run) break;
+        if (outcome === "quota" && allowFallback && epoch === this.epoch && this.switchToEdge()) {
           restart = true;
           break;
         }
@@ -119,33 +127,52 @@ export class VoiceController extends StateController<VoiceState> {
         if (outcome === "stop") break;
       }
     } finally {
-      this.patch(epoch === this.epoch ? { generating: false, progress: null } : { generating: false, progress: null, failed: {} });
+      // Đã bị Dừng/reset thì cancel() đã trả trạng thái rồi; lượt cũ không được đụng vào lượt mới.
+      if (this.active === run) {
+        this.active = null;
+        this.patch({ generating: false, progress: null });
+      }
     }
     // Đổi giọng nên mọi câu cũ đều thành cũ: đọc lại cả tin bằng giọng Edge (chỉ một lần).
-    if (restart) await this.generateRun(false);
+    if (restart && this.active === null) await this.generateRun(false);
   }
 
   async retry(sceneId: string): Promise<void> {
     if (this.state.generating) return;
-    this.cancelRequested = false;
+    const run = new AbortController();
+    this.active = run;
     const epoch = this.epoch;
-    this.patch({ generating: true, error: null });
+    this.patch({ generating: true, error: null, stoppedNotice: null });
     try {
-      await this.runScene(sceneId, epoch);
+      await this.runScene(sceneId, epoch, run);
     } finally {
-      this.patch(epoch === this.epoch ? { generating: false } : { generating: false, failed: {} });
+      if (this.active === run) {
+        this.active = null;
+        this.patch({ generating: false });
+      }
     }
   }
 
+  /** Dừng NGAY: huỷ lần gọi đang bay, trả trạng thái về rảnh; các câu đã xong giữ nguyên. */
   cancel(): void {
-    this.cancelRequested = true;
+    const run = this.active;
+    const preview = this.previewCtl;
+    this.active = null;
+    this.previewCtl = null;
+    run?.abort();
+    preview?.abort();
+    if (!run && !preview) return;
+    this.patch({
+      ...(run ? { generating: false, progress: null, stoppedNotice: STOPPED_NOTICE } : {}),
+      ...(preview ? { previewing: false } : {}),
+    });
   }
 
   /** Dự án mới: dừng lượt đang chạy và bỏ lỗi, tiến độ của dự án cũ. */
   reset(): void {
     this.epoch += 1;
     this.cancel();
-    this.patch({ error: null, failed: {}, progress: null, fallbackNotice: null });
+    this.patch({ error: null, failed: {}, progress: null, fallbackNotice: null, stoppedNotice: null });
   }
 
   async previewVoice(): Promise<Blob | null> {
@@ -154,36 +181,46 @@ export class VoiceController extends StateController<VoiceState> {
       this.patch({ error: voice ? "Chưa có dự án" : "Chưa chọn giọng" });
       return null;
     }
+    const ctl = new AbortController();
+    this.previewCtl = ctl;
     this.patch({ previewing: true, error: null });
     try {
       const tweak = this.deps.session.state.options.voiceTweak;
-      if (isDefaultVoiceTweak(tweak)) return await this.previewWith(project.introScene.text, voice, true);
+      if (isDefaultVoiceTweak(tweak)) {
+        const blob = await this.previewWith(project.introScene.text, voice, true, ctl.signal);
+        return this.previewCtl === ctl ? blob : null;
+      }
       // Có tinh chỉnh: dùng giọng đã tạo của câu tiêu đề nếu còn mới (khỏi tốn lượt), không thì đọc thử; xử lý ở máy rồi phát WAV.
       const intro = project.introScene;
       const narration = this.deps.session.state.narrations.get(intro.id);
       const bytes =
         narration && !narration.isStaleFor(intro, voice)
           ? (narration.audio.slice().buffer as ArrayBuffer)
-          : await (await this.previewWith(intro.text, voice, true)).arrayBuffer();
+          : await (await this.previewWith(intro.text, voice, true, ctl.signal)).arrayBuffer();
       const decoded = await this.deps.decoder.decode(bytes);
+      if (this.previewCtl !== ctl) return null;
       const samples = applyVoiceTweak(AudioDecodeService.toMono(decoded.channels), decoded.sampleRate, tweak);
       return new Blob([encodeWav(samples, decoded.sampleRate)], { type: "audio/wav" });
     } catch (error) {
+      if (this.previewCtl !== ctl) return null; // đã bị Dừng/reset: bỏ im lặng
       this.patch({ error: this.report(error) });
       return null;
     } finally {
-      this.patch({ previewing: false });
+      if (this.previewCtl === ctl) {
+        this.previewCtl = null;
+        this.patch({ previewing: false });
+      }
     }
   }
 
-  private async previewWith(text: string, voice: VoiceSettings, allowFallback: boolean): Promise<Blob> {
+  private async previewWith(text: string, voice: VoiceSettings, allowFallback: boolean, signal: AbortSignal): Promise<Blob> {
     try {
-      const bytes = await this.deps.tts.synthesize(text, voice.voiceName, voice.speakingRate);
+      const bytes = await this.deps.tts.synthesize(text, voice.voiceName, voice.speakingRate, signal);
       return new Blob([bytes], { type: "audio/mpeg" });
     } catch (error) {
       if (allowFallback && isQuotaExhausted(error) && this.switchToEdge()) {
         const next = this.deps.session.state.voice;
-        if (next) return this.previewWith(text, next, false);
+        if (next) return this.previewWith(text, next, false, signal);
       }
       throw error;
     }
@@ -208,16 +245,16 @@ export class VoiceController extends StateController<VoiceState> {
   }
 
   /** Tạo giọng một cảnh. "stop" nếu phải dừng cả lượt (hết phiên); "quota" nếu hết lượt giọng. */
-  private async runScene(sceneId: string, epoch: number): Promise<"ok" | "stop" | "quota"> {
+  private async runScene(sceneId: string, epoch: number, run: AbortController): Promise<"ok" | "stop" | "quota"> {
     const start = this.deps.session.state;
     const scene = start.project?.scenes.find((s) => s.id === sceneId);
     const voice = start.voice;
     if (!scene || !voice) return "ok";
     try {
-      const bytes = await this.deps.tts.synthesize(scene.text, voice.voiceName, voice.speakingRate);
+      const bytes = await this.deps.tts.synthesize(scene.text, voice.voiceName, voice.speakingRate, run.signal);
       // decode làm hỏng (detach) bộ đệm đầu vào nên đưa bản sao; bản gốc đem lưu.
       const decoded = await this.deps.decoder.decode(bytes.slice(0));
-      if (this.cancelRequested || epoch !== this.epoch) return "ok";
+      if (this.active !== run || epoch !== this.epoch) return "ok";
       const narration = Narration.create({
         sceneId,
         text: scene.text,
@@ -234,7 +271,7 @@ export class VoiceController extends StateController<VoiceState> {
       this.patch({ failed: rest });
       return "ok";
     } catch (error) {
-      if (epoch !== this.epoch) return "ok";
+      if (this.active !== run || epoch !== this.epoch) return "ok";
       this.patch({ failed: { ...this.state.failed, [sceneId]: this.report(error) } });
       if (isSessionExpired(error)) return "stop";
       return isQuotaExhausted(error) ? "quota" : "ok";

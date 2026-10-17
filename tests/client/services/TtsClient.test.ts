@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/client/services/AuthClient";
+import { networkSafeFetch } from "@/client/services/apiError";
 import { TtsClient } from "@/client/services/TtsClient";
 
 describe("TtsClient", () => {
@@ -24,5 +25,18 @@ describe("TtsClient", () => {
       Response.json({ error: { code: "QUOTA", message: "Hết hạn mức giọng đọc hôm nay, liên hệ Hải" } }, { status: 429 })) as unknown as typeof fetch);
     await expect(client.synthesize("a", "vi-VN-A", 1)).rejects.toBeInstanceOf(ApiError);
     await expect(client.voices()).rejects.toThrow("Hết hạn mức giọng đọc hôm nay, liên hệ Hải");
+  });
+
+  it("synthesize truyền signal vào fetch; huỷ chủ động đi xuyên nguyên vẹn qua networkSafeFetch", async () => {
+    const hanging = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+    }));
+    const client = new TtsClient(networkSafeFetch(hanging as unknown as typeof fetch));
+    const controller = new AbortController();
+    const pending = client.synthesize("Xin chào.", "vi-VN-A", 1, controller.signal);
+    const [, init] = hanging.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.signal).toBe(controller.signal);
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
   });
 });

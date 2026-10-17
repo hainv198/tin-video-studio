@@ -206,6 +206,109 @@ describe("VoiceController", () => {
   });
 });
 
+describe("VoiceController: Dừng có hiệu lực ngay", () => {
+  /** TTS treo cho tới khi signal bị huỷ (như fetch thật); câu có trong `instant` trả ngay. */
+  function setupHang(instant: string[] = []) {
+    const made = makeSessionWithProject(2);
+    const signals: AbortSignal[] = [];
+    const tts: TtsApi = {
+      voices: async () => [],
+      synthesize: (text, _voice, _rate, signal) => {
+        if (instant.includes(text)) return Promise.resolve(new Uint8Array([1, 2, 3, 4]).buffer);
+        if (signal) signals.push(signal);
+        return new Promise<ArrayBuffer>((_resolve, reject) => {
+          signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+        });
+      },
+    };
+    const decoder = { decode: vi.fn(async () => ({ channels: [new Float32Array(48)], sampleRate: 48000, durationSec: 1.5 })) };
+    const ctrl = new VoiceController({ session: made.session, tts, decoder });
+    return { ...made, ctrl, signals, tts };
+  }
+
+  it("cancel làm generating=false ngay, abort lần gọi đang bay, không báo lỗi, báo đã dừng", async () => {
+    const { ctrl, signals, session } = setupHang();
+    const run = ctrl.generate();
+    await Promise.resolve();
+    expect(ctrl.state.generating).toBe(true);
+    ctrl.cancel();
+    expect(ctrl.state.generating).toBe(false);
+    expect(ctrl.state.progress).toBeNull();
+    expect(ctrl.state.stoppedNotice).toBe("Đã dừng. Các câu đã tạo được giữ lại.");
+    expect(signals[0]?.aborted).toBe(true);
+    await run;
+    expect(ctrl.state.error).toBeNull();
+    expect(ctrl.state.failed).toEqual({});
+    expect(session.state.narrations.size).toBe(0);
+  });
+
+  it("câu đã xong trước khi dừng được giữ, câu đang bay bị bỏ", async () => {
+    const probe = setupHang();
+    const first = probe.session.state.project!.scenes[0]!.text;
+    const { ctrl, session } = setupHang([first]);
+    const run = ctrl.generate();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(session.state.narrations.size).toBe(1);
+    ctrl.cancel();
+    await run;
+    expect(session.state.narrations.size).toBe(1);
+    expect(ctrl.state.generating).toBe(false);
+    expect(ctrl.state.error).toBeNull();
+  });
+
+  it("generate lại ngay sau khi dừng chạy được; kết quả muộn của lượt cũ không ảnh hưởng", async () => {
+    const made = setupHang();
+    let hang = true;
+    const tts: TtsApi = {
+      voices: async () => [],
+      synthesize: (text, v, r, signal) => (hang ? made.tts.synthesize(text, v, r, signal) : Promise.resolve(new Uint8Array([1, 2, 3, 4]).buffer)),
+    };
+    const decoder = { decode: vi.fn(async () => ({ channels: [new Float32Array(48)], sampleRate: 48000, durationSec: 1.5 })) };
+    const ctrl = new VoiceController({ session: made.session, tts, decoder });
+    const first = ctrl.generate();
+    await Promise.resolve();
+    ctrl.cancel();
+    hang = false;
+    await ctrl.generate();
+    expect(made.session.state.narrations.size).toBe(3);
+    expect(ctrl.state.stoppedNotice).toBeNull();
+    expect(ctrl.state.generating).toBe(false);
+    await first;
+    expect(ctrl.state.generating).toBe(false);
+    expect(ctrl.state.error).toBeNull();
+  });
+
+  it("retry và previewVoice cũng dừng được ngay", async () => {
+    const { ctrl } = setupHang();
+    const retry = ctrl.retry("s2");
+    await Promise.resolve();
+    expect(ctrl.state.generating).toBe(true);
+    ctrl.cancel();
+    expect(ctrl.state.generating).toBe(false);
+    await retry;
+    expect(ctrl.state.error).toBeNull();
+    const preview = ctrl.previewVoice();
+    await Promise.resolve();
+    expect(ctrl.state.previewing).toBe(true);
+    ctrl.cancel();
+    expect(ctrl.state.previewing).toBe(false);
+    expect(await preview).toBeNull();
+    expect(ctrl.state.error).toBeNull();
+  });
+
+  it("reset huỷ lượt đang chạy ngay", async () => {
+    const { ctrl, signals } = setupHang();
+    const run = ctrl.generate();
+    await Promise.resolve();
+    ctrl.reset();
+    expect(signals[0]?.aborted).toBe(true);
+    expect(ctrl.state.generating).toBe(false);
+    expect(ctrl.state.stoppedNotice).toBeNull();
+    await run;
+    expect(ctrl.state.error).toBeNull();
+  });
+});
+
 describe("VoiceController: tự chuyển sang giọng Edge khi hết lượt", () => {
   const NOTICE = "Gemini đã hết lượt, đã chuyển cả tin sang giọng Edge (miễn phí, chỉ trên máy này)";
   const VOICES = [

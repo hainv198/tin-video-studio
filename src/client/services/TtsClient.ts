@@ -8,7 +8,7 @@ export interface VoiceInfo {
 
 export interface TtsApi {
   voices(): Promise<VoiceInfo[]>;
-  synthesize(text: string, voiceName: string, speakingRate: number): Promise<ArrayBuffer>;
+  synthesize(text: string, voiceName: string, speakingRate: number, signal?: AbortSignal): Promise<ArrayBuffer>;
 }
 
 export class TtsClient implements TtsApi {
@@ -20,11 +20,12 @@ export class TtsClient implements TtsApi {
     return (await readJson<{ voices: VoiceInfo[] }>(response)).voices;
   }
 
-  async synthesize(text: string, voiceName: string, speakingRate: number): Promise<ArrayBuffer> {
+  async synthesize(text: string, voiceName: string, speakingRate: number, signal?: AbortSignal): Promise<ArrayBuffer> {
     const response = await this.fetchImpl("/api/tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, voiceName, speakingRate }),
+      signal,
     });
     if (!response.ok) throw await readApiError(response);
     assertSameSession(response);
