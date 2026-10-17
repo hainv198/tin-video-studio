@@ -35,7 +35,7 @@ describe("GET /api/config", () => {
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(text).not.toContain("BIMAT-1");
-    expect(JSON.parse(text).keys.length).toBe(7);
+    expect(JSON.parse(text).keys.length).toBe(4);
   });
 });
 

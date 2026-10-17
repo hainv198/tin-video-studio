@@ -12,13 +12,16 @@ function make(env: Record<string, string | undefined> = {}, overrides: { onAppli
 
 describe("ConfigController.snapshot", () => {
   it("liệt kê đúng whitelist, không lộ giá trị", () => {
-    const { controller } = make({ GEMINI_API_KEY: "BIMAT-123", MINIMAX_VOICES: '[{"a":1},{"a":2}]', EDGE_TTS_DEV: "1" });
+    const { controller } = make({ GEMINI_API_KEY: "BIMAT-123", MINIMAX_VOICES: "BIMAT-VOICES", EDGE_TTS_DEV: "1" });
     const snap = controller.snapshot();
     expect(snap.keys.map((k) => k.key)).toEqual(CONFIG_KEYS.map((k) => k.key));
     expect(snap.keys.find((k) => k.key === "GEMINI_API_KEY")?.isSet).toBe(true);
     expect(snap.keys.find((k) => k.key === "PIXABAY_API_KEY")?.isSet).toBe(false);
-    expect(snap.keys.find((k) => k.key === "MINIMAX_VOICES")?.count).toBe(2);
-    expect(snap.keys.find((k) => k.key === "EDGE_TTS_DEV")?.isSet).toBe(true);
+    for (const gone of ["MINIMAX_API_KEY", "MINIMAX_VOICES", "EDGE_TTS_DEV"]) {
+      expect(snap.keys.some((k) => k.key === gone)).toBe(false);
+      expect(CONFIG_KEYS.some((k) => k.key === gone)).toBe(false);
+    }
+    expect(JSON.stringify(snap)).not.toContain("BIMAT-VOICES");
     expect(JSON.stringify(snap)).not.toContain("BIMAT-123");
     expect(snap.editable).toBe(true);
   });
@@ -70,9 +73,12 @@ describe("ConfigController.update", () => {
     [{ set: { GEMINI_API_KEY: "a\rb" } }],
     [{ set: { GEMINI_API_KEY: "a\u0000b" } }],
     [{ set: { GEMINI_API_KEY: "a".repeat(4001) } }],
-    [{ set: { MINIMAX_VOICES: "{khong-json" } }],
-    [{ set: { MINIMAX_VOICES: '{"a":1}' } }],
-    [{ set: { EDGE_TTS_DEV: "yes" } }],
+    [{ set: { MINIMAX_API_KEY: "x" } }],
+    [{ set: { MINIMAX_VOICES: "[]" } }],
+    [{ set: { EDGE_TTS_DEV: "1" } }],
+    [{ clear: ["MINIMAX_API_KEY"] }],
+    [{ clear: ["MINIMAX_VOICES"] }],
+    [{ clear: ["EDGE_TTS_DEV"] }],
     [{ set: { GEMINI_API_KEY: 5 } }],
     [{ set: { GEMINI_API_KEY: "a" }, clear: ["GEMINI_API_KEY"] }],
     [{ set: [] }],
@@ -84,9 +90,16 @@ describe("ConfigController.update", () => {
     expect(apply).not.toHaveBeenCalled();
   });
 
+  it("3 khoá đã bỏ bị từ chối là khoá không được phép", async () => {
+    const { controller } = make({});
+    for (const key of ["MINIMAX_API_KEY", "MINIMAX_VOICES", "EDGE_TTS_DEV"]) {
+      await expect(controller.update({ set: { [key]: "BIMAT" } })).rejects.toThrow(/không được phép/);
+    }
+  });
+
   it("thông báo lỗi không chứa giá trị", async () => {
     const { controller } = make({});
-    const err = await controller.update({ set: { MINIMAX_VOICES: "BIMAT-json{" } }).catch((e: Error) => e);
+    const err = await controller.update({ set: { GEMINI_API_KEY: "BIMAT-json\n{" } }).catch((e: Error) => e);
     expect((err as Error).message).not.toContain("BIMAT");
   });
 

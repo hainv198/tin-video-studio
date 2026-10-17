@@ -35,24 +35,6 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
     hint: "Google Cloud Console → bật Text-to-Speech API → Credentials → API key.",
     kind: "secret",
   },
-  {
-    key: "MINIMAX_API_KEY",
-    label: "MiniMax (giọng clone)",
-    hint: "Bảng điều khiển MiniMax → API Keys. Cần dùng cùng danh sách giọng bên dưới.",
-    kind: "secret",
-  },
-  {
-    key: "MINIMAX_VOICES",
-    label: "Danh sách giọng MiniMax",
-    hint: 'Mảng JSON, ví dụ [{"alias":"Giọng A","voiceId":"...","gender":"FEMALE"}]. Tạo bằng npm run minimax:clone.',
-    kind: "json",
-  },
-  {
-    key: "EDGE_TTS_DEV",
-    label: "Edge TTS (chỉ khi dev)",
-    hint: 'Công tắc dùng giọng Edge trên máy dev, giá trị "1". Chỉ có tác dụng cùng FAKE_PROVIDERS=1.',
-    kind: "flag",
-  },
 ];
 
 export const MAX_VALUE_LENGTH = 4000;

@@ -51,8 +51,8 @@ describe("EnvFileWriter", () => {
   });
 
   it("giá trị JSON được bọc ngoặc đơn để dotenv đọc nguyên văn", async () => {
-    await new EnvFileWriter(file).apply({ set: { MINIMAX_VOICES: '[{"alias":"A B"}]' }, clear: [] });
-    expect(await readFile(file, "utf8")).toBe(`MINIMAX_VOICES='[{"alias":"A B"}]'\n`);
+    await new EnvFileWriter(file).apply({ set: { TEST_JSON_VALUE: '[{"alias":"A B"}]' }, clear: [] });
+    expect(await readFile(file, "utf8")).toBe(`TEST_JSON_VALUE='[{"alias":"A B"}]'\n`);
   });
 
   it("không để lại file tạm", async () => {

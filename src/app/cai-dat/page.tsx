@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 const GENDER_LABEL: Record<string, string> = { MALE: "Nam", FEMALE: "Nữ", NEUTRAL: "Trung tính" };
 const STOCK_LABEL: Record<string, string> = { pexels: "Pexels", pixabay: "Pixabay", fake: "Giả lập (dev)" };
 const TIER_ORDER = ["Vclip", "MiniMax", "Gemini", "Chirp3-HD", "Neural2", "Wavenet", "Standard", "Edge", "Fake"];
-const CLONE_ENV: Record<string, string> = { Vclip: "VCLIP_VOICES", MiniMax: "MINIMAX_VOICES" };
+const CLONE_TIERS = new Set(["Vclip", "MiniMax"]);
 
 function groupByTier(voices: TtsVoice[]): [string, TtsVoice[]][] {
   const groups = new Map<string, TtsVoice[]>();
@@ -113,8 +113,8 @@ export default async function SettingsPage() {
               <h3 className="text-sm font-medium text-neutral-300">
                 {tier} ({list.length})
               </h3>
-              {CLONE_ENV[tier] ? (
-                <p className="text-xs text-neutral-500">Giọng clone: thêm/bớt bằng biến VCLIP_VOICES / MINIMAX_VOICES</p>
+              {CLONE_TIERS.has(tier) ? (
+                <p className="text-xs text-neutral-500">Giọng clone: cấu hình trong file .env.local</p>
               ) : null}
               <table className="w-full border border-neutral-800 text-left text-sm">
                 <thead className="bg-neutral-900 text-neutral-400">
