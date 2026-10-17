@@ -26,7 +26,7 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mx-auto mt-24 flex w-full max-w-sm flex-col gap-4 rounded-xl bg-neutral-900 p-6">
+    <form onSubmit={onSubmit} className="mx-auto mt-16 flex w-full max-w-sm flex-col gap-4 rounded-xl bg-neutral-900 p-6 sm:mt-24">
       <h1 className="text-xl font-semibold">Tin Video Studio</h1>
       <label className="flex flex-col gap-1 text-sm">
         Tên đăng nhập
@@ -51,7 +51,7 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={state.status === "submitting"}
-        className="rounded-md bg-emerald-600 px-4 py-2 font-medium disabled:opacity-50"
+        className="min-h-11 sm:min-h-0 rounded-md bg-emerald-600 px-4 py-2 font-medium disabled:opacity-50"
       >
         {state.status === "submitting" ? "Đang đăng nhập…" : "Đăng nhập"}
       </button>

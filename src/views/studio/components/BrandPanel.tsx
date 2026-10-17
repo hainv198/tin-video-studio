@@ -19,9 +19,10 @@ export function BrandPanel({ studio, templateId }: { studio: Studio; templateId:
         spec.type === "image" ? (
           <div key={spec.key} className="flex flex-col gap-1 text-sm">
             {spec.label}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <input
                 type="file"
+                className="max-w-full"
                 aria-label={spec.label}
                 accept="image/png,image/jpeg,image/webp"
                 onChange={(e) => {
@@ -31,7 +32,7 @@ export function BrandPanel({ studio, templateId }: { studio: Studio; templateId:
                 }}
               />
               {brand.logo && (
-                <button type="button" className="rounded-md bg-neutral-800 px-3 py-1" onClick={() => studio.brand.clearLogo()}>
+                <button type="button" className="min-h-11 sm:min-h-0 rounded-md bg-neutral-800 px-3 py-1" onClick={() => studio.brand.clearLogo()}>
                   Bỏ logo ({Math.round(brand.logo.size / 1024)} KB)
                 </button>
               )}
@@ -61,7 +62,7 @@ export function BrandPanel({ studio, templateId }: { studio: Studio; templateId:
       <div className="flex items-center gap-3">
         <button
           type="button"
-          className="rounded-md bg-neutral-700 px-3 py-1.5 text-sm"
+          className="min-h-11 sm:min-h-0 rounded-md bg-neutral-700 px-3 py-1.5 text-sm"
           onClick={() => void studio.brand.save()}
         >
           Lưu thương hiệu

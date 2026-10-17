@@ -34,8 +34,8 @@ export default async function SettingsPage() {
 
   if (!isAdmin(user)) {
     return (
-      <main className="mx-auto max-w-4xl space-y-4 p-6">
-        <Link href="/studio" className="text-sm underline">
+      <main className="mx-auto max-w-4xl space-y-4 px-4 py-4 sm:p-6">
+        <Link href="/studio" className="inline-flex min-h-11 sm:min-h-0 items-center underline text-sm">
           ← Về trình dựng
         </Link>
         <h1 className="text-xl font-semibold">Cấu hình</h1>
@@ -65,13 +65,13 @@ export default async function SettingsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-4xl space-y-8 p-6">
+    <main className="mx-auto max-w-4xl space-y-8 px-4 py-4 sm:p-6">
       <header className="space-y-2">
-        <div className="flex gap-4 text-sm">
-          <Link href="/studio" className="underline">
+        <div className="flex flex-wrap gap-x-4 text-sm">
+          <Link href="/studio" className="inline-flex min-h-11 sm:min-h-0 items-center underline">
             ← Về trình dựng
           </Link>
-          <Link href="/tai-khoan" className="underline">
+          <Link href="/tai-khoan" className="inline-flex min-h-11 sm:min-h-0 items-center underline">
             Tài khoản
           </Link>
         </div>

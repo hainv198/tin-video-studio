@@ -110,7 +110,7 @@ export function StepVoice({ studio }: { studio: Studio }) {
           <button
             type="button"
             disabled={!tweaked}
-            className="rounded-md bg-neutral-800 px-3 py-1.5 disabled:opacity-40"
+            className="min-h-11 sm:min-h-0 rounded-md bg-neutral-800 px-3 py-1.5 disabled:opacity-40"
             onClick={() => studio.options.resetVoiceTweak()}
           >
             Về mặc định
@@ -138,7 +138,7 @@ export function StepVoice({ studio }: { studio: Studio }) {
         <button
           type="button"
           disabled={voice.previewing || !settings}
-          className="rounded-md bg-neutral-800 px-4 py-2 disabled:opacity-50"
+          className="min-h-11 sm:min-h-0 rounded-md bg-neutral-800 px-4 py-2 disabled:opacity-50"
           onClick={() => void preview()}
         >
           {voice.previewing ? "Đang đọc thử…" : "Nghe thử câu tiêu đề"}
@@ -146,13 +146,13 @@ export function StepVoice({ studio }: { studio: Studio }) {
         <button
           type="button"
           disabled={voice.generating || stale.size === 0 || !settings}
-          className="rounded-md bg-emerald-600 px-4 py-2 font-medium disabled:opacity-50"
+          className="min-h-11 sm:min-h-0 rounded-md bg-emerald-600 px-4 py-2 font-medium disabled:opacity-50"
           onClick={() => void studio.voice.generate()}
         >
           {stale.size === project.scenes.length ? "Tạo giọng" : stale.size === 0 ? "Giọng đã đủ" : `Tạo lại ${stale.size} câu`}
         </button>
         {voice.generating && (
-          <button type="button" className="rounded-md bg-neutral-800 px-4 py-2" onClick={() => studio.voice.cancel()}>
+          <button type="button" className="min-h-11 sm:min-h-0 rounded-md bg-neutral-800 px-4 py-2" onClick={() => studio.voice.cancel()}>
             Dừng
           </button>
         )}
@@ -179,7 +179,7 @@ export function StepVoice({ studio }: { studio: Studio }) {
                   <button
                     type="button"
                     disabled={voice.generating}
-                    className="rounded-md bg-neutral-800 px-3 py-1 disabled:opacity-50"
+                    className="min-h-11 sm:min-h-0 rounded-md bg-neutral-800 px-3 py-1 disabled:opacity-50"
                     onClick={() => void studio.voice.retry(scene.id)}
                   >
                     Thử lại

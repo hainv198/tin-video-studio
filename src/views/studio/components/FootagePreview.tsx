@@ -39,7 +39,7 @@ function FootagePreviewInner({ studio, footage }: { studio: Studio; footage: Foo
     };
   }, [studio, footage]);
 
-  const box = "aspect-video w-full max-w-60 overflow-hidden rounded-md bg-neutral-800 object-cover";
+  const box = "aspect-video w-36 shrink-0 overflow-hidden sm:w-60 rounded-md bg-neutral-800 object-cover";
   if (!footage || footage.kind === "fallback" || !src) {
     return <div className={`${box} flex items-center justify-center text-xs text-neutral-500`}>Nền mặc định</div>;
   }

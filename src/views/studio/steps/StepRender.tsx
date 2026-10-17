@@ -32,7 +32,7 @@ export function StepRender({ studio }: { studio: Studio }) {
       <fieldset className="flex flex-col gap-2 text-sm" disabled={working}>
         <legend className="mb-1 font-medium">Chất lượng video</legend>
         {(Object.keys(VIDEO_BITRATE_CHOICES) as VideoQuality[]).map((q) => (
-          <label key={q} className="flex items-center gap-2">
+          <label key={q} className="flex min-h-11 sm:min-h-0 items-center gap-2">
             <input
               type="radio"
               name="chat-luong-video"
@@ -48,13 +48,13 @@ export function StepRender({ studio }: { studio: Studio }) {
         <button
           type="button"
           disabled={working || render.status === "unsupported"}
-          className="rounded-md bg-emerald-600 px-4 py-2 font-medium disabled:opacity-50"
+          className="min-h-11 sm:min-h-0 rounded-md bg-emerald-600 px-4 py-2 font-medium disabled:opacity-50"
           onClick={() => void studio.render.start()}
         >
           {render.status === "done" || render.status === "error" ? "Dựng lại" : "Dựng video"}
         </button>
         {working && (
-          <button type="button" className="rounded-md bg-neutral-800 px-4 py-2" onClick={() => studio.render.cancel()}>
+          <button type="button" className="min-h-11 sm:min-h-0 rounded-md bg-neutral-800 px-4 py-2" onClick={() => studio.render.cancel()}>
             Huỷ
           </button>
         )}
@@ -84,7 +84,7 @@ export function StepRender({ studio }: { studio: Studio }) {
               {w}
             </p>
           ))}
-          <a className="text-emerald-400 underline" href={render.url} download={render.fileName}>
+          <a className="flex min-h-11 sm:min-h-0 w-fit items-center break-all text-emerald-400 underline" href={render.url} download={render.fileName}>
             Tải MP4 ({render.fileName})
           </a>
         </div>

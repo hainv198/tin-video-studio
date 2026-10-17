@@ -1,1 +1,10 @@
 @import "tailwindcss";
+
+/* Điện thoại: ô nhập cỡ chữ ≥ 16px để iOS không tự phóng to khi chạm (ngoài layer nên thắng text-sm/text-xs). */
+@media (max-width: 639.98px) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

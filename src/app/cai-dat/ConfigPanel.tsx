@@ -61,14 +61,14 @@ export function ConfigPanel({ initial }: { initial: ConfigSnapshot }) {
                     autoComplete="new-password"
                     aria-label={`Dán ${k.label} mới`}
                     placeholder={k.kind === "flag" ? "Gõ 1 để bật" : "Dán key mới"}
-                    className="min-w-0 flex-1 rounded-md bg-neutral-800 px-3 py-1.5 text-sm"
+                    className="min-h-11 sm:min-h-0 min-w-0 flex-1 basis-full rounded-md bg-neutral-800 px-3 py-1.5 text-sm sm:basis-0"
                     value={drafts[k.key] ?? ""}
                     onChange={(e) => setDrafts((d) => ({ ...d, [k.key]: e.target.value }))}
                     disabled={busy}
                   />
                   <button
                     type="button"
-                    className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                    className="min-h-11 sm:min-h-0 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
                     disabled={busy || !(drafts[k.key] ?? "").trim()}
                     onClick={() => void onSave(k.key)}
                   >
@@ -78,7 +78,7 @@ export function ConfigPanel({ initial }: { initial: ConfigSnapshot }) {
                     label="Xoá"
                     prompt={`Xoá giá trị của "${k.label}"?`}
                     confirmAriaLabel={`Xác nhận xoá giá trị ${k.label}`}
-                    className="rounded-md bg-neutral-800 px-3 py-1.5 text-sm disabled:opacity-50"
+                    className="min-h-11 sm:min-h-0 rounded-md bg-neutral-800 px-3 py-1.5 text-sm disabled:opacity-50"
                     disabled={busy || !k.isSet}
                     onConfirm={() => controller.clear(k.key)}
                   />

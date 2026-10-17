@@ -15,7 +15,7 @@ interface Props {
   onConfirm: () => unknown;
 }
 
-const CANCEL_CLASS = "rounded-md bg-neutral-800 px-3 py-1.5 text-sm disabled:opacity-50";
+const CANCEL_CLASS = "min-h-11 sm:min-h-0 rounded-md bg-neutral-800 px-3 py-1.5 text-sm disabled:opacity-50";
 
 /** Nút hai bước thay cho window.confirm: bấm lần đầu hiện "Xác nhận / Huỷ" tại chỗ. */
 export function ConfirmButton({ label, prompt, confirmAriaLabel, className, disabled, title, onConfirm }: Props) {

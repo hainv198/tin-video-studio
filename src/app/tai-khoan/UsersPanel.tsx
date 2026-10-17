@@ -11,9 +11,12 @@ import { UsersPanelController } from "./UsersPanelController";
 
 const ROLE_LABEL: Record<UserRole, string> = { admin: "Quản trị (admin)", user: "Người dùng (user)" };
 const EMPTY_FORM = { username: "", displayName: "", password: "", role: "user" as UserRole };
-const INPUT = "min-w-0 rounded-md bg-neutral-800 px-3 py-1.5 text-sm";
-const BUTTON = "rounded-md bg-neutral-800 px-3 py-1.5 text-sm disabled:opacity-50";
-const PRIMARY = "rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium disabled:opacity-50";
+const INPUT = "min-h-11 min-w-0 rounded-md bg-neutral-800 px-3 py-1.5 text-sm sm:min-h-0";
+const BUTTON = "min-h-11 rounded-md bg-neutral-800 px-3 py-1.5 text-sm disabled:opacity-50 sm:min-h-0";
+const PRIMARY = "min-h-11 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium disabled:opacity-50 sm:min-h-0";
+// Điện thoại: bảng hiển thị thành thẻ (mỗi tài khoản một thẻ, nhãn cột hiện trong ô); từ sm trở lên là bảng như cũ.
+const CELL = "block px-0 py-1 sm:table-cell sm:border sm:border-neutral-800 sm:px-3 sm:py-1.5";
+const CELL_LABEL = "text-neutral-500 sm:hidden";
 
 export function UsersPanel({ initial, currentUsername }: { initial: UsersSnapshot; currentUsername: string }) {
   const controller = useMemo(() => new UsersPanelController(new UsersClient(), initial), [initial]);
@@ -110,8 +113,8 @@ export function UsersPanel({ initial, currentUsername }: { initial: UsersSnapsho
           </div>
         ) : null}
 
-        <table className="w-full border border-neutral-800 text-left text-sm">
-          <thead className="bg-neutral-900 text-neutral-400">
+        <table className="block w-full text-left text-sm sm:table sm:border sm:border-neutral-800">
+          <thead className="hidden bg-neutral-900 text-neutral-400 sm:table-header-group">
             <tr>
               <th className="border border-neutral-800 px-3 py-1.5 font-medium">Tên đăng nhập</th>
               <th className="border border-neutral-800 px-3 py-1.5 font-medium">Tên hiển thị</th>
@@ -119,18 +122,24 @@ export function UsersPanel({ initial, currentUsername }: { initial: UsersSnapsho
               <th className="border border-neutral-800 px-3 py-1.5 font-medium">Thao tác</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="flex flex-col gap-3 sm:table-row-group">
             {snapshot.users.map((u) => {
               const isSelf = u.username === currentUsername;
               return (
-                <tr key={u.username} className="align-top">
-                  <td className="border border-neutral-800 px-3 py-1.5">
+                <tr key={u.username} className="block rounded-md border border-neutral-800 p-3 align-top sm:table-row sm:rounded-none sm:border-0 sm:p-0">
+                  <td className={`${CELL} font-medium sm:font-normal`}>
                     <code>{u.username}</code>
                     {isSelf ? <span className="ml-1 text-xs text-neutral-500">(bạn)</span> : null}
                   </td>
-                  <td className="border border-neutral-800 px-3 py-1.5">{u.displayName}</td>
-                  <td className="border border-neutral-800 px-3 py-1.5">{ROLE_LABEL[u.role]}</td>
-                  <td className="space-y-2 border border-neutral-800 px-3 py-1.5">
+                  <td className={CELL}>
+                    <span className={CELL_LABEL}>Tên hiển thị: </span>
+                    {u.displayName}
+                  </td>
+                  <td className={CELL}>
+                    <span className={CELL_LABEL}>Role: </span>
+                    {ROLE_LABEL[u.role]}
+                  </td>
+                  <td className={`${CELL} space-y-2 pt-2`}>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -156,7 +165,7 @@ export function UsersPanel({ initial, currentUsername }: { initial: UsersSnapsho
                         label="Xoá"
                         prompt={`Xoá tài khoản "${u.username}"? Người này sẽ bị đăng xuất và không đăng nhập lại được.`}
                         confirmAriaLabel={`Xác nhận xoá tài khoản ${u.username}`}
-                        className="rounded-md bg-red-900 px-3 py-1.5 text-sm disabled:opacity-50"
+                        className="min-h-11 rounded-md bg-red-900 px-3 py-1.5 text-sm disabled:opacity-50 sm:min-h-0"
                         disabled={busy || isSelf}
                         title={isSelf ? "Không thể tự xoá tài khoản của chính mình" : undefined}
                         onConfirm={() => controller.remove(u.username)}
@@ -169,7 +178,7 @@ export function UsersPanel({ initial, currentUsername }: { initial: UsersSnapsho
                           autoComplete="new-password"
                           aria-label={`Mật khẩu mới cho ${u.username}`}
                           placeholder="Mật khẩu mới (≥ 8 ký tự)"
-                          className={`${INPUT} flex-1`}
+                          className={`${INPUT} flex-1 basis-full sm:basis-0`}
                           value={pwDraft}
                           onChange={(e) => setPwDraft(e.target.value)}
                           disabled={busy}
@@ -240,11 +249,11 @@ export function UsersPanel({ initial, currentUsername }: { initial: UsersSnapsho
             </label>
             <label className="space-y-1 text-sm">
               <span className="block text-neutral-400">Mật khẩu</span>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <input
                   type={formGenerated ? "text" : "password"}
                   autoComplete="new-password"
-                  className={`${INPUT} flex-1`}
+                  className={`${INPUT} flex-1 basis-full sm:basis-0`}
                   placeholder="Ít nhất 8 ký tự"
                   value={form.password}
                   onChange={(e) => {

@@ -75,7 +75,7 @@ export function PreviewPanel({ studio, form }: { studio: Studio; form: PreviewFo
       <button
         type="button"
         aria-expanded={open}
-        className="rounded-md bg-neutral-800 px-3 py-1.5 text-sm lg:hidden"
+        className="min-h-11 rounded-md bg-neutral-800 px-3 py-1.5 text-sm lg:hidden"
         onClick={() => setOpen((v) => !v)}
       >
         {open ? "Ẩn xem trước" : "Xem trước"}
@@ -88,7 +88,7 @@ export function PreviewPanel({ studio, form }: { studio: Studio; form: PreviewFo
               type="button"
               role="tab"
               aria-selected={state.tab === t.id}
-              className={`flex-1 rounded-md px-2 py-1 ${state.tab === t.id ? "bg-emerald-700" : "bg-neutral-800"}`}
+              className={`min-h-11 sm:min-h-0 flex-1 rounded-md px-2 py-1 ${state.tab === t.id ? "bg-emerald-700" : "bg-neutral-800"}`}
               onClick={() => controller.setTab(t.id)}
             >
               {t.label}

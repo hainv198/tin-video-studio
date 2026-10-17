@@ -12,9 +12,12 @@ const ACCEPT = "image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quick
 /** Nhãn đoạn như trên thẻ: "Mở đầu" cho đoạn đầu, "Cảnh k" cho các đoạn sau. */
 const sceneLabel = (index: number) => (index === 0 ? "Mở đầu" : `Cảnh ${index}`);
 
+/** Nút/ô phụ: cao 44px trên điện thoại (mục tiêu chạm), gọn như cũ từ sm trở lên; không co trong hàng cuộn ngang. */
+const TAP = "min-h-11 shrink-0 sm:min-h-0";
+
 function OwnFootageToggle({ studio, sceneId, checked }: { studio: Studio; sceneId: string; checked: boolean }) {
   return (
-    <label className="flex w-fit cursor-pointer items-center gap-2 text-sm">
+    <label className={`${TAP} flex w-fit cursor-pointer items-center gap-2 text-sm`}>
       <input type="checkbox" checked={checked} onChange={(e) => studio.options.setSceneContinued(sceneId, !e.target.checked)} />
       Có cảnh trám riêng
     </label>
@@ -46,10 +49,15 @@ function SceneCard({ studio, sceneId, index }: { studio: Studio; sceneId: string
     // Không có cảnh riêng: thu gọn, ảnh/video của chủ cảnh chạy tiếp qua đoạn này.
     const ownerIndex = project.scenes.findIndex((s) => s.id === ownerId);
     return (
-      <li className="flex flex-col gap-2 rounded-lg border border-dashed border-neutral-800 p-3">
-        {heading}
+      <li className="flex items-center gap-3 rounded-lg border border-dashed border-neutral-800 px-3 py-2">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm">
+            <span className="text-neutral-500">{sceneLabel(index)}: </span>
+            {scene.text}
+          </div>
+          <p className="text-xs text-neutral-400">Dùng tiếp cảnh của {sceneLabel(ownerIndex)}</p>
+        </div>
         <OwnFootageToggle studio={studio} sceneId={sceneId} checked={false} />
-        <p className="text-sm text-neutral-400">Dùng tiếp cảnh của {sceneLabel(ownerIndex)}</p>
       </li>
     );
   }
@@ -63,39 +71,43 @@ function SceneCard({ studio, sceneId, index }: { studio: Studio; sceneId: string
   return (
     <li className="flex flex-col gap-3 rounded-lg border border-neutral-800 p-3">
       {heading}
-      {canContinue && <OwnFootageToggle studio={studio} sceneId={sceneId} checked />}
-      <FootagePreview studio={studio} footage={current} />
+      <div className="flex items-start gap-3">
+        <FootagePreview studio={studio} footage={current} />
+        <div className="flex min-w-0 flex-col gap-2">
+          {canContinue && <OwnFootageToggle studio={studio} sceneId={sceneId} checked />}
+          <div role="group" aria-label="Loại cảnh trám" className="flex w-fit overflow-hidden rounded-md text-sm">
+            {(["image", "video"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={kind === k}
+                disabled={state?.loading}
+                title={kind === k ? "Bấm lại để tìm cả ảnh và video" : undefined}
+                className={`${TAP} px-3 py-1.5 disabled:opacity-50 ${kind === k ? "bg-emerald-600 font-medium" : "bg-neutral-800"}`}
+                onClick={() => void studio.search.setSceneKind(sceneId, kind === k ? null : k)}
+              >
+                {k === "image" ? "Ảnh" : "Video"}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
       <form
-        className="flex flex-wrap items-center gap-2 text-sm"
+        className="flex items-center gap-2 text-sm"
         onSubmit={(e) => {
           e.preventDefault();
           void studio.search.search(sceneId, shown);
           setDraft(null);
         }}
       >
-        <div role="group" aria-label="Loại cảnh trám" className="flex overflow-hidden rounded-md">
-          {(["image", "video"] as const).map((k) => (
-            <button
-              key={k}
-              type="button"
-              aria-pressed={kind === k}
-              disabled={state?.loading}
-              title={kind === k ? "Bấm lại để tìm cả ảnh và video" : undefined}
-              className={`px-3 py-1.5 disabled:opacity-50 ${kind === k ? "bg-emerald-600 font-medium" : "bg-neutral-800"}`}
-              onClick={() => void studio.search.setSceneKind(sceneId, kind === k ? null : k)}
-            >
-              {k === "image" ? "Ảnh" : "Video"}
-            </button>
-          ))}
-        </div>
         <input
-          className="min-w-40 flex-1 rounded-md bg-neutral-800 px-3 py-1.5"
+          className={`${TAP} min-w-0 flex-1 rounded-md bg-neutral-800 px-3 py-1.5 sm:max-w-md`}
           placeholder="Từ khoá tiếng Anh (ví dụ: police car)"
           aria-label="Từ khoá tìm cảnh trám"
           value={shown}
           onChange={(e) => setDraft({ base, text: e.target.value })}
         />
-        <button type="submit" disabled={state?.loading} className="rounded-md bg-neutral-700 px-3 py-1.5 disabled:opacity-50">
+        <button type="submit" disabled={state?.loading} className={`${TAP} rounded-md bg-neutral-700 px-3 py-1.5 disabled:opacity-50`}>
           Tìm lại
         </button>
       </form>
@@ -109,24 +121,28 @@ function SceneCard({ studio, sceneId, index }: { studio: Studio; sceneId: string
         <p className="text-sm text-amber-400">Không tìm ra kết quả. Hãy sửa từ khoá; nếu bỏ qua, cảnh dùng nền mặc định.</p>
       )}
       {state && state.items.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        // Điện thoại: một hàng cuộn ngang (snap) thay vì lưới nhiều hàng; từ sm trở lên xếp nhiều hàng như cũ.
+        <div className="-mx-3 flex snap-x snap-mandatory gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
           {state.items.map((item) => (
             <button
               key={`${item.provider}-${item.kind}-${item.id}`}
               type="button"
               title={`${item.kind === "video" ? "Video" : "Ảnh"} · ${item.author}`}
-              className="relative overflow-hidden rounded-md ring-emerald-500 hover:ring-2"
+              className="relative shrink-0 snap-start overflow-hidden rounded-md ring-emerald-500 hover:ring-2"
               onClick={() => studio.search.choose(sceneId, item)}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="h-16 w-28 object-cover" src={item.thumbUrl} alt={item.kind === "video" ? "Video gợi ý" : "Ảnh gợi ý"} />
+              <img className="h-14 w-24 object-cover sm:h-16 sm:w-28" src={item.thumbUrl} alt={item.kind === "video" ? "Video gợi ý" : "Ảnh gợi ý"} />
               {item.kind === "video" && <span className="absolute bottom-0 right-0 bg-black/70 px-1 text-xs">▶</span>}
             </button>
           ))}
         </div>
       )}
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <label className="cursor-pointer rounded-md bg-neutral-800 px-3 py-1.5 hover:bg-neutral-700 focus-within:ring-2 focus-within:ring-emerald-500">
+      {/* Nút phụ: điện thoại xếp một hàng cuộn ngang, từ sm trở lên xuống dòng như cũ. */}
+      <div className="-mx-3 flex items-center gap-2 overflow-x-auto px-3 pb-1 text-sm whitespace-nowrap sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
+        <label
+          className={`${TAP} flex cursor-pointer items-center rounded-md bg-neutral-800 px-3 py-1.5 hover:bg-neutral-700 focus-within:ring-2 focus-within:ring-emerald-500`}
+        >
           Tải file thay thế
           <input
             type="file"
@@ -139,12 +155,12 @@ function SceneCard({ studio, sceneId, index }: { studio: Studio; sceneId: string
             }}
           />
         </label>
-        <button type="button" className="rounded-md bg-neutral-800 px-3 py-1.5" onClick={() => studio.footage.unassign(sceneId)}>
+        <button type="button" className={`${TAP} rounded-md bg-neutral-800 px-3 py-1.5`} onClick={() => studio.footage.unassign(sceneId)}>
           Dùng nền mặc định
         </button>
         <select
           aria-label="Hoán đổi với cảnh khác"
-          className="rounded-md bg-neutral-800 px-2 py-1.5"
+          className={`${TAP} rounded-md bg-neutral-800 px-2 py-1.5`}
           value=""
           onChange={(e) => {
             if (e.target.value) studio.footage.swap(sceneId, e.target.value);
@@ -160,7 +176,7 @@ function SceneCard({ studio, sceneId, index }: { studio: Studio; sceneId: string
         {pool.length > 0 && (
           <select
             aria-label="Dùng file đã tải lên"
-            className="rounded-md bg-neutral-800 px-2 py-1.5"
+            className={`${TAP} rounded-md bg-neutral-800 px-2 py-1.5`}
             value=""
             onChange={(e) => {
               if (e.target.value) studio.footage.assignFromPool(sceneId, e.target.value);
@@ -196,7 +212,7 @@ export function StepFootage({ studio }: { studio: Studio }) {
         gợi ý để đổi.
       </p>
       <div className="flex flex-wrap items-center gap-3">
-        <label className="cursor-pointer rounded-md bg-neutral-800 px-4 py-2 hover:bg-neutral-700 focus-within:ring-2 focus-within:ring-emerald-500">
+        <label className="flex min-h-11 cursor-pointer items-center rounded-md bg-neutral-800 px-4 py-2 hover:bg-neutral-700 sm:min-h-0 focus-within:ring-2 focus-within:ring-emerald-500">
           Tải ảnh/video lên
           <input
             type="file"
@@ -213,23 +229,23 @@ export function StepFootage({ studio }: { studio: Studio }) {
         <button
           type="button"
           disabled={search.autoRunning}
-          className="rounded-md bg-emerald-600 px-4 py-2 font-medium disabled:opacity-50"
+          className="min-h-11 rounded-md bg-emerald-600 px-4 py-2 font-medium disabled:opacity-50 sm:min-h-0"
           onClick={() => void studio.search.autoFill()}
         >
           {search.autoRunning ? "Đang tìm…" : "Tự tìm cảnh còn trống"}
         </button>
         {search.autoRunning && (
-          <button type="button" className="rounded-md bg-neutral-800 px-4 py-2" onClick={() => studio.search.cancel()}>
+          <button type="button" className="min-h-11 rounded-md bg-neutral-800 px-4 py-2 sm:min-h-0" onClick={() => studio.search.cancel()}>
             Dừng
           </button>
         )}
         {footage.busy && <span className="text-sm text-neutral-400">Đang xử lý file…</span>}
       </div>
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        <button type="button" className="rounded-md bg-neutral-800 px-3 py-1.5" onClick={() => studio.options.mergeScenesInPairs()}>
+      <div className="flex flex-wrap items-center gap-2 text-sm sm:gap-3">
+        <button type="button" className={`${TAP} rounded-md bg-neutral-800 px-3 py-1.5`} onClick={() => studio.options.mergeScenesInPairs()}>
           Gộp: mỗi 2 đoạn một cảnh
         </button>
-        <button type="button" className="rounded-md bg-neutral-800 px-3 py-1.5" onClick={() => studio.options.resetSceneGrouping()}>
+        <button type="button" className={`${TAP} rounded-md bg-neutral-800 px-3 py-1.5`} onClick={() => studio.options.resetSceneGrouping()}>
           Mỗi đoạn một cảnh
         </button>
         <span className="text-neutral-400">

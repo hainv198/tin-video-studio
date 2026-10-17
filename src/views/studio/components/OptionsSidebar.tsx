@@ -29,7 +29,7 @@ export function OptionsSidebar({ studio }: { studio: Studio }) {
         type="button"
         aria-expanded={open}
         aria-controls="tvs-tuy-chon-video"
-        className="rounded-md bg-neutral-800 px-4 py-2 text-left font-medium lg:hidden"
+        className="min-h-11 rounded-md bg-neutral-800 px-4 py-2 text-left font-medium lg:hidden"
         onClick={() => setOpen(!open)}
       >
         Tuỳ chọn video {open ? "▲" : "▼"}
@@ -113,7 +113,7 @@ export function OptionsSidebar({ studio }: { studio: Studio }) {
           <button
             type="button"
             disabled={!colors.custom}
-            className="self-start rounded-md bg-neutral-800 px-3 py-1.5 disabled:opacity-40"
+            className="min-h-11 sm:min-h-0 self-start rounded-md bg-neutral-800 px-3 py-1.5 disabled:opacity-40"
             onClick={() => studio.options.resetIntroColors()}
           >
             Về mặc định
@@ -167,6 +167,14 @@ export function OptionsSidebar({ studio }: { studio: Studio }) {
             {panel.error}
           </p>
         )}
+        <button
+          type="button"
+          aria-controls="tvs-tuy-chon-video"
+          className="min-h-11 rounded-md bg-neutral-700 px-4 py-2 font-medium lg:hidden"
+          onClick={() => setOpen(false)}
+        >
+          Đóng
+        </button>
       </div>
     </aside>
   );

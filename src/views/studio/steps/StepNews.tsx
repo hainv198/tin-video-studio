@@ -74,14 +74,14 @@ export function StepNews({ studio }: { studio: Studio }) {
           <div className="flex gap-3">
             <button
               type="button"
-              className="rounded-md bg-emerald-600 px-4 py-2 font-medium"
+              className="min-h-11 sm:min-h-0 rounded-md bg-emerald-600 px-4 py-2 font-medium"
               onClick={() => studio.project.createFromForm({ text, title, sourceCredit: credit, publishDateText: date, templateId })}
             >
               Chia cảnh
             </button>
             <button
               type="button"
-              className="rounded-md bg-neutral-800 px-4 py-2"
+              className="min-h-11 sm:min-h-0 rounded-md bg-neutral-800 px-4 py-2"
               onClick={() => {
                 setText(SAMPLE_NEWS.text);
                 setCredit(SAMPLE_NEWS.sourceCredit);
@@ -154,7 +154,7 @@ export function StepNews({ studio }: { studio: Studio }) {
               <div className="flex gap-2 text-sm">
                 <button
                   type="button"
-                  className="rounded-md bg-neutral-800 px-3 py-1"
+                  className="min-h-11 sm:min-h-0 rounded-md bg-neutral-800 px-3 py-1"
                   disabled={index === project.scenes.length - 1}
                   onClick={() => studio.project.mergeWithNext(scene.id)}
                 >
@@ -162,7 +162,7 @@ export function StepNews({ studio }: { studio: Studio }) {
                 </button>
                 <button
                   type="button"
-                  className="rounded-md bg-neutral-800 px-3 py-1"
+                  className="min-h-11 sm:min-h-0 rounded-md bg-neutral-800 px-3 py-1"
                   onClick={() => studio.project.splitScene(scene.id, textareas.current[scene.id]?.selectionStart ?? 0)}
                 >
                   Tách tại con trỏ

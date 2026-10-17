@@ -32,6 +32,18 @@ function renderStep(step: StepId, studio: Studio) {
   }
 }
 
+function newProjectButton(studio: Studio) {
+  return (
+    <ConfirmButton
+      label="Dự án mới"
+      prompt="Bắt đầu dự án mới? Dự án hiện tại, giọng đã tạo và file tải lên sẽ bị xoá."
+      confirmAriaLabel="Xác nhận bắt đầu dự án mới"
+      className="min-h-11 rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-300 lg:min-h-0"
+      onConfirm={() => studio.wizard.newProject()}
+    />
+  );
+}
+
 export function StudioShell({ studio }: { studio: Studio }) {
   const wizard = useController(studio.wizard);
   const data = useController(studio.session);
@@ -40,18 +52,18 @@ export function StudioShell({ studio }: { studio: Studio }) {
   const nextEnabled = nextStep ? canEnter(nextStep.id, data) : false;
 
   return (
-    <div className="mt-6 grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+    <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
       <OptionsSidebar studio={studio} />
-      <div className="flex min-w-0 flex-col gap-6">
+      <div className="flex min-w-0 flex-col gap-4 sm:gap-6">
         {wizard.resume && (
           <div className="flex flex-wrap items-center gap-3 rounded-lg bg-neutral-800 p-4 text-sm">
             <span>
               Có bản nháp “{wizard.resume.title}” lưu lúc {new Date(wizard.resume.savedAt).toLocaleString("vi-VN")}.
             </span>
-            <button type="button" className="rounded-md bg-emerald-600 px-3 py-1.5 font-medium" onClick={() => void studio.wizard.resume()}>
+            <button type="button" className="min-h-11 rounded-md bg-emerald-600 px-3 py-1.5 font-medium sm:min-h-0" onClick={() => void studio.wizard.resume()}>
               Mở lại
             </button>
-            <button type="button" className="rounded-md bg-neutral-700 px-3 py-1.5" onClick={() => void studio.wizard.discard()}>
+            <button type="button" className="min-h-11 rounded-md bg-neutral-700 px-3 py-1.5 sm:min-h-0" onClick={() => void studio.wizard.discard()}>
               Bỏ bản nháp
             </button>
           </div>
@@ -63,37 +75,36 @@ export function StudioShell({ studio }: { studio: Studio }) {
           </p>
         )}
         <section>{renderStep(wizard.step, studio)}</section>
-        <nav className="flex flex-wrap items-center gap-3 border-t border-neutral-800 pt-4">
-          <button
-            type="button"
-            disabled={index === 0}
-            className="rounded-md bg-neutral-800 px-4 py-2 disabled:opacity-40"
-            onClick={() => studio.wizard.back()}
-          >
-            Quay lại
-          </button>
-          {nextStep && (
+        {/* Điện thoại: "Dự án mới" nằm cuối nội dung, ngoài thanh dính đáy để khỏi chạm nhầm. */}
+        <div className="flex justify-end lg:hidden">{newProjectButton(studio)}</div>
+        <nav
+          aria-label="Điều hướng bước"
+          className="sticky bottom-0 z-30 -mx-4 flex flex-col gap-2 border-t border-neutral-800 bg-neutral-950 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3 lg:bg-transparent lg:px-0 lg:pt-4 lg:pb-0"
+        >
+          <div className="flex gap-2 lg:gap-3">
             <button
               type="button"
-              disabled={!nextEnabled}
-              className="rounded-md bg-emerald-600 px-4 py-2 font-medium disabled:opacity-40"
-              onClick={() => studio.wizard.next()}
+              disabled={index === 0}
+              className="min-h-11 shrink-0 rounded-md bg-neutral-800 px-4 py-2 disabled:opacity-40 lg:min-h-0"
+              onClick={() => studio.wizard.back()}
             >
-              Tiếp tục: {nextStep.label}
+              Quay lại
             </button>
-          )}
+            {nextStep && (
+              <button
+                type="button"
+                disabled={!nextEnabled}
+                className="min-h-11 min-w-0 flex-1 truncate rounded-md bg-emerald-600 px-4 py-2 font-medium disabled:opacity-40 lg:min-h-0 lg:flex-none"
+                onClick={() => studio.wizard.next()}
+              >
+                Tiếp tục: {nextStep.label}
+              </button>
+            )}
+          </div>
           {nextStep && !nextEnabled && BLOCKED_HINT[wizard.step] && (
-            <span className="text-sm text-neutral-400">{BLOCKED_HINT[wizard.step]}</span>
+            <span className="order-first text-sm text-neutral-400 lg:order-none">{BLOCKED_HINT[wizard.step]}</span>
           )}
-          <span className="ml-auto">
-            <ConfirmButton
-              label="Dự án mới"
-              prompt="Bắt đầu dự án mới? Dự án hiện tại, giọng đã tạo và file tải lên sẽ bị xoá."
-              confirmAriaLabel="Xác nhận bắt đầu dự án mới"
-              className="rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-300"
-              onConfirm={() => studio.wizard.newProject()}
-            />
-          </span>
+          <span className="ml-auto hidden lg:inline">{newProjectButton(studio)}</span>
         </nav>
       </div>
     </div>

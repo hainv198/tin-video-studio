@@ -72,7 +72,7 @@ export function StepMusic({ studio }: { studio: Studio }) {
       <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
         <li>
           <label
-            className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border p-2 text-center text-xs focus-within:ring-2 focus-within:ring-emerald-500 ${
+            className={`flex h-full min-h-32 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border p-2 text-center text-xs focus-within:ring-2 focus-within:ring-emerald-500 ${
               selected === null ? "border-emerald-500 bg-emerald-950/40" : "border-neutral-800 hover:bg-neutral-900"
             }`}
           >
@@ -90,7 +90,7 @@ export function StepMusic({ studio }: { studio: Studio }) {
           return (
             <li
               key={track.id}
-              className={`flex aspect-square flex-col overflow-hidden rounded-lg border ${
+              className={`flex min-h-32 flex-col overflow-hidden rounded-lg border ${
                 isSelected ? "border-emerald-500 ring-1 ring-emerald-500" : "border-neutral-800"
               }`}
             >
@@ -106,11 +106,13 @@ export function StepMusic({ studio }: { studio: Studio }) {
                 <span aria-hidden className="text-2xl">
                   {isPlaying ? "⏸" : "▶"}
                 </span>
-                <span className="line-clamp-3 text-xs leading-tight">{track.title}</span>
+                <span title={track.title} className="line-clamp-2 text-xs leading-tight break-words sm:line-clamp-3">
+                  {track.title}
+                </span>
                 {track.origin === "upload" && <span className="text-xs text-neutral-500">(của bạn)</span>}
               </button>
               <label
-                className={`flex cursor-pointer items-center justify-center gap-2 border-t px-1 py-1 text-[11px] focus-within:ring-2 focus-within:ring-emerald-500 ${
+                className={`flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 border-t px-1 py-1 text-xs focus-within:ring-2 focus-within:ring-emerald-500 sm:min-h-0 sm:text-[11px] ${
                   isSelected ? "border-emerald-500 bg-emerald-900/50 text-emerald-200" : "border-neutral-800 bg-neutral-900"
                 }`}
               >
@@ -127,7 +129,7 @@ export function StepMusic({ studio }: { studio: Studio }) {
           );
         })}
       </ul>
-      <label className="w-fit cursor-pointer rounded-md bg-neutral-800 px-4 py-2 text-sm hover:bg-neutral-700 focus-within:ring-2 focus-within:ring-emerald-500">
+      <label className="flex min-h-11 w-fit cursor-pointer items-center rounded-md bg-neutral-800 px-4 py-2 text-sm sm:min-h-0 hover:bg-neutral-700 focus-within:ring-2 focus-within:ring-emerald-500">
         {music.busy ? "Đang xử lý…" : "Tải nhạc của bạn lên (MP3, WAV, M4A)"}
         <input
           type="file"

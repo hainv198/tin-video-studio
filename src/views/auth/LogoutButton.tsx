@@ -4,12 +4,12 @@ import { useMemo } from "react";
 import { SessionController } from "@/client/controllers/SessionController";
 import { AuthClient } from "@/client/services/AuthClient";
 
-export function LogoutButton() {
+export function LogoutButton({ className = "rounded-md bg-neutral-800 px-3 py-1 text-sm" }: { className?: string }) {
   const controller = useMemo(() => new SessionController(new AuthClient()), []);
   return (
     <button
       type="button"
-      className="rounded-md bg-neutral-800 px-3 py-1 text-sm"
+      className={className}
       onClick={async () => {
         try {
           await controller.logout();
