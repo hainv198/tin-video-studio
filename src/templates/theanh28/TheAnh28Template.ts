@@ -13,7 +13,7 @@ import {
   type SceneMedia,
   type TemplateDefaults,
 } from "../VideoTemplate";
-import { containRect, coverRect, kenBurnsRect, LAYOUT, withAlpha, wrapText, type Rect } from "./layout";
+import { containRect, coverRect, kenBurnsRect, LAYOUT, withAlpha, wrapText, type Rect, type TheAnh28Layout } from "./layout";
 import { cueAt, splitSubtitle, timeCues, type SubtitleCue } from "./subtitles";
 
 export const THEANH28_FONT_FAMILY = "TVS Barlow Condensed";
@@ -22,44 +22,55 @@ const WHITE = "#FFFFFF";
 /** Font chữ khi dự án không có tuỳ chọn riêng: giữ đúng hình ảnh trước khi có tuỳ chọn video. */
 const DEFAULT_TEXT_FONT: FontStyle = { family: THEANH28_FONT_FAMILY, semiBold: 600, bold: 800 };
 
+/** Trường thương hiệu của Theanh28 (phong cách con dùng lại rồi thêm trường riêng). */
+export const THEANH28_BRAND_FIELDS: readonly BrandFieldSpec[] = [
+  { key: "channelName", label: "Tên kênh", type: "text", required: true, defaultValue: "TIN NHANH", maxLength: 24 },
+  { key: "primaryColor", label: "Màu chủ đạo", type: "color", required: true, defaultValue: DEFAULT_COLOR },
+  { key: "logo", label: "Logo", type: "image", required: false },
+  { key: "titleFontPx", label: "Cỡ chữ tiêu đề mở đầu (px, 44–80)", type: "number", required: false, defaultValue: "64", min: 44, max: 80 },
+];
+
 type Weight = "semiBold" | "bold";
 
 const upper = (s: string) => s.toLocaleUpperCase("vi");
 
 export class TheAnh28Template extends VideoTemplate {
-  readonly id = "theanh28";
-  readonly name = "Bản tin kiểu Theanh28";
-
-  readonly brandFields: readonly BrandFieldSpec[] = [
-    { key: "channelName", label: "Tên kênh", type: "text", required: true, defaultValue: "TIN NHANH", maxLength: 24 },
-    { key: "primaryColor", label: "Màu chủ đạo", type: "color", required: true, defaultValue: DEFAULT_COLOR },
-    { key: "logo", label: "Logo", type: "image", required: false },
-    { key: "titleFontPx", label: "Cỡ chữ tiêu đề mở đầu (px, 44–80)", type: "number", required: false, defaultValue: "64", min: 44, max: 80 },
-  ];
-
-  readonly defaults: TemplateDefaults = {
-    width: LAYOUT.frame.width,
-    height: LAYOUT.frame.height,
-    fps: 30,
-    timeline: DEFAULT_TIMELINE_CONFIG,
-    fallbackKeyword: "news",
-  };
+  readonly id: string = "theanh28";
+  readonly name: string = "Bản tin kiểu Theanh28";
+  readonly brandFields: readonly BrandFieldSpec[] = THEANH28_BRAND_FIELDS;
+  readonly defaults: TemplateDefaults;
 
   readonly fonts: readonly FontFaceSpec[] = [
     { family: THEANH28_FONT_FAMILY, url: "/templates/theanh28/fonts/BarlowCondensed-SemiBold.ttf", weight: "600" },
     { family: THEANH28_FONT_FAMILY, url: "/templates/theanh28/fonts/BarlowCondensed-ExtraBold.ttf", weight: "800" },
   ];
 
+  /** Toạ độ khung. Gán trong hàm dựng (không dùng tham số-thuộc-tính: trường lớp khởi tạo trước khi tham số được gán). */
+  protected readonly layout: TheAnh28Layout;
+
   /** Đoạn phụ đề đã chia, theo (font, mốc giọng, câu). Chỉ là bộ nhớ đệm: kết quả chỉ phụ thuộc đầu vào nên hàm vẽ vẫn thuần. */
   private readonly cueCache = new Map<string, SubtitleCue[]>();
+
+  /** `layout` bỏ trống = bố cục Theanh28 gốc (hình y hệt trước khi tham số hoá). */
+  constructor(layout: TheAnh28Layout = LAYOUT) {
+    super();
+    this.layout = layout;
+    this.defaults = {
+      width: layout.frame.width,
+      height: layout.frame.height,
+      fps: 30,
+      timeline: DEFAULT_TIMELINE_CONFIG,
+      fallbackKeyword: "news",
+    };
+  }
 
   protected drawIntro(ctx: Canvas2D, project: ProjectFrame, scene: SceneFrame): void {
     const color = this.color(project);
     // Màu riêng của thumbnail đầu (tuỳ chọn video); không đặt thì theo màu chủ đạo thương hiệu.
     const background = project.style?.intro.backgroundColor ?? color;
     const block = project.style?.intro.blockColor ?? color;
-    const { width, height } = LAYOUT.frame;
-    const L = LAYOUT.intro;
+    const { width, height } = this.layout.frame;
+    const L = this.layout.intro;
 
     ctx.fillStyle = background;
     ctx.fillRect(0, 0, width, height);
@@ -89,8 +100,8 @@ export class TheAnh28Template extends VideoTemplate {
 
   protected drawBody(ctx: Canvas2D, project: ProjectFrame, scene: SceneFrame): void {
     const color = this.color(project);
-    const { width, height } = LAYOUT.frame;
-    const B = LAYOUT.body;
+    const { width, height } = this.layout.frame;
+    const B = this.layout.body;
 
     if (scene.image) {
       if (scene.backdrop) {
@@ -101,7 +112,7 @@ export class TheAnh28Template extends VideoTemplate {
       } else {
         const full = coverRect(scene.image.width, scene.image.height, { x: 0, y: 0, w: width, h: height });
         const backdrop = kenBurnsRect(full, 1, 1, B.backdropScale);
-        ctx.filter = `blur(${LAYOUT.blurPx}px)`;
+        ctx.filter = `blur(${this.layout.blurPx}px)`;
         ctx.drawImage(scene.image.source, backdrop.x, backdrop.y, backdrop.w, backdrop.h);
         ctx.filter = "none";
       }
@@ -119,10 +130,10 @@ export class TheAnh28Template extends VideoTemplate {
   }
 
   protected drawOverlay(ctx: Canvas2D, project: ProjectFrame, scene: SceneFrame): void {
-    const C = LAYOUT.credit;
+    const C = this.layout.credit;
     // vùng cho phép của dòng nguồn tin: tới mép trái huy hiệu logo (cảnh thân bài) hoặc mép phải khung (cảnh mở đầu)
     const limit =
-      (scene.role === "body" ? this.cornerLogoBox(ctx, project).badgeX - C.gapToLogo : LAYOUT.frame.width - C.rightMargin) -
+      (scene.role === "body" ? this.cornerLogoBox(ctx, project).badgeX - C.gapToLogo : this.layout.frame.width - C.rightMargin) -
       C.x;
     ctx.font = this.font(project, "semiBold", C.fontPx);
     ctx.fillStyle = WHITE;
@@ -137,7 +148,7 @@ export class TheAnh28Template extends VideoTemplate {
   }
 
   private drawSubtitle(ctx: Canvas2D, style: FrameStyle, scene: SceneFrame): void {
-    const S = LAYOUT.subtitle;
+    const S = this.layout.subtitle;
     ctx.save();
     ctx.font = cssFont(style.subtitles.font, "bold", S.fontPx);
     const voiceStart = scene.voiceStart ?? 0;
@@ -169,7 +180,7 @@ export class TheAnh28Template extends VideoTemplate {
     let cues = this.cueCache.get(key);
     if (!cues) {
       if (this.cueCache.size >= 64) this.cueCache.clear();
-      const S = LAYOUT.subtitle;
+      const S = this.layout.subtitle;
       cues = timeCues(splitSubtitle(text, S.maxWidth, (s) => ctx.measureText(s).width, S.maxLines), voiceStart, voiceDuration);
       this.cueCache.set(key, cues);
     }
@@ -197,7 +208,8 @@ export class TheAnh28Template extends VideoTemplate {
 
   private drawClipped(ctx: Canvas2D, image: DrawableImage, box: Rect, progress: number, media?: SceneMedia): void {
     const base = media?.fit === "contain" ? containRect(image.width, image.height, box) : coverRect(image.width, image.height, box);
-    const target = media?.motion === false ? base : kenBurnsRect(base, progress);
+    const K = this.layout.kenBurns;
+    const target = media?.motion === false ? base : kenBurnsRect(base, progress, K.from, K.to);
     ctx.save();
     ctx.beginPath();
     ctx.rect(box.x, box.y, box.w, box.h);
@@ -207,7 +219,7 @@ export class TheAnh28Template extends VideoTemplate {
   }
 
   private drawDotPattern(ctx: Canvas2D): void {
-    const P = LAYOUT.intro.pattern;
+    const P = this.layout.intro.pattern;
     ctx.save();
     ctx.globalAlpha = P.alpha;
     ctx.fillStyle = WHITE;
@@ -243,7 +255,7 @@ export class TheAnh28Template extends VideoTemplate {
   }
 
   private drawChip(ctx: Canvas2D, project: ProjectFrame): void {
-    const K = LAYOUT.intro.chip;
+    const K = this.layout.intro.chip;
     const name = this.channelName(project);
     ctx.font = this.font(project, "bold", K.fontPx);
     const textW = ctx.measureText(name).width;
@@ -264,7 +276,7 @@ export class TheAnh28Template extends VideoTemplate {
   }
 
   private drawDateTag(ctx: Canvas2D, project: ProjectFrame, dateText: string, x: number, y: number): void {
-    const D = LAYOUT.dateTag;
+    const D = this.layout.dateTag;
     const text = `NGÀY ĐĂNG: ${dateText}`;
     ctx.font = this.font(project, "semiBold", D.fontPx);
     const w = ctx.measureText(text).width + D.padX * 2;
@@ -278,15 +290,15 @@ export class TheAnh28Template extends VideoTemplate {
 
   /** Vị trí huy hiệu logo và chữ tên kênh ở góc trên phải (cảnh thân bài). Đặt font của ctx về font tên kênh. */
   private cornerLogoBox(ctx: Canvas2D, project: ProjectFrame): { name: string; textX: number; badgeX: number } {
-    const G = LAYOUT.logo;
+    const G = this.layout.logo;
     const name = this.channelName(project);
     ctx.font = this.font(project, "bold", G.fontPx);
-    const textX = LAYOUT.frame.width - G.right - ctx.measureText(name).width;
+    const textX = this.layout.frame.width - G.right - ctx.measureText(name).width;
     return { name, textX, badgeX: textX - G.gap - G.size };
   }
 
   private drawCornerLogo(ctx: Canvas2D, project: ProjectFrame): void {
-    const G = LAYOUT.logo;
+    const G = this.layout.logo;
     const { name, textX, badgeX } = this.cornerLogoBox(ctx, project);
     this.drawLogoBadge(ctx, project, badgeX, G.y, G.size);
     ctx.font = this.font(project, "bold", G.fontPx);

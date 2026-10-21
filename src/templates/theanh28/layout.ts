@@ -5,6 +5,38 @@ export interface Rect {
   h: number;
 }
 
+/** Toạ độ một bố cục Theanh28 (khung 1080×1920). `LAYOUT` là bố cục gốc; phong cách con truyền bố cục riêng. */
+export interface TheAnh28Layout {
+  frame: { width: number; height: number };
+  intro: {
+    image: Rect;
+    gradientTop: number;
+    gradientSolid: number;
+    chip: { x: number; y: number; h: number; padX: number; logoSize: number; gap: number; fontPx: number };
+    dateTag: { x: number; y: number };
+    title: { x: number; y: number; maxWidth: number; fontPx: number; lineHeight: number; maxLines: number };
+    pattern: Rect & { spacing: number; radius: number; alpha: number };
+  };
+  body: { band: Rect; dateTag: { x: number; y: number }; backdropScale: number; backdropShade: number };
+  credit: { x: number; y: number; lineHeight: number; fontPx: number; rightMargin: number; gapToLogo: number };
+  logo: { right: number; y: number; size: number; gap: number; fontPx: number };
+  dateTag: { h: number; padX: number; fontPx: number };
+  subtitle: {
+    centerX: number;
+    maxWidth: number;
+    fontPx: number;
+    lineHeight: number;
+    maxLines: number;
+    bodyBottom: number;
+    introBottom: number;
+    strokePx: number;
+    shadowBlurPx: number;
+    shadowOffsetPx: number;
+  };
+  kenBurns: { from: number; to: number };
+  blurPx: number;
+}
+
 /** Toạ độ đo từ video mẫu Theanh28 (khung 540×960, nhân đôi lên 1080×1920). */
 export const LAYOUT = {
   frame: { width: 1080, height: 1920 },
@@ -41,7 +73,7 @@ export const LAYOUT = {
   },
   kenBurns: { from: 1, to: 1.08 },
   blurPx: 48,
-} as const;
+} as const satisfies TheAnh28Layout;
 
 export function coverRect(srcW: number, srcH: number, box: Rect): Rect {
   const scale = Math.max(box.w / srcW, box.h / srcH);

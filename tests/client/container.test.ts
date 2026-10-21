@@ -26,7 +26,9 @@ describe("RENDER_SAMPLE_RATE", () => {
 describe("createClientServices", () => {
   it("lắp đủ dịch vụ, phong cách theanh28 có trong registry", () => {
     const s = createClientServices(fakeEnv());
-    expect(s.templates.list()).toEqual([{ id: "theanh28", name: "Bản tin kiểu Theanh28" }]);
+    const templates = s.templates.list();
+    expect(templates[0]).toEqual({ id: "theanh28", name: "Bản tin kiểu Theanh28" }); // phong cách cũ vẫn đứng đầu (mặc định)
+    expect(templates.map((x) => x.id)).toContain("theanh28-banner");
     expect(typeof s.support).toBe("function");
     expect(s.env.origin).toBe("http://localhost:3100");
   });

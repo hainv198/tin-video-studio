@@ -71,6 +71,8 @@ export interface ProjectFrame {
   style?: FrameStyle;
   /** Dòng thứ hai khối nguồn tin; bỏ trống = "ẢNH: TỔNG HỢP". */
   mediaCredit?: string;
+  /** Ảnh banner chân (phong cách có banner); null/bỏ trống = phong cách tự xử lý (tô đen dải). Phong cách khác bỏ qua. */
+  banner?: DrawableImage | null;
 }
 
 export interface SceneFrame {
@@ -96,6 +98,12 @@ export interface SceneFrame {
   media?: SceneMedia;
 }
 
+/** Phong cách có banner chân: ảnh mặc định (URL tương đối trong public/) và dải vẽ trên khung. */
+export interface FooterBannerSpec {
+  defaultUrl: string;
+  box: { x: number; y: number; w: number; h: number };
+}
+
 /** Một phong cách video. Hàm vẽ phải thuần theo thời gian: cùng đầu vào ra cùng hình. */
 export abstract class VideoTemplate {
   abstract readonly id: string;
@@ -103,6 +111,8 @@ export abstract class VideoTemplate {
   abstract readonly brandFields: readonly BrandFieldSpec[];
   abstract readonly defaults: TemplateDefaults;
   abstract readonly fonts: readonly FontFaceSpec[];
+  /** Có thì worker/xem trước nạp ảnh banner (riêng của thương hiệu, không có thì `defaultUrl`) vào `ProjectFrame.banner`. */
+  readonly footerBanner: FooterBannerSpec | null = null;
 
   drawFrame(ctx: Canvas2D, project: ProjectFrame, scene: SceneFrame): void {
     ctx.save();
