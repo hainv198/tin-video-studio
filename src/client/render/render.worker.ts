@@ -107,7 +107,7 @@ async function render(job: RenderJob): Promise<void> {
     }
     if (job.sourceClip) {
       // Mở video tải lên MỘT lần: một khung làm ảnh thẻ tiêu đề, rồi phát trọn ở cảnh thân bài (không zoom).
-      // Ngang: vừa khung trên nền mờ; dọc/vuông: phủ kín khung (xem sourceClipMediaFor).
+      // 9:16 gốc: phủ toàn khung, không nền mờ; khổ khác: vừa khung trên nền mờ (xem sourceClipMediaFor).
       const clip = job.sourceClip;
       const overlay = clip.composition === "title-over-clip";
       const frames = await VideoFrameProvider.open(clip.blob).catch((error: unknown) => {

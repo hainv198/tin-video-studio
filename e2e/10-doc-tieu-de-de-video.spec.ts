@@ -23,14 +23,18 @@ const SHOT_DIR = join(".superpowers", "sample");
 const TITLE_THEANH28: Region = { x: 96, y: 1302, w: 880, h: 54 };
 const TITLE_BANNER: Region = { x: 96, y: 1208, w: 880, h: 50 };
 const BANNER: Region = { x: 0, y: 1560, w: 1080, h: 360 };
+/** Nửa dưới khung trên banner: video 9:16 phủ toàn khung thì là hình video. */
+const LOWER_FRAME: Region = { x: 40, y: 900, w: 1000, h: 600 };
 
 let ffmpeg = true;
 let withAudio = "";
+let portrait = "";
 let longClip = "";
 
 test.beforeAll(() => {
   try {
     withAudio = makeSampleClip({ out: join(DIR, "clip-440-1280x720.mp4"), seconds: CLIP_SEC, width: 1280, height: 720, audio: true });
+    portrait = makeSampleClip({ out: join(DIR, "clip-440-1080x1920.mp4"), seconds: CLIP_SEC, width: 1080, height: 1920, audio: true });
     if (process.env.PERF_CLIP === "1") {
       longClip = makeSampleClip({ out: join("test-results", "hieu-nang", "clip-doc-de-60.mp4"), seconds: 60, width: 1920, height: 1080, audio: true });
     }
@@ -94,7 +98,7 @@ function saveShot(file: string, t: number, name: string): void {
 }
 
 /** Kiểm chung: tổng = video, giọng từ nghỉ đầu 0,3 s, tiếng gốc −12 dB khi đọc rồi trở lại, khối tiêu đề có rồi thu gọn. */
-async function checkOverlayFile(file: string, total: number, titleZone: Region, label: string) {
+async function checkOverlayFile(file: string, total: number, titleZone: Region, label: string, fillsFrame = false) {
   expect(Math.abs(total - CLIP_SEC)).toBeLessThan(0.15);
   expect(Math.abs(videoDurationSec(file) - CLIP_SEC)).toBeLessThan(0.15);
   const audio = decodeFileAudio(file);
@@ -112,12 +116,23 @@ async function checkOverlayFile(file: string, total: number, titleZone: Region, 
   const tRead = (start + end) / 2;
   // hết giọng + giữ 0,35 s + thu gọn 0,4 s + dư 0,5 s
   const tAfter = Math.min(CLIP_SEC - 0.3, end + 0.35 + 0.4 + 0.5);
-  const reading = edgeSharpness(grabRegion(file, tRead, titleZone), titleZone);
-  const after = edgeSharpness(grabRegion(file, tAfter, titleZone), titleZone);
+  const readingPixels = grabRegion(file, tRead, titleZone);
+  const afterPixels = grabRegion(file, tAfter, titleZone);
+  const reading = edgeSharpness(readingPixels, titleZone);
+  const after = edgeSharpness(afterPixels, titleZone);
   expect(reading).toBeGreaterThan(SHARP_MIN);
-  expect(after).toBeLessThan(BLURRED_MAX);
-  saveShot(file, tRead, `doc-de-${label}-dang-doc.png`);
-  saveShot(file, tAfter, `doc-de-${label}-sau-khi-doc.png`);
+  if (fillsFrame) {
+    // Video 9:16 phủ toàn khung: sau khi thu gọn, vùng tiêu đề là hình video (sắc), khác hẳn khối tiêu đề lúc đọc.
+    expect(after).toBeGreaterThan(SHARP_MIN);
+    expect(meanAbsDiff(readingPixels, afterPixels)).toBeGreaterThan(20);
+    const lower = edgeSharpness(grabRegion(file, tAfter, LOWER_FRAME), LOWER_FRAME);
+    expect(lower).toBeGreaterThan(SHARP_MIN);
+  } else {
+    expect(after).toBeLessThan(BLURRED_MAX);
+  }
+  const prefix = fillsFrame ? "916-doc-de" : "doc-de";
+  saveShot(file, tRead, `${prefix}-${label}-dang-doc.png`);
+  saveShot(file, tAfter, `${prefix}-${label}-sau-khi-doc.png`);
   console.log(
     `[e2e đọc đè ${label}] tổng ${total} s; giọng ${start.toFixed(2)}–${end.toFixed(2)} s; tiếng gốc khi đọc ${duringDb.toFixed(2)} dB (mong ${(SINE_DB - DUCK_DB).toFixed(2)}), sau ${afterDb.toFixed(2)} dB (mong ${SINE_DB.toFixed(2)}); khối tiêu đề sắc ${reading.toFixed(1)} → ${after.toFixed(1)}`,
   );
@@ -151,6 +166,23 @@ test("Đọc tiêu đề đè trên video + banner chân: banner cố định su
   expect(bannerDiff).toBeLessThan(3);
   console.log(`[e2e đọc đè banner] banner lúc đọc↔sau khi đọc ${bannerDiff.toFixed(2)}`);
 });
+
+for (const [style, titleZone, label] of [
+  [undefined, TITLE_THEANH28, "theanh28"],
+  [STYLE_BANNER, TITLE_BANNER, "banner"],
+] as const) {
+  test(`Đọc tiêu đề đè trên video 9:16 gốc (${label}): video phủ toàn khung, khối tiêu đề đè lên rồi thu gọn`, async ({ page }) => {
+    test.skip(!ffmpeg, "cần ffmpeg để tạo video mẫu");
+    await login(page);
+    await discardDraftIfOffered(page);
+    await startOverlayProject(page, `Clip dọc đọc đè ${label}`, style);
+    await uploadClip(page, portrait, "0:08");
+    await voiceAndGoRender(page, "none");
+    const file = await renderAndDownload(page, "test-results", `doc-de-916-${label}-`);
+    const { tRead, tAfter } = await checkOverlayFile(file, await shownDuration(page), titleZone, label, true);
+    if (style) expect(meanAbsDiff(grabRegion(file, tRead, BANNER), grabRegion(file, tAfter, BANNER))).toBeLessThan(3);
+  });
+}
 
 test("Đọc đè: giọng tiêu đề dài hơn video → cảnh báo ở bước Giọng, chặn ở bước Dựng bằng câu tiếng Việt", async ({ page }) => {
   test.skip(!ffmpeg, "cần ffmpeg để tạo video mẫu");

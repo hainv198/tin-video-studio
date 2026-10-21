@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BrandKit } from "@/domain/BrandKit";
 import { DEFAULT_TIMELINE_CONFIG } from "@/domain/Timeline";
 import type { Canvas2D } from "@/templates/Canvas2D";
-import { SOURCE_CLIP_MEDIA, sourceClipMediaFor, VideoTemplate, type ProjectFrame, type SceneFrame } from "@/templates/VideoTemplate";
+import { isNativePortrait, NATIVE_PORTRAIT_MEDIA, SOURCE_CLIP_MEDIA, sourceClipMediaFor, VideoTemplate, type ProjectFrame, type SceneFrame } from "@/templates/VideoTemplate";
 import { RecordingCanvas } from "../helpers/RecordingCanvas";
 
 class SpyTemplate extends VideoTemplate {
@@ -49,14 +49,49 @@ describe("VideoTemplate.drawFrame", () => {
   });
 });
 
-describe("sourceClipMediaFor — đặt video tải lên vào khung thân bài", () => {
-  it("video ngang: vừa khung (contain) trên nền mờ, không zoom", () => {
-    expect(sourceClipMediaFor(1920, 1080)).toEqual(SOURCE_CLIP_MEDIA);
-    expect(sourceClipMediaFor(1920, 1080)).toEqual({ fit: "contain", motion: false });
+describe("isNativePortrait — hình 9:16 gốc (rộng/cao ≈ 0,5625, dung sai ±6%)", () => {
+  it("9:16 chính xác và các cỡ 9:16 thường gặp", () => {
+    expect(isNativePortrait(9, 16)).toBe(true);
+    expect(isNativePortrait(1080, 1920)).toBe(true);
+    expect(isNativePortrait(720, 1280)).toBe(true);
+    expect(isNativePortrait(1079, 1920)).toBe(true);
   });
 
-  it("video dọc hoặc vuông: phủ kín khung (cover), không zoom", () => {
-    expect(sourceClipMediaFor(1080, 1920)).toEqual({ fit: "cover", motion: false });
-    expect(sourceClipMediaFor(1080, 1080)).toEqual({ fit: "cover", motion: false });
+  it("lệch +5% còn trong dung sai, lệch ±8% ra ngoài", () => {
+    expect(isNativePortrait(1134, 1920)).toBe(true); // 1080 × 1,05
+    expect(isNativePortrait(1026, 1920)).toBe(true); // 1080 × 0,95
+    expect(isNativePortrait(1166, 1920)).toBe(false); // ≈ 1080 × 1,08
+    expect(isNativePortrait(994, 1920)).toBe(false); // ≈ 1080 × 0,92
+  });
+
+  it("khổ khác (vuông, ngang, 4:3, dọc 3:4/4:5, rất thon) không phải 9:16 gốc", () => {
+    expect(isNativePortrait(1080, 1080)).toBe(false);
+    expect(isNativePortrait(1920, 1080)).toBe(false);
+    expect(isNativePortrait(1440, 1080)).toBe(false);
+    expect(isNativePortrait(1080, 1440)).toBe(false);
+    expect(isNativePortrait(1080, 1350)).toBe(false);
+    expect(isNativePortrait(400, 1920)).toBe(false);
+  });
+
+  it("kích thước không hợp lệ: không phải 9:16 gốc", () => {
+    expect(isNativePortrait(0, 1920)).toBe(false);
+    expect(isNativePortrait(1080, 0)).toBe(false);
+    expect(isNativePortrait(Number.NaN, 1920)).toBe(false);
+  });
+});
+
+describe("sourceClipMediaFor — đặt video tải lên vào khung thân bài", () => {
+  it("9:16 gốc: phủ toàn khung 1080×1920, không nền mờ, không zoom", () => {
+    expect(NATIVE_PORTRAIT_MEDIA).toEqual({ fit: "fullFrame", motion: false });
+    for (const [w, h] of [[1080, 1920], [720, 1280], [1079, 1920], [1134, 1920]] as const) {
+      expect(sourceClipMediaFor(w, h)).toEqual(NATIVE_PORTRAIT_MEDIA);
+    }
+  });
+
+  it("mọi khổ khác: vừa khung (contain) trên nền mờ, không zoom", () => {
+    expect(SOURCE_CLIP_MEDIA).toEqual({ fit: "contain", motion: false });
+    for (const [w, h] of [[1920, 1080], [1080, 1080], [1440, 1080], [1080, 1440], [1080, 1350], [1166, 1920], [400, 1920]] as const) {
+      expect(sourceClipMediaFor(w, h)).toEqual(SOURCE_CLIP_MEDIA);
+    }
   });
 });

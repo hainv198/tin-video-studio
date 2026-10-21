@@ -3,7 +3,16 @@ import type { Canvas2D } from "@/templates/Canvas2D";
 export interface DrawCall {
   op: string;
   args: unknown[];
-  state: { fillStyle: unknown; font: string; globalAlpha: number; filter: string; imageSmoothingEnabled: boolean; imageSmoothingQuality: string };
+  state: {
+    fillStyle: unknown;
+    font: string;
+    globalAlpha: number;
+    filter: string;
+    imageSmoothingEnabled: boolean;
+    imageSmoothingQuality: string;
+    shadowColor: string;
+    shadowBlur: number;
+  };
 }
 
 class RecordedGradient {
@@ -43,6 +52,8 @@ export class RecordingCanvas {
         filter: this.filter,
         imageSmoothingEnabled: this.imageSmoothingEnabled,
         imageSmoothingQuality: this.imageSmoothingQuality,
+        shadowColor: this.shadowColor,
+        shadowBlur: this.shadowBlur,
       },
     });
   }

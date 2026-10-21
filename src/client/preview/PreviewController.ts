@@ -173,7 +173,8 @@ export class PreviewController extends StateController<PreviewState> {
       ...(banner.image ? { banner: banner.image } : {}),
     });
     const scene = this.state.tab === "intro" ? frames.intro : frames.body;
-    const backdrop = scene.role === "body" && scene.image && surface.backdrop ? surface.backdrop.make(scene.image) : null;
+    const needsBackdrop = scene.role === "body" && scene.media?.fit !== "fullFrame";
+    const backdrop = needsBackdrop && scene.image && surface.backdrop ? surface.backdrop.make(scene.image) : null;
     template.drawFrame(surface.ctx, frames.project, { ...scene, backdrop });
     this.lastKey = key;
     this.lastLogoBlob = brand.logo;

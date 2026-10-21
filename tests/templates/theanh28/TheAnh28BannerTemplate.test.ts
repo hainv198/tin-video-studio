@@ -8,7 +8,7 @@ import { BANNER_LAYOUT, FOOTER_BANNER_BOX } from "@/templates/theanh28/bannerLay
 import { DEFAULT_FOOTER_BANNER_URL, TheAnh28BannerTemplate } from "@/templates/theanh28/TheAnh28BannerTemplate";
 import { TheAnh28Template } from "@/templates/theanh28/TheAnh28Template";
 import { coverRect, LAYOUT } from "@/templates/theanh28/layout";
-import { SOURCE_CLIP_MEDIA, type DrawableImage, type ProjectFrame, type SceneFrame } from "@/templates/VideoTemplate";
+import { NATIVE_PORTRAIT_MEDIA, SOURCE_CLIP_MEDIA, type DrawableImage, type ProjectFrame, type SceneFrame } from "@/templates/VideoTemplate";
 import { RecordingCanvas, type DrawCall } from "../../helpers/RecordingCanvas";
 
 const t = new TheAnh28BannerTemplate();
@@ -87,6 +87,19 @@ describe("TheAnh28BannerTemplate — mọi nội dung nằm trên y = 1560", () 
   it("video tải lên (contain) dùng khung thân bài 1080×880 tại y = 300", () => {
     const c = draw(t, project(), scene({ text: "", media: SOURCE_CLIP_MEDIA }));
     expect(c.ops("rect").some((x) => x.args.join() === "0,300,1080,880")).toBe(true);
+  });
+
+  it("video 9:16 gốc: phủ toàn khung 1080×1920 không nền mờ; banner chân vẽ đè lên sau cùng", () => {
+    const tall: DrawableImage = { source: { tag: "tall" } as unknown as CanvasImageSource, width: 720, height: 1280 };
+    const backdrop: DrawableImage = { source: { tag: "backdrop" } as unknown as CanvasImageSource, width: 135, height: 240 };
+    const c = draw(t, project({ style: undefined }), scene({ text: "", image: tall, backdrop, media: NATIVE_PORTRAIT_MEDIA }));
+    const images = c.ops("drawImage");
+    expect(images.some((x) => x.args[0] === backdrop.source)).toBe(false);
+    expect(images.filter((x) => x.args[0] === tall.source).map((x) => x.args.slice(1))).toEqual([[0, 0, 1080, 1920]]);
+    expect(c.ops("rect").some((x) => x.args.join() === "0,300,1080,880")).toBe(false);
+    expect(images.at(-1)?.args[0]).toBe(banner.source);
+    // chữ phủ trên video vẫn nằm trên dải banner
+    expect(Math.max(...textBottoms(c))).toBeLessThanOrEqual(1560);
   });
 });
 

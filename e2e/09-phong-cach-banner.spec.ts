@@ -27,6 +27,8 @@ const SUBTITLE_LINE: Region = { x: 130, y: 1460, w: 820, h: 44 };
 /** Bố cục banner, video ngang 16:9 vừa khung 1080×880 tại y = 300: video cao 607,5 từ y ≈ 436. */
 const ABOVE_VIDEO: Region = { x: 40, y: 310, w: 1000, h: 110 };
 const VIDEO_MIDDLE: Region = { x: 40, y: 640, w: 1000, h: 120 };
+/** Nửa dưới khung trên banner (dưới dải thân bài 300..1180): video 9:16 phủ toàn khung thì là hình video. */
+const LOWER_FRAME: Region = { x: 40, y: 900, w: 1000, h: 600 };
 const SHARP_MIN = 120;
 const BLURRED_MAX = 80;
 /** Banner trong MP4 so với ảnh mặc định thu về 1080×360: sai khác trung bình mỗi byte (màu sau H.264 lệch vài mức). */
@@ -36,6 +38,7 @@ const DIR = join("test-results", "mau-banner");
 
 let ffmpeg = true;
 let landscape = "";
+let portrait = "";
 let redPng = "";
 let squarePng = "";
 let expectedBanner: Uint8Array = new Uint8Array(0);
@@ -48,6 +51,7 @@ test.beforeAll(() => {
   try {
     mkdirSync(DIR, { recursive: true });
     landscape = makeSampleClip({ out: join(DIR, "clip-ngang-1920x1080.mp4"), seconds: 8, width: 1920, height: 1080, audio: true });
+    portrait = makeSampleClip({ out: join(DIR, "clip-doc-1080x1920.mp4"), seconds: 8, width: 1080, height: 1920, audio: true });
     redPng = join(DIR, "banner-do-1500x500.png");
     squarePng = join(DIR, "anh-vuong-800.png");
     ffmpegRun(["-v", "error", "-y", "-f", "lavfi", "-i", "color=c=red:s=1500x500", "-frames:v", "1", redPng]);
@@ -217,5 +221,43 @@ test("Video tải lên + banner: banner ở thẻ đầu và cả đoạn video;
   saveShot(file, tClip, "banner-tai-len-video.png");
   console.log(
     `[e2e banner tải lên] tổng ${total} s; banner thẻ đầu↔video ${sameAcross.toFixed(2)}, so ảnh mặc định ${vsDefault.toFixed(2)}; trên video ${above.toFixed(1)}, giữa ${middle.toFixed(1)}`,
+  );
+  saveShot(file, tClip, "916-banner-ngang-nen-mo.png");
+});
+
+test("Video tải lên 9:16 gốc + banner: video phủ toàn khung (không nền mờ), banner chân đè lên trên", async ({ page }) => {
+  test.skip(!ffmpeg, "cần ffmpeg để tạo video mẫu");
+  await login(page);
+  await discardDraftIfOffered(page);
+  await page.getByRole("radio", { name: "Video tải lên" }).check();
+  await chooseStyle(page);
+  await page.getByLabel("Tiêu đề video").fill("Clip dọc 9:16 có banner chân");
+  await page.getByRole("button", { name: "Tạo dự án" }).click();
+  await goNext(page, "Video của bạn");
+  await uploadClip(page, portrait, "0:08");
+  await goNext(page, "Giọng tiêu đề");
+  await page.getByRole("button", { name: "Tạo giọng" }).click();
+  await expect(page.getByText(/✓ [\d.]+ giây/)).toHaveCount(1, { timeout: 60_000 });
+  await goNext(page, "Nhạc nền");
+  await page.getByRole("radio", { name: "Không dùng nhạc" }).check();
+  await goNext(page, "Dựng video");
+
+  const file = await renderAndDownload(page, "test-results", "banner-tai-len-916-");
+  const total = await shownDuration(page);
+  const tClip = total - 4;
+  const vsDefault = meanAbsDiff(grabRegion(file, tClip, BANNER), expectedBanner);
+  const above = edgeSharpness(grabRegion(file, tClip, ABOVE_VIDEO), ABOVE_VIDEO);
+  const middle = edgeSharpness(grabRegion(file, tClip, VIDEO_MIDDLE), VIDEO_MIDDLE);
+  const lower = edgeSharpness(grabRegion(file, tClip, LOWER_FRAME), LOWER_FRAME);
+  expect(vsDefault).toBeLessThan(BANNER_MATCH_MAX);
+  // Phủ toàn khung: trên dải thân bài cũ và nửa dưới (trước đây nền mờ) đều là hình video sắc.
+  expect(above).toBeGreaterThan(SHARP_MIN);
+  expect(middle).toBeGreaterThan(SHARP_MIN);
+  expect(lower).toBeGreaterThan(SHARP_MIN);
+  expect(lower).toBeGreaterThan(middle * 0.7);
+  saveShot(file, 0.5, "916-banner-the-dau.png");
+  saveShot(file, tClip, "916-banner-video.png");
+  console.log(
+    `[e2e banner 9:16] tổng ${total} s; banner so ảnh mặc định ${vsDefault.toFixed(2)}; trên ${above.toFixed(1)}, giữa ${middle.toFixed(1)}, nửa dưới ${lower.toFixed(1)}`,
   );
 });
