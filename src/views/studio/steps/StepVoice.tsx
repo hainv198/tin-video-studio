@@ -30,6 +30,7 @@ export function StepVoice({ studio }: { studio: Studio }) {
 
   const project = data.project;
   if (!project) return null;
+  const upload = project.kind === "upload";
   const stale = new Set(staleSceneIds(data));
   const settings = data.voice;
   const tweak = data.options.voiceTweak;
@@ -52,7 +53,10 @@ export function StepVoice({ studio }: { studio: Studio }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-lg font-semibold">Chọn giọng đọc</h2>
+      <h2 className="text-lg font-semibold">{upload ? "Giọng đọc tiêu đề" : "Chọn giọng đọc"}</h2>
+      {upload && (
+        <p className="text-sm text-neutral-400">Kiểu Video tải lên chỉ đọc câu tiêu đề trên thẻ đầu; phần video giữ tiếng gốc.</p>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">
           Giọng

@@ -131,6 +131,28 @@ Font (Phudu, Be Vietnam Pro, Oswald, Montserrat, Roboto Condensed, Barlow Conden
 
 So khung có/không phụ đề: `npm run contact:sheet -- co-phu-de.mp4 khong-phu-de.mp4 so-khung.png 1,6,10,20`.
 
+## Kiểu "Video tải lên"
+
+Ở bước 1 chọn **Kiểu video → Video tải lên**: chỉ nhập tiêu đề (+ nguồn tin, ngày đăng, thương hiệu), bấm **Tạo dự án**.
+
+1. **Nhập tiêu đề** — tiêu đề cũng là câu giọng đọc trên thẻ đầu.
+2. **Video của bạn** — chọn đúng một video MP4/MOV/WebM, tối đa **5 phút** và **500 MB**. Chỉnh **Âm thanh gốc** 0–150 % (100 % = giữ nguyên, 0 = tắt).
+3. **Giọng tiêu đề** — chỉ đọc câu tiêu đề.
+4. **Nhạc nền** — tuỳ chọn; tự đặt thấp hơn tiếng gốc ít nhất 12 dB.
+5. **Dựng video** — thẻ tiêu đề kiểu Theanh28 (ảnh lấy từ giây 1 của video) rồi video chạy trọn trong khung thân bài: video ngang vừa khung trên nền mờ lấy từ chính video; video dọc hoặc vuông phủ kín khung (cắt gọn hai mép). Không phụ đề. Video dài hơn 1 phút: nên chọn chất lượng **Nhẹ** (file nhỏ, đỡ tốn bộ nhớ) và giữ tab mở khi dựng.
+
+Đã có dự án thì không đổi kiểu được; bấm **Dự án mới** để làm kiểu khác. Track âm của video không giải mã được khi dựng thì việc dựng dừng và báo lỗi (không âm thầm bỏ tiếng gốc): kéo **Âm thanh gốc** về 0 % để dựng không có tiếng gốc, hoặc chuyển video sang MP4 (âm AAC).
+
+Video quay iPhone dạng HEVC (.mov) hoặc có âm AC-3/E-AC-3 có thể không đọc được trên Chrome Windows: xuất lại MP4 (H.264 + AAC) trước khi tải lên, ví dụ bằng ffmpeg:
+
+```bash
+ffmpeg -i IMG_0001.MOV -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -c:a aac -b:a 160k -movflags +faststart IMG_0001.mp4
+```
+
+Trên iPhone có thể đặt sẵn **Cài đặt → Camera → Định dạng → Tương thích nhất** để quay thẳng H.264.
+
+Tạo video mẫu để thử: `npm run sample:clip -- test-results/mau.mp4 8` (cần ffmpeg; thêm `--size 1080x1920` cho video dọc, `--no-audio` cho video không tiếng). Đo hiệu năng video dài: `$env:PERF_CLIP="1"; npm run test:e2e -- e2e/08-hieu-nang-video-dai.spec.ts`.
+
 ## Deploy lên Vercel (từng bước)
 
 Chỉ Hải chạy các lệnh git và thao tác trên GitHub/Vercel.

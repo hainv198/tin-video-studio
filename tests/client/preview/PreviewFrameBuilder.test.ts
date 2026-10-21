@@ -112,3 +112,46 @@ describe("buildPreviewFrames — vẽ bằng template thật", () => {
     expect(off.ops("drawImage").some((x) => x.args[0] === image.source)).toBe(true);
   });
 });
+
+
+describe("buildPreviewFrames — kiểu Video tải lên", () => {
+  const base = {
+    template,
+    brandValues: {},
+    options: VideoOptions.defaults().snapshot(),
+    logo: null,
+    image,
+    now: new Date(2026, 9, 21),
+  };
+  const uploadForm = { text: "", title: "Clip hiện trường vụ cháy.", sourceCredit: "Báo A", publishDateText: "2026-10-21", templateId: "theanh28", kind: "upload" as const };
+
+  it("tiêu đề lấy từ ô tiêu đề; thân bài là khung video vừa khung, không chữ, không phụ đề, credit VIDEO", () => {
+    const f = buildPreviewFrames({ ...base, form: uploadForm });
+    expect(f.usingSample).toBe(false);
+    expect(f.project.displayTitle).toBe("Clip hiện trường vụ cháy");
+    expect(f.project.mediaCredit).toBe("VIDEO: TỔNG HỢP");
+    expect(f.project.style?.subtitles.enabled).toBe(false);
+    expect(f.intro.text).toBe("Clip hiện trường vụ cháy.");
+    expect(f.body.text).toBe("");
+    expect(f.body.media).toEqual({ fit: "contain", motion: false });
+    expect(f.body.image).toBe(base.image);
+  });
+
+  it("chưa gõ tiêu đề thì dùng tiêu đề mẫu và báo usingSample", () => {
+    const f = buildPreviewFrames({ ...base, form: { ...uploadForm, title: " " } });
+    expect(f.usingSample).toBe(true);
+    expect(f.project.displayTitle.length).toBeGreaterThan(10);
+  });
+
+  it("kiểu tin (kind bỏ trống) giữ nguyên: không media, không mediaCredit", () => {
+    const f = buildPreviewFrames({ ...base, form: { ...uploadForm, kind: undefined, text: "Câu một. Câu hai." } });
+    expect(f.body.media).toBeUndefined();
+    expect(f.project.mediaCredit).toBeUndefined();
+  });
+
+  it("khung video dọc: thân bài phủ kín khung (cover), không zoom", () => {
+    const tall: DrawableImage = { ...image, width: 1080, height: 1920 };
+    const f = buildPreviewFrames({ ...base, image: tall, form: uploadForm });
+    expect(f.body.media).toEqual({ fit: "cover", motion: false });
+  });
+});

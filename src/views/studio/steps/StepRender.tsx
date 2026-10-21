@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import type { Studio } from "@/client/controllers/createStudio";
 import { VIDEO_BITRATE_CHOICES, VIDEO_QUALITY_LABELS, type VideoQuality } from "@/client/render/encodingDefaults";
+import { LONG_CLIP_SEC, renderSummary } from "@/client/controllers/renderSummary";
 import { useController } from "@/views/hooks/useController";
 
 export function StepRender({ studio }: { studio: Studio }) {
@@ -15,15 +16,17 @@ export function StepRender({ studio }: { studio: Studio }) {
   }, [studio]);
 
   if (!project) return null;
-  const voiceSeconds = [...data.narrations.values()].reduce((sum, n) => sum + n.durationSec, 0);
   const working = render.status === "working";
 
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-lg font-semibold">Dựng và tải về</h2>
-      <p className="text-sm text-neutral-400">
-        {project.scenes.length} cảnh, giọng gốc khoảng {voiceSeconds.toFixed(0)} giây, nhạc: {data.music ? data.music.title : "không dùng"}.
-      </p>
+      <p className="text-sm text-neutral-400">{renderSummary(data)}</p>
+      {project.kind === "upload" && (data.sourceClip?.durationSec ?? 0) > LONG_CLIP_SEC && (
+        <p className="text-sm text-amber-400">
+          Video dài: dựng có thể mất vài phút. Giữ tab này mở, không cho máy ngủ; chất lượng “Nhẹ” cho file nhỏ hơn và đỡ tốn bộ nhớ.
+        </p>
+      )}
       {render.status === "unsupported" && (
         <p role="alert" className="text-red-400">
           Hãy dùng Chrome hoặc Edge bản mới. Thiếu: {render.missing.join(", ")}

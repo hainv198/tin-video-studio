@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { STEPS, canEnter, stepReady, type StepId } from "@/client/controllers/readiness";
+import { canEnter, stepReady, stepsOf, type StepId } from "@/client/controllers/readiness";
 import type { StudioData } from "@/client/controllers/StudioSession";
 
 interface Props {
@@ -26,10 +26,10 @@ export function Stepper({ current, data, onSelect }: Props) {
       ref={list}
       className="relative -mx-4 flex gap-2 overflow-x-auto px-4 text-sm sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
     >
-      {STEPS.map((step, index) => {
+      {stepsOf(data).map((step, index) => {
         const enabled = canEnter(step.id, data);
         const active = step.id === current;
-        const done = (step.id === "news" || step.id === "voice") && stepReady(step.id, data);
+        const done = (step.id === "news" || step.id === "clip" || step.id === "voice") && stepReady(step.id, data);
         return (
           <li key={step.id} className="shrink-0">
             <button

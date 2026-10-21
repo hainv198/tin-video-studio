@@ -41,6 +41,8 @@ export class VideoFrameProvider implements FrameProvider {
     readonly durationSec: number,
     readonly width: number,
     readonly height: number,
+    /** Mốc khung hình đầu của video, giây. */
+    readonly startSec: number,
   ) {}
 
   static async open(blob: Blob, maxSide = 1080): Promise<VideoFrameProvider> {
@@ -58,7 +60,8 @@ export class VideoFrameProvider implements FrameProvider {
     // poolSize 3: bộ đọc giữ tối đa hai canvas cùng lúc (hiện tại và kế tiếp)
     const sink = new CanvasSink(track, { width, height, fit: "fill", poolSize: 3 });
     const durationSec = await track.computeDuration();
-    return new VideoFrameProvider(input, sink, durationSec, width, height);
+    const startSec = await track.getFirstTimestamp();
+    return new VideoFrameProvider(input, sink, durationSec, width, height, startSec);
   }
 
   /** Phải gọi tuần tự, không chồng lệnh. */

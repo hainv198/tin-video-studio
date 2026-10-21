@@ -2,7 +2,7 @@ import { parseUploadUri } from "@/client/media/footageFactory";
 import type { DraftRepository } from "@/client/storage/DraftRepository";
 import type { DraftBody } from "@/client/storage/ProjectDraft";
 import type { UploadRepository } from "@/client/storage/UploadRepository";
-import { canEnter, firstIncompleteStep, STEPS, type StepId } from "./readiness";
+import { canEnter, firstIncompleteStep, stepsOf, type StepId } from "./readiness";
 import { StateController } from "./StateController";
 import type { StudioSession } from "./StudioSession";
 
@@ -26,7 +26,7 @@ export interface WizardDeps {
   onAuthLost?: () => void;
 }
 
-/** Điều hướng 5 bước, mở lại/bỏ bản nháp, dự án mới, dọn file tải lên không còn dùng. */
+/** Điều hướng các bước (theo kiểu video), mở lại/bỏ bản nháp, dự án mới, dọn file tải lên không còn dùng. */
 export class WizardController extends StateController<WizardState> {
   private pending: (DraftBody & { savedAt: string }) | null = null;
   private bootToken = 0;
@@ -107,14 +107,16 @@ export class WizardController extends StateController<WizardState> {
   }
 
   next(): boolean {
-    const index = STEPS.findIndex((s) => s.id === this.state.step);
-    const target = STEPS[index + 1];
+    const steps = stepsOf(this.deps.session.state);
+    const index = steps.findIndex((s) => s.id === this.state.step);
+    const target = steps[index + 1];
     return target ? this.goTo(target.id) : false;
   }
 
   back(): void {
-    const index = STEPS.findIndex((s) => s.id === this.state.step);
-    const target = STEPS[index - 1];
+    const steps = stepsOf(this.deps.session.state);
+    const index = steps.findIndex((s) => s.id === this.state.step);
+    const target = steps[index - 1];
     if (target) this.patch({ step: target.id });
   }
 
@@ -122,7 +124,7 @@ export class WizardController extends StateController<WizardState> {
   async cleanupUploads(): Promise<void> {
     try {
       if (this.deps.deferCleanup?.()) return;
-      const { footage, music } = this.deps.session.state;
+      const { footage, music, sourceClip } = this.deps.session.state;
       const used = new Set<string>();
       for (const sceneId of footage.sceneIds()) {
         const snap = footage.get(sceneId)?.snapshot();
@@ -133,6 +135,7 @@ export class WizardController extends StateController<WizardState> {
       }
       const musicId = music ? parseUploadUri(music.uri) : null;
       if (musicId) used.add(musicId);
+      if (sourceClip) used.add(sourceClip.uploadId);
       for (const id of this.deps.liveUploadIds?.() ?? []) used.add(id);
       for (const meta of await this.deps.uploads.list()) {
         if (!used.has(meta.id)) await this.deps.uploads.delete(meta.id);

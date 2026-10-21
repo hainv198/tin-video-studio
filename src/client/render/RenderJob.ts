@@ -24,11 +24,23 @@ export interface NarrationInput {
   samples: Float32Array;
 }
 
+/** Video người dùng tải lên (kiểu "Video tải lên"): phát trọn sau thẻ tiêu đề. */
+export interface SourceClipInput {
+  blob: Blob;
+  /** Giây, tính từ khung hình đầu (từ MediaProbe). */
+  durationSec: number;
+  hasAudio: boolean;
+  /** Hệ số tuyến tính 0–1,5 cho tiếng gốc (0 = tắt). */
+  gain: number;
+  /** Giây (tính từ khung đầu) lấy ảnh cho thẻ tiêu đề. */
+  thumbnailSec: number;
+}
+
 export interface RenderJob {
   templateId: string;
   brandValues: Record<string, string>;
   logo: Blob | null;
-  project: { displayTitle: string; sourceCredit: string; publishDateText: string };
+  project: { displayTitle: string; sourceCredit: string; publishDateText: string; mediaCredit?: string };
   scenes: RenderSceneInput[];
   narrations: NarrationInput[];
   music: MusicBed | null;
@@ -39,6 +51,8 @@ export interface RenderJob {
   videoBitrate?: number;
   /** Tuỳ chọn riêng của video: font chữ, phụ đề, màu thumbnail đầu. */
   options: VideoOptionsSnapshot;
+  /** Có khi kiểu "Video tải lên"; bỏ trống = dựng như bản tin nhiều cảnh. */
+  sourceClip?: SourceClipInput;
 }
 
 export type WorkerRequest = { type: "start"; job: RenderJob } | { type: "probe" };

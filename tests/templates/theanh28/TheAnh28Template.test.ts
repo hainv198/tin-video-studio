@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { BrandKit } from "@/domain/BrandKit";
 import { TheAnh28Template } from "@/templates/theanh28/TheAnh28Template";
 import { LAYOUT } from "@/templates/theanh28/layout";
-import type { DrawableImage, ProjectFrame, SceneFrame } from "@/templates/VideoTemplate";
+import { SOURCE_CLIP_MEDIA, type DrawableImage, type ProjectFrame, type SceneFrame } from "@/templates/VideoTemplate";
 import { RecordingCanvas } from "../../helpers/RecordingCanvas";
 
 const t = new TheAnh28Template();
@@ -301,5 +301,29 @@ describe("TheAnh28Template — phụ đề", () => {
     expect(at(2.5).map(([line]) => line)).toEqual(["tu12 tu13 tu14 tu15 tu16 tu17", "tu18 tu19 tu20 tu21 tu22 tu23"]);
     expect(at(4.3)).toEqual(at(2.5));
     expect(at(0)).toEqual(at(0)); // cùng đầu vào ra cùng hình (cache không đổi kết quả)
+  });
+});
+
+describe("TheAnh28Template — video tải lên", () => {
+  const bandImageCalls = (c: RecordingCanvas) =>
+    c.ops("drawImage").filter((x) => x.args[0] === image.source && x.args.length === 5 && x.state.filter === "none");
+
+  it("media contain + không chuyển động: video vừa dải thân bài, không zoom theo thời gian", () => {
+    const early = bandImageCalls(draw(project(), scene({ media: SOURCE_CLIP_MEDIA, sceneTime: 0 })));
+    const late = bandImageCalls(draw(project(), scene({ media: SOURCE_CLIP_MEDIA, sceneTime: 3.9 })));
+    expect(early.at(-1)?.args.slice(1)).toEqual([0, 536.25, 1080, 607.5]);
+    expect(late.at(-1)?.args.slice(1)).toEqual([0, 536.25, 1080, 607.5]);
+  });
+
+  it("không có media: vẫn cover + Ken Burns như cũ", () => {
+    const calls = bandImageCalls(draw(project(), scene({ sceneTime: 0 })));
+    const w = calls.at(-1)?.args[3] as number;
+    expect(w).toBeGreaterThan(1080);
+  });
+
+  it("mediaCredit thay dòng 'ẢNH: TỔNG HỢP'; bỏ trống giữ như cũ", () => {
+    expect(draw(project({ mediaCredit: "VIDEO: TỔNG HỢP" }), scene()).texts()).toContain("VIDEO: TỔNG HỢP");
+    expect(draw(project({ mediaCredit: "VIDEO: TỔNG HỢP" }), scene()).texts()).not.toContain("ẢNH: TỔNG HỢP");
+    expect(draw(project(), scene()).texts()).toContain("ẢNH: TỔNG HỢP");
   });
 });

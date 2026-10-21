@@ -14,7 +14,7 @@ export class DraftRepository {
     await this.store.set(KEY, draft);
   }
 
-  /** Bản nháp không đọc được hoặc sai phiên bản thì coi như chưa có (không ném). v1 và v2 đều đọc được. */
+  /** Bản nháp không đọc được hoặc sai phiên bản thì coi như chưa có (không ném). v1, v2, v3 đều đọc được. */
   async load(): Promise<ProjectDraft | null> {
     const value = await this.store.get<unknown>(KEY);
     if (typeof value !== "object" || value === null) return null;

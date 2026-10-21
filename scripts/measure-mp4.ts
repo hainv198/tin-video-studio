@@ -14,8 +14,13 @@ export class FfmpegMissingError extends Error {
   }
 }
 
-/** Giải mã âm của MP4 bằng ffmpeg rồi đo. Ném FfmpegMissingError nếu máy không có ffmpeg (để e2e bỏ qua phần đo). */
-export function measureFile(file: string): AudioMetrics {
+export interface DecodedFileAudio {
+  channels: Float32Array[];
+  sampleRate: number;
+}
+
+/** Giải mã âm của MP4 bằng ffmpeg (stereo 48 kHz). Ném FfmpegMissingError nếu máy không có ffmpeg. */
+export function decodeFileAudio(file: string): DecodedFileAudio {
   let wav: Buffer;
   try {
     wav = execFileSync("ffmpeg", ["-v", "error", "-i", file, "-vn", "-ac", "2", "-ar", "48000", "-f", "wav", "pipe:1"], {
@@ -26,7 +31,13 @@ export function measureFile(file: string): AudioMetrics {
     throw error;
   }
   const parsed = parseWav(new Uint8Array(wav.buffer, wav.byteOffset, wav.byteLength));
-  return audioMetrics(parsed.channels, parsed.sampleRate);
+  return { channels: parsed.channels, sampleRate: parsed.sampleRate };
+}
+
+/** Giải mã âm của MP4 bằng ffmpeg rồi đo. Ném FfmpegMissingError nếu máy không có ffmpeg (để e2e bỏ qua phần đo). */
+export function measureFile(file: string): AudioMetrics {
+  const audio = decodeFileAudio(file);
+  return audioMetrics(audio.channels, audio.sampleRate);
 }
 
 function main(): void {

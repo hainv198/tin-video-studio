@@ -7,7 +7,7 @@ import { RenderCancelledError } from "@/client/render/errors";
 import { FallbackFootage, ImageFootage } from "@/domain/Footage";
 import { MusicTrack } from "@/domain/MusicTrack";
 import { defaultTemplateRegistry } from "@/templates/registry";
-import { fakeNarration, makeProject, memoryUploads, VOICE } from "../../helpers/studioFixtures";
+import { fakeNarration, makeClip, makeProject, makeUploadProject, memoryUploads, VOICE } from "../../helpers/studioFixtures";
 
 const SR = 48000;
 
@@ -218,5 +218,62 @@ describe("RenderJobBuilder — bitrate", () => {
     const expected = trimSilence(voiceChannel(), SR).samples;
     expect(n.durationSec).toBe(expected.length / SR);
     expect(Array.from(n.samples)).toEqual(Array.from(expected));
+  });
+});
+
+describe("RenderJobBuilder — kiểu Video tải lên", () => {
+  async function uploadSetup(clipOver: Parameters<typeof makeClip>[0] = {}) {
+    const base = setup();
+    const project = makeUploadProject();
+    const meta = await base.uploads.put(new Blob(["mp4"]), { name: "c.mp4", kind: "video" });
+    const data: StudioData = {
+      ...EMPTY_STUDIO,
+      kind: "upload",
+      project,
+      voice: VOICE,
+      narrations: new Map([[project.introScene.id, fakeNarration(project.introScene)]]),
+      brand: base.data.brand,
+      sourceClip: makeClip({ uploadId: meta.id, volumePercent: 80, ...clipOver }),
+    };
+    return { ...base, data, project, meta };
+  }
+
+  it("job: một cảnh mở đầu + khối sourceClip; không phụ đề; credit VIDEO", async () => {
+    const { builder, data } = await uploadSetup();
+    const { job, warnings } = await builder.build(data);
+    expect(warnings).toEqual([]);
+    expect(job.scenes).toEqual([{ sceneId: "s1", role: "intro", text: "Tiêu đề video tải lên", footage: { kind: "fallback" } }]);
+    expect(job.narrations).toHaveLength(1);
+    expect(job.project).toEqual({
+      displayTitle: "Tiêu đề video tải lên",
+      sourceCredit: "Nguồn thử",
+      publishDateText: "14/10/2026",
+      mediaCredit: "VIDEO: TỔNG HỢP",
+    });
+    expect(job.options.subtitles.enabled).toBe(false);
+    expect(job.sourceClip).toMatchObject({ durationSec: 8, hasAudio: true, gain: 0.8, thumbnailSec: 1 });
+    expect(job.sourceClip?.blob).toBeInstanceOf(Blob);
+  });
+
+  it("video không có tiếng gốc: hệ số 0 và cảnh báo", async () => {
+    const { builder, data } = await uploadSetup({ hasAudio: false });
+    const { job, warnings } = await builder.build(data);
+    expect(job.sourceClip?.gain).toBe(0);
+    expect(warnings).toEqual(["Video tải lên không có tiếng gốc"]);
+  });
+
+  it("chưa tải video hoặc mất blob thì báo lỗi rõ", async () => {
+    const { builder, data } = await uploadSetup();
+    await expect(builder.build({ ...data, sourceClip: null })).rejects.toThrow("Chưa tải video lên");
+    await expect(builder.build({ ...data, sourceClip: makeClip({ uploadId: "upload-mat" }) })).rejects.toThrow(
+      "Không tìm thấy video đã tải lên, hãy tải lại ở bước Video của bạn",
+    );
+  });
+
+  it("kiểu tin: job không có sourceClip, project không có mediaCredit", async () => {
+    const { builder, data } = setup();
+    const { job } = await builder.build(data);
+    expect("sourceClip" in job).toBe(false);
+    expect("mediaCredit" in job.project).toBe(false);
   });
 });

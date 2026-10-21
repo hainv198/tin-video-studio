@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { audioMetrics } from "../../scripts/lib/audioMetrics";
+import { audioMetrics, rmsDbBetween, toneRmsDb } from "../../scripts/lib/audioMetrics";
 
 const SR = 48000;
 function tone(sec: number, amp: number, freq = 220): Float32Array {
@@ -41,5 +41,25 @@ describe("audioMetrics", () => {
     const l = new Float32Array(SR); l[100] = 0.3;
     const r = new Float32Array(SR); r[200] = -0.9;
     expect(audioMetrics([l, r], SR).peak).toBeCloseTo(0.9, 6);
+  });
+});
+
+describe("đo theo khoảng thời gian", () => {
+  const SR = 8000;
+  const tone = (freq: number, sec: number, amp: number) =>
+    Float32Array.from({ length: Math.round(SR * sec) }, (_, i) => amp * Math.sin((2 * Math.PI * freq * i) / SR));
+
+  it("rmsDbBetween: RMS năng lượng của đoạn [from, to)", () => {
+    const a = new Float32Array(SR * 2);
+    a.set(tone(440, 1, 0.5), SR);
+    expect(rmsDbBetween([a], SR, 1, 2)).toBeCloseTo(20 * Math.log10(0.5 / Math.SQRT2), 2);
+    expect(rmsDbBetween([a], SR, 0, 1)).toBeLessThan(-100);
+    expect(Number.isNaN(rmsDbBetween([a], SR, 3, 4))).toBe(true);
+  });
+
+  it("toneRmsDb: tách đúng thành phần 440 Hz, bỏ qua 230 Hz", () => {
+    const mixed = tone(440, 1, 0.25).map((v, i) => v + 0.5 * Math.sin((2 * Math.PI * 230 * i) / SR));
+    expect(toneRmsDb([mixed], SR, 0, 1, 440)).toBeCloseTo(20 * Math.log10(0.25 / Math.SQRT2), 1);
+    expect(toneRmsDb([tone(230, 1, 0.5)], SR, 0, 1, 440)).toBeLessThan(-45);
   });
 });

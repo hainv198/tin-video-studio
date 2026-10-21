@@ -44,6 +44,23 @@ export interface TemplateDefaults {
   fallbackKeyword: string;
 }
 
+/** Cách đặt ảnh/video vào khung: cắt cho đầy (cover) hay vừa trọn (contain); có zoom Ken Burns hay đứng yên. */
+export interface SceneMedia {
+  fit: "cover" | "contain";
+  motion: boolean;
+}
+
+/** Video người dùng tải lên: không cắt mất nội dung, không zoom. */
+export const SOURCE_CLIP_MEDIA: SceneMedia = { fit: "contain", motion: false };
+
+/**
+ * Cách đặt video tải lên theo hướng khung: ngang (rộng > cao) thì vừa khung trên nền mờ lấy từ chính video;
+ * dọc hoặc vuông thì phủ kín khung (cắt gọn như cảnh trám, không để nền mờ hai bên). Cả hai đều không zoom.
+ */
+export function sourceClipMediaFor(width: number, height: number): SceneMedia {
+  return width > height ? SOURCE_CLIP_MEDIA : { fit: "cover", motion: false };
+}
+
 export interface ProjectFrame {
   displayTitle: string;
   sourceCredit: string;
@@ -52,6 +69,8 @@ export interface ProjectFrame {
   logo: DrawableImage | null;
   /** Tuỳ chọn riêng của video. Bỏ trống = như trước khi có tuỳ chọn (font mặc định của phong cách, không phụ đề, màu chủ đạo). */
   style?: FrameStyle;
+  /** Dòng thứ hai khối nguồn tin; bỏ trống = "ẢNH: TỔNG HỢP". */
+  mediaCredit?: string;
 }
 
 export interface SceneFrame {
@@ -73,6 +92,8 @@ export interface SceneFrame {
   voiceStart?: number;
   /** Độ dài giọng đọc của cảnh; bỏ trống = cả cảnh. */
   voiceDuration?: number;
+  /** Bỏ trống = cover + Ken Burns (như cảnh trám). */
+  media?: SceneMedia;
 }
 
 /** Một phong cách video. Hàm vẽ phải thuần theo thời gian: cùng đầu vào ra cùng hình. */

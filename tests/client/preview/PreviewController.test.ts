@@ -187,4 +187,22 @@ describe("PreviewController", () => {
     expect(canvas.calls).toHaveLength(0);
     expect(ctrl.state.drawCount).toBe(0);
   });
+  it("setImage thay ảnh minh hoạ và vẽ lại; null thì về ảnh minh hoạ", async () => {
+    const { ctrl, sched, canvas } = setup();
+    ctrl.attach({ ctx: canvas.asCanvas(), placeholder });
+    ctrl.setForm(form({ kind: "upload", text: "", title: "Clip A" }));
+    await settle(sched);
+    const frame: DrawableImage = { source: { tag: "frame" } as unknown as CanvasImageSource, width: 1280, height: 720 };
+    const before = ctrl.state.drawCount;
+    ctrl.setImage(frame);
+    await settle(sched);
+    expect(ctrl.state.drawCount).toBe(before + 1);
+    expect(canvas.ops("drawImage").some((c) => c.args[0] === frame.source)).toBe(true);
+    ctrl.setImage(frame); // cùng ảnh: không vẽ lại
+    await settle(sched);
+    expect(ctrl.state.drawCount).toBe(before + 1);
+    ctrl.setImage(null);
+    await settle(sched);
+    expect(ctrl.state.drawCount).toBe(before + 2);
+  });
 });

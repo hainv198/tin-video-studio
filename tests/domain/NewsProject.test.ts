@@ -230,3 +230,52 @@ describe("NewsProject restore: bộ sinh id không đụng id đã có", () => {
     expect(ids).toHaveLength(4);
   });
 });
+
+describe("NewsProject — kiểu Video tải lên", () => {
+  const input = { title: "  Clip   hiện trường vụ cháy  ", sourceCredit: "Báo A", publishDate: new Date(2026, 9, 21), templateId: "theanh28" };
+
+  it("titleOnly: đúng một cảnh mở đầu, kind upload", () => {
+    const p = NewsProject.titleOnly(input, sequentialIds("s"));
+    expect(p.kind).toBe("upload");
+    expect(p.scenes.map((s) => [s.id, s.role, s.text])).toEqual([["s1", "intro", "Clip hiện trường vụ cháy"]]);
+    expect(p.title).toBe("Clip hiện trường vụ cháy");
+    expect(p.bodyScenes).toEqual([]);
+  });
+
+  it("titleOnly: thiếu tiêu đề / phong cách / ngày sai thì ném", () => {
+    expect(() => NewsProject.titleOnly({ ...input, title: " " }, sequentialIds("s"))).toThrow("Chưa có tiêu đề video");
+    expect(() => NewsProject.titleOnly({ ...input, templateId: "" }, sequentialIds("s"))).toThrow("Chưa chọn phong cách video");
+    expect(() => NewsProject.titleOnly({ ...input, publishDate: new Date(Number.NaN) }, sequentialIds("s"))).toThrow("Ngày đăng không hợp lệ");
+  });
+
+  it("sửa tiêu đề qua cảnh mở đầu, withMeta giữ kind; không tách/gộp được", () => {
+    const p = NewsProject.titleOnly(input, sequentialIds("s"));
+    const edited = p.updateSceneText("s1", "Tiêu đề mới").withMeta({ sourceCredit: "Báo B" });
+    expect(edited.kind).toBe("upload");
+    expect(edited.title).toBe("Tiêu đề mới");
+    expect(() => p.splitScene("s1", 3)).toThrow("Không tách được cảnh mở đầu");
+    expect(() => p.mergeWithNext("s1")).toThrow("Không gộp được cảnh mở đầu");
+  });
+
+  it("snapshot: kiểu upload có khoá kind; kiểu tin KHÔNG có khoá kind", () => {
+    const up = NewsProject.titleOnly(input, sequentialIds("s"));
+    expect(up.snapshot().kind).toBe("upload");
+    const news = NewsProject.fromText({ ...input, text: "Câu một. Câu hai." }, new SentenceSplitter(), sequentialIds("n"));
+    expect(news.kind).toBe("news");
+    expect("kind" in news.snapshot()).toBe(false);
+  });
+
+  it("restore: khứ hồi upload; thiếu kind = news; cấu trúc sai theo kiểu thì ném", () => {
+    const up = NewsProject.titleOnly(input, sequentialIds("s"));
+    const back = NewsProject.restore(up.snapshot(), sequentialIds("x"));
+    expect(back.kind).toBe("upload");
+    expect(back.snapshot()).toEqual(up.snapshot());
+    const twoScenes = { ...up.snapshot(), scenes: [...up.snapshot().scenes, { id: "s2", text: "Thân bài", role: "body" as const }] };
+    expect(() => NewsProject.restore(twoScenes, sequentialIds("x"))).toThrow("Bản nháp hỏng: cấu trúc cảnh không hợp lệ");
+    const { kind: _k, ...asNews } = up.snapshot();
+    expect(() => NewsProject.restore(asNews, sequentialIds("x"))).toThrow("Bản nháp hỏng: cấu trúc cảnh không hợp lệ");
+    expect(() => NewsProject.restore({ ...up.snapshot(), kind: "khac" as never }, sequentialIds("x"))).toThrow(
+      "Bản nháp hỏng: kiểu video không hợp lệ",
+    );
+  });
+});

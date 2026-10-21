@@ -59,3 +59,22 @@ describe("Timeline tra cứu", () => {
     expect(() => t.frameCount(Number.NaN)).toThrow("fps phải là số dương");
   });
 });
+
+describe("Timeline — đoạn lặng (video tải lên)", () => {
+  const cfg = { leadInSec: 0.3, gapSec: 0.35, tailSec: 0.6 };
+
+  it("thẻ đầu = nghỉ đầu + giọng + nghỉ; video nối ngay sau, không đuôi", () => {
+    const t = Timeline.build([{ sceneId: "s1", durationSec: 2 }, { sceneId: "clip", durationSec: 8, silent: true }], cfg);
+    expect(t.slots).toEqual([
+      { sceneId: "s1", index: 0, start: 0, voiceStart: 0.3, voiceEnd: 2.3, end: 2.65 },
+      { sceneId: "clip", index: 1, start: 2.65, voiceStart: 2.65, voiceEnd: 2.65, end: 10.65 },
+    ]);
+    expect(t.totalDuration).toBe(10.65);
+    expect(t.frameCount(30)).toBe(320);
+    expect(t.slotAt(5).sceneId).toBe("clip");
+  });
+
+  it("đoạn lặng độ dài sai thì ném", () => {
+    expect(() => Timeline.build([{ sceneId: "clip", durationSec: 0, silent: true }], cfg)).toThrow("Đoạn clip có độ dài không hợp lệ");
+  });
+});

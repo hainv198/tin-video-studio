@@ -52,6 +52,8 @@ export class PreviewController extends StateController<PreviewState> {
   private generation = 0;
   private lastKey: string | null = null;
   private lastLogoBlob: Blob | null = null;
+  private image: DrawableImage | null = null;
+  private imageVersion = 0;
   private logo: { blob: Blob; decoded: DecodedImage } | null = null;
   /** URL font đã nạp (hoặc đã thử mà lỗi): không nạp lại. */
   private readonly fontUrls = new Set<string>();
@@ -80,6 +82,14 @@ export class PreviewController extends StateController<PreviewState> {
   setTab(tab: PreviewTab): void {
     if (tab === this.state.tab) return;
     this.patch({ tab });
+    this.request(0);
+  }
+
+  /** Ảnh thật thay ảnh minh hoạ (ví dụ khung của video tải lên); null = về ảnh minh hoạ. */
+  setImage(image: DrawableImage | null): void {
+    if (image === this.image) return;
+    this.image = image;
+    this.imageVersion += 1;
     this.request(0);
   }
 
@@ -113,7 +123,7 @@ export class PreviewController extends StateController<PreviewState> {
     if (!surface || !form) return;
     const { brand, options } = this.deps.session.state;
     const snapshot = options.snapshot();
-    const key = JSON.stringify({ tab: this.state.tab, form, brand: brand.values, options: snapshot });
+    const key = JSON.stringify({ tab: this.state.tab, form, brand: brand.values, options: snapshot, image: this.imageVersion });
     if (key === this.lastKey && brand.logo === this.lastLogoBlob) return;
     const token = ++this.generation;
     const live = () => token === this.generation && this.surface === surface;
@@ -141,7 +151,7 @@ export class PreviewController extends StateController<PreviewState> {
     const logo = await this.logoFor(brand.logo, live);
     if (logo === undefined) return;
 
-    const frames = buildPreviewFrames({ form, template, brandValues: brand.values, options: snapshot, logo, image: surface.placeholder });
+    const frames = buildPreviewFrames({ form, template, brandValues: brand.values, options: snapshot, logo, image: this.image ?? surface.placeholder });
     const scene = this.state.tab === "intro" ? frames.intro : frames.body;
     const backdrop = scene.role === "body" && scene.image && surface.backdrop ? surface.backdrop.make(scene.image) : null;
     template.drawFrame(surface.ctx, frames.project, { ...scene, backdrop });

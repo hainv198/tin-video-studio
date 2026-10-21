@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BrandKit } from "@/domain/BrandKit";
 import { DEFAULT_TIMELINE_CONFIG } from "@/domain/Timeline";
 import type { Canvas2D } from "@/templates/Canvas2D";
-import { VideoTemplate, type ProjectFrame, type SceneFrame } from "@/templates/VideoTemplate";
+import { SOURCE_CLIP_MEDIA, sourceClipMediaFor, VideoTemplate, type ProjectFrame, type SceneFrame } from "@/templates/VideoTemplate";
 import { RecordingCanvas } from "../helpers/RecordingCanvas";
 
 class SpyTemplate extends VideoTemplate {
@@ -46,5 +46,17 @@ describe("VideoTemplate.drawFrame", () => {
     const t = new SpyTemplate();
     t.drawFrame(new RecordingCanvas().asCanvas(), project, scene("body"));
     expect(t.seen).toEqual(["body", "overlay:body"]);
+  });
+});
+
+describe("sourceClipMediaFor — đặt video tải lên vào khung thân bài", () => {
+  it("video ngang: vừa khung (contain) trên nền mờ, không zoom", () => {
+    expect(sourceClipMediaFor(1920, 1080)).toEqual(SOURCE_CLIP_MEDIA);
+    expect(sourceClipMediaFor(1920, 1080)).toEqual({ fit: "contain", motion: false });
+  });
+
+  it("video dọc hoặc vuông: phủ kín khung (cover), không zoom", () => {
+    expect(sourceClipMediaFor(1080, 1920)).toEqual({ fit: "cover", motion: false });
+    expect(sourceClipMediaFor(1080, 1080)).toEqual({ fit: "cover", motion: false });
   });
 });

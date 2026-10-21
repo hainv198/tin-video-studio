@@ -1,5 +1,6 @@
 import { FootageBoard } from "@/domain/FootageBoard";
 import { NewsProject } from "@/domain/NewsProject";
+import { isProjectKind, type ProjectKind } from "@/domain/ProjectKind";
 import { SentenceSplitter } from "@/domain/SentenceSplitter";
 import { ValidationError } from "@/domain/errors";
 import type { IdGenerator } from "@/domain/ids";
@@ -22,7 +23,9 @@ export interface ProjectInput {
   templateId: string;
 }
 
-/** Bước 1: tạo dự án từ text, sửa/gộp/tách cảnh. */
+export const KIND_LOCKED_MESSAGE = "Đã có dự án. Muốn đổi kiểu video, bấm “Dự án mới” (dự án, giọng và video đã tải sẽ bị xoá).";
+
+/** Bước 1: chọn kiểu video, tạo dự án (chia cảnh hoặc chỉ tiêu đề), sửa/gộp/tách cảnh. */
 export class ProjectController extends StateController<{ error: string | null }> {
   private readonly splitter: SentenceSplitter;
 
@@ -39,6 +42,36 @@ export class ProjectController extends StateController<{ error: string | null }>
         project,
         narrations: new Map(),
         footage: FootageBoard.empty(),
+        sourceClip: null,
+      }));
+    });
+  }
+
+  /** Chọn kiểu video ở bước 1. Chỉ đổi được khi chưa có dự án. */
+  setKind(kind: ProjectKind): boolean {
+    return this.attempt(() => {
+      if (!isProjectKind(kind)) throw new ValidationError("Kiểu video không hợp lệ");
+      if (this.deps.session.state.project) throw new ValidationError(KIND_LOCKED_MESSAGE);
+      if (this.deps.session.state.kind !== kind) this.deps.session.update((d) => ({ ...d, kind }));
+    });
+  }
+
+  /** Kiểu "Video tải lên": dự án chỉ có câu tiêu đề. */
+  createTitleOnlyFromForm(form: { title: string; sourceCredit: string; publishDateText: string; templateId: string }): boolean {
+    const publishDate = this.parseDate(form.publishDateText);
+    if (!publishDate) return false;
+    return this.attempt(() => {
+      const project = NewsProject.titleOnly(
+        { title: form.title, sourceCredit: form.sourceCredit, publishDate, templateId: form.templateId },
+        this.deps.ids,
+      );
+      this.deps.session.update((d) => ({
+        ...d,
+        kind: "upload",
+        project,
+        narrations: new Map(),
+        footage: FootageBoard.empty(),
+        sourceClip: null,
       }));
     });
   }

@@ -2,10 +2,11 @@ import { fromDateInput } from "@/client/controllers/dateText";
 import { SAMPLE_NEWS } from "@/client/sample/sampleNews";
 import { BrandKit } from "@/domain/BrandKit";
 import { NewsProject } from "@/domain/NewsProject";
+import { MEDIA_CREDIT, type ProjectKind } from "@/domain/ProjectKind";
 import { SentenceSplitter } from "@/domain/SentenceSplitter";
 import type { VideoOptionsSnapshot } from "@/domain/VideoOptions";
 import { frameStyleFor } from "@/templates/fonts/FontCatalog";
-import type { DrawableImage, ProjectFrame, SceneFrame, VideoTemplate } from "@/templates/VideoTemplate";
+import { SOURCE_CLIP_MEDIA, sourceClipMediaFor, type DrawableImage, type ProjectFrame, type SceneFrame, type VideoTemplate } from "@/templates/VideoTemplate";
 
 export type PreviewTab = "intro" | "body";
 
@@ -17,6 +18,8 @@ export interface PreviewForm {
   /** yyyy-mm-dd như <input type="date">. */
   publishDateText: string;
   templateId: string;
+  /** Bỏ trống = "news". */
+  kind?: ProjectKind;
 }
 
 export interface PreviewInput {
@@ -71,19 +74,70 @@ function splitNews(text: string, title: string, templateId: string, splitter: Se
   }
 }
 
+function previewDate(form: PreviewForm, usingSample: boolean, now: Date | undefined): Date {
+  try {
+    return fromDateInput(form.publishDateText);
+  } catch {
+    return usingSample ? SAMPLE_NEWS.publishDate : (now ?? new Date());
+  }
+}
+
+/** Kiểu "Video tải lên": thẻ đầu với tiêu đề; thân bài là khung video vừa khung, không chữ, không phụ đề. */
+function buildUploadFrames(input: PreviewInput, splitter: SentenceSplitter): PreviewFrames {
+  const { form, template, options } = input;
+  const typed = form.title.replace(/\s+/g, " ").trim();
+  const usingSample = typed === "";
+  const introText = typed || (splitter.split(SAMPLE_NEWS.text)[0] ?? "Tiêu đề video");
+  const publishDate = previewDate(form, usingSample, input.now);
+  const credit = form.sourceCredit.trim() || (usingSample ? SAMPLE_NEWS.sourceCredit : "");
+  const style = frameStyleFor(options);
+  const project: ProjectFrame = {
+    displayTitle: introText.replace(/[.!?…]+$/u, "").trim(),
+    sourceCredit: credit,
+    publishDateText: dateText(publishDate),
+    brand: brandKit(template, input.brandValues),
+    logo: input.logo,
+    style: { ...style, subtitles: { ...style.subtitles, enabled: false } },
+    mediaCredit: MEDIA_CREDIT.upload,
+  };
+  const { leadInSec, gapSec } = options.pacing;
+  const introVoice = voiceSecFor(introText);
+  const introDuration = leadInSec + introVoice + gapSec;
+  const intro: SceneFrame = {
+    role: "intro",
+    text: introText,
+    image: input.image,
+    sceneTime: 0,
+    sceneDuration: introDuration,
+    footageTime: 0,
+    footageDuration: introDuration,
+    voiceStart: leadInSec,
+    voiceDuration: introVoice,
+  };
+  const body: SceneFrame = {
+    role: "body",
+    text: "",
+    image: input.image,
+    sceneTime: 0,
+    sceneDuration: 1,
+    footageTime: 0,
+    footageDuration: 1,
+    voiceStart: 0,
+    voiceDuration: 0,
+    media: input.image ? sourceClipMediaFor(input.image.width, input.image.height) : SOURCE_CLIP_MEDIA,
+  };
+  return { project, intro, body, usingSample };
+}
+
 /** Dựng ProjectFrame + hai SceneFrame (khung đầu của cảnh mở đầu, giữa câu thân bài đầu) cho xem trước bước 1. */
 export function buildPreviewFrames(input: PreviewInput, splitter = new SentenceSplitter()): PreviewFrames {
+  if (input.form.kind === "upload") return buildUploadFrames(input, splitter);
   const { form, template, options } = input;
   const usingSample = splitter.split(form.text).length === 0;
   const text = usingSample ? SAMPLE_NEWS.text : form.text;
   const news = splitNews(text, form.title, form.templateId, splitter);
 
-  let publishDate: Date;
-  try {
-    publishDate = fromDateInput(form.publishDateText);
-  } catch {
-    publishDate = usingSample ? SAMPLE_NEWS.publishDate : (input.now ?? new Date());
-  }
+  const publishDate = previewDate(form, usingSample, input.now);
   const credit = form.sourceCredit.trim() || (usingSample ? SAMPLE_NEWS.sourceCredit : "");
 
   const project: ProjectFrame = {

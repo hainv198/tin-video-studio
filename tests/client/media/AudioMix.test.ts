@@ -150,3 +150,54 @@ describe("mixProgram với bộ giới hạn", () => {
     expect(rmsDb(slice(out.left, 0, 8))).toBeCloseTo(MIX_DEFAULTS.voiceTargetDb, 0);
   });
 });
+
+describe("mixProgram — tiếng gốc của video tải lên", () => {
+  const fade = Math.round(MIX_DEFAULTS.sourceEdgeFadeSec * SR); // 20 mẫu ở SR 1000
+
+  it("đặt từ startSec, nhân đúng hệ số, không chuẩn hoá; vuốt 20 ms hai đầu", () => {
+    const src = sine(2, 0.2, 47); // 47 Hz ở 1000 mẫu/giây: hầu như không có mẫu rơi đúng điểm qua 0 (cổng −120 dB sẽ loại các mẫu đó và làm lệch mức đo)
+    const out = mixProgram([], null, { sampleRate: SR, durationSec: 3 }, { channels: [src], startSec: 1, gain: 0.5 });
+    expect(out.left[999]).toBe(0);
+    expect(out.left[1000]).toBe(0); // mẫu đầu của vuốt vào nhân 1/20 × 0
+    expect(out.left[1000 + 100]).toBeCloseTo(0.5 * (src[100] ?? 0), 6);
+    expect(Math.abs(out.left[1000 + 5] ?? 0)).toBeLessThan(Math.abs(0.5 * (src[5] ?? 0)) + 1e-9);
+    expect(out.right[1000 + 100]).toBeCloseTo(out.left[1000 + 100] ?? 0, 9);
+    expect(rmsDb(slice(out.left, 1 + fade / SR, 3 - fade / SR), -120)).toBeCloseTo(20 * Math.log10((0.5 * 0.2) / Math.SQRT2), 1);
+    expect(out.limiterGainDb).toBe(0);
+  });
+
+  it("stereo giữ hai kênh riêng", () => {
+    const l = sine(1, 0.2, 50);
+    const r = sine(1, 0.1, 50);
+    const out = mixProgram([], null, { sampleRate: SR, durationSec: 1 }, { channels: [l, r], startSec: 0, gain: 1 });
+    expect(out.left[500]).toBeCloseTo(l[500] ?? 0, 6);
+    expect(out.right[500]).toBeCloseTo(r[500] ?? 0, 6);
+  });
+
+  it("dài hơn bản trộn thì cắt; gain 0 thì không có tiếng gốc", () => {
+    const out = mixProgram([], null, { sampleRate: SR, durationSec: 1 }, { channels: [sine(3, 0.2)], startSec: 0.5, gain: 1 });
+    expect(out.left.length).toBe(1000);
+    const muted = mixProgram([], null, { sampleRate: SR, durationSec: 1 }, { channels: [sine(1, 0.2)], startSec: 0, gain: 0 });
+    expect(Array.from(muted.left).every((v) => v === 0)).toBe(true);
+  });
+
+  it("nhạc nền thấp hơn tiếng gốc ít nhất 12 dB (mức cố định cả bài)", () => {
+    const src = sine(4, 0.05, 50); // ≈ −29 dB
+    const music = { channels: [sine(4, 0.5, 30)], levelBelowVoiceDb: 15 };
+    const opts = { sampleRate: SR, durationSec: 4, fadeInSec: 0, fadeOutSec: 0 };
+    const bed = { channels: [src], startSec: 0, gain: 1 };
+    const withMusic = mixProgram([], music, opts, bed);
+    const without = mixProgram([], null, opts, bed);
+    const musicOnly = withMusic.left.map((v, i) => v - (without.left[i] ?? 0));
+    const expected = Math.min(MIX_DEFAULTS.voiceTargetDb - 15, rmsDb(src) - MIX_DEFAULTS.sourceOverMusicDb);
+    expect(rmsDb(musicOnly, -120)).toBeCloseTo(expected, 0);
+  });
+
+  it("không có tiếng gốc (null hoặc gain 0): nhạc theo quy tắc cũ", () => {
+    const music = { channels: [sine(2, 0.5, 30)], levelBelowVoiceDb: 15 };
+    const opts = { sampleRate: SR, durationSec: 2, fadeInSec: 0, fadeOutSec: 0 };
+    const old = mixProgram([], music, opts);
+    const muted = mixProgram([], music, opts, { channels: [sine(2, 0.2)], startSec: 0, gain: 0 });
+    expect(Array.from(muted.left)).toEqual(Array.from(old.left));
+  });
+});

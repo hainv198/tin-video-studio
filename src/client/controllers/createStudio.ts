@@ -10,6 +10,7 @@ import { OptionsController } from "./OptionsController";
 import { ProjectController } from "./ProjectController";
 import { RenderController } from "./RenderController";
 import { RenderJobBuilder } from "./RenderJobBuilder";
+import { SourceClipController } from "./SourceClipController";
 import { StudioSession, type SessionDeps } from "./StudioSession";
 import { VoiceController } from "./VoiceController";
 import { WizardController } from "./WizardController";
@@ -31,6 +32,7 @@ export interface Studio {
   footage: FootageController;
   search: FootageSearchController;
   music: MusicController;
+  clip: SourceClipController;
   render: RenderController;
   dispose(): void;
 }
@@ -105,6 +107,7 @@ export function createStudio(services: ClientServices, options: StudioOptions = 
     probe: services.probe,
     onAuthLost,
   });
+  const clip = new SourceClipController({ session, uploads: services.uploads, probe: services.probe, onAuthLost });
   const wizard = new WizardController({
     session,
     drafts: services.drafts,
@@ -116,12 +119,13 @@ export function createStudio(services: ClientServices, options: StudioOptions = 
         return id ? [id] : [];
       }),
     ],
-    deferCleanup: () => footage.ingesting || music.state.busy,
+    deferCleanup: () => footage.ingesting || music.state.busy || clip.ingesting,
     onReset: () => {
       footage.reset();
       search.reset();
       voice.reset();
       music.reset();
+      clip.reset();
       render.reset();
     },
     onAuthLost,
@@ -140,6 +144,7 @@ export function createStudio(services: ClientServices, options: StudioOptions = 
     footage,
     search,
     music,
+    clip,
     render,
     dispose() {
       render.dispose();

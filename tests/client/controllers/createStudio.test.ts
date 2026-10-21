@@ -115,4 +115,19 @@ describe("createStudio", () => {
     expect(studio.session.state.options.textFontId).toBe("oswald");
     studio.dispose();
   });
+
+  it("lắp SourceClipController; dự án mới dọn blob video tải lên", async () => {
+    const services = createClientServices(env());
+    (services.probe as unknown as { clip: () => Promise<unknown> }).clip = async () => ({ width: 640, height: 360, durationSec: 5, hasAudio: false });
+    const studio = createStudio(services, { schedule: () => () => {} });
+    expect(studio.project.setKind("upload")).toBe(true);
+    expect(studio.project.createTitleOnlyFromForm({ title: "Clip", sourceCredit: "", publishDateText: "2026-10-21", templateId: "theanh28" })).toBe(true);
+    await studio.clip.upload(new File([new Uint8Array([1])], "c.mp4", { type: "video/mp4" }));
+    expect(studio.session.state.sourceClip?.hasAudio).toBe(false);
+    expect(await services.uploads.list()).toHaveLength(1);
+    await studio.wizard.newProject();
+    expect(studio.session.state.sourceClip).toBeNull();
+    expect(await services.uploads.list()).toEqual([]);
+    studio.dispose();
+  });
 });

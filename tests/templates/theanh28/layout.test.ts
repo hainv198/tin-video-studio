@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coverRect, kenBurnsRect, LAYOUT, withAlpha, wrapText } from "@/templates/theanh28/layout";
+import { containRect, coverRect, kenBurnsRect, LAYOUT, withAlpha, wrapText } from "@/templates/theanh28/layout";
 
 describe("LAYOUT", () => {
   it("khung 1080×1920, dải ảnh thân bài 380→1300", () => {
@@ -75,5 +75,12 @@ describe("LAYOUT.subtitle", () => {
     expect(introTop).toBeGreaterThan(LAYOUT.credit.y + 2 * LAYOUT.credit.lineHeight);
     expect(S.centerX - S.maxWidth / 2).toBeGreaterThanOrEqual(120);
     expect(S.centerX + S.maxWidth / 2).toBeLessThanOrEqual(960);
+  });
+});
+
+describe("containRect", () => {
+  it("vừa khung, giữ tỉ lệ, căn giữa", () => {
+    expect(containRect(1600, 900, { x: 0, y: 380, w: 1080, h: 920 })).toEqual({ x: 0, y: 536.25, w: 1080, h: 607.5 });
+    expect(containRect(1080, 1920, { x: 0, y: 380, w: 1080, h: 920 })).toEqual({ x: 281.25, y: 380, w: 517.5, h: 920 });
   });
 });

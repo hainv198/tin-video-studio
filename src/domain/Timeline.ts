@@ -25,8 +25,12 @@ export class Timeline {
     readonly totalDuration: number,
   ) {}
 
+  /**
+   * `silent`: đoạn không giọng (video tải lên) — bắt đầu ngay sau đoạn trước, dài đúng `durationSec`, không nghỉ đầu,
+   * không nghỉ/đuôi sau. Đoạn có giọng giữ quy tắc cũ (nghỉ đầu ở đoạn đầu, nghỉ giữa câu, đuôi ở đoạn cuối).
+   */
   static build(
-    entries: ReadonlyArray<{ sceneId: string; durationSec: number }>,
+    entries: ReadonlyArray<{ sceneId: string; durationSec: number; silent?: boolean }>,
     config: TimelineConfig = DEFAULT_TIMELINE_CONFIG,
   ): Timeline {
     if (entries.length === 0) throw new ValidationError("Chưa có cảnh nào để dựng");
@@ -35,7 +39,16 @@ export class Timeline {
     let voiceStart = config.leadInSec;
     entries.forEach((entry, index) => {
       if (!Number.isFinite(entry.durationSec) || entry.durationSec <= 0) {
-        throw new ValidationError(`Cảnh ${entry.sceneId} chưa có độ dài giọng`);
+        throw new ValidationError(
+          entry.silent ? `Đoạn ${entry.sceneId} có độ dài không hợp lệ` : `Cảnh ${entry.sceneId} chưa có độ dài giọng`,
+        );
+      }
+      if (entry.silent) {
+        const end = start + entry.durationSec;
+        slots.push({ sceneId: entry.sceneId, index, start: ms(start), voiceStart: ms(start), voiceEnd: ms(start), end: ms(end) });
+        start = end;
+        voiceStart = end;
+        return;
       }
       const voiceEnd = voiceStart + entry.durationSec;
       const isLast = index === entries.length - 1;

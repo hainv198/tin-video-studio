@@ -10,9 +10,10 @@ import {
   type FrameStyle,
   type ProjectFrame,
   type SceneFrame,
+  type SceneMedia,
   type TemplateDefaults,
 } from "../VideoTemplate";
-import { coverRect, kenBurnsRect, LAYOUT, withAlpha, wrapText, type Rect } from "./layout";
+import { containRect, coverRect, kenBurnsRect, LAYOUT, withAlpha, wrapText, type Rect } from "./layout";
 import { cueAt, splitSubtitle, timeCues, type SubtitleCue } from "./subtitles";
 
 export const THEANH28_FONT_FAMILY = "TVS Barlow Condensed";
@@ -106,7 +107,7 @@ export class TheAnh28Template extends VideoTemplate {
       }
       ctx.fillStyle = `rgba(0,0,0,${B.backdropShade})`;
       ctx.fillRect(0, 0, width, height);
-      this.drawClipped(ctx, scene.image, B.band, this.progress(scene));
+      this.drawClipped(ctx, scene.image, B.band, this.progress(scene), scene.media);
     } else {
       const gradient = ctx.createLinearGradient(0, 0, 0, height);
       gradient.addColorStop(0, color);
@@ -128,7 +129,8 @@ export class TheAnh28Template extends VideoTemplate {
     ctx.textBaseline = "top";
     ctx.textAlign = "left";
     const measure = (s: string) => ctx.measureText(s).width;
-    const lines = project.sourceCredit ? [`THEO: ${upper(project.sourceCredit)}`, "ẢNH: TỔNG HỢP"] : ["ẢNH: TỔNG HỢP"];
+    const mediaCredit = project.mediaCredit ?? "ẢNH: TỔNG HỢP";
+    const lines = project.sourceCredit ? [`THEO: ${upper(project.sourceCredit)}`, mediaCredit] : [mediaCredit];
     lines.forEach((line, i) => ctx.fillText(wrapText(line, limit, measure, 1)[0] ?? "", C.x, C.y + i * C.lineHeight));
     if (scene.role === "body") this.drawCornerLogo(ctx, project);
     if (project.style?.subtitles.enabled) this.drawSubtitle(ctx, project.style, scene);
@@ -193,8 +195,9 @@ export class TheAnh28Template extends VideoTemplate {
     return duration > 0 ? time / duration : 0;
   }
 
-  private drawClipped(ctx: Canvas2D, image: DrawableImage, box: Rect, progress: number): void {
-    const target = kenBurnsRect(coverRect(image.width, image.height, box), progress);
+  private drawClipped(ctx: Canvas2D, image: DrawableImage, box: Rect, progress: number, media?: SceneMedia): void {
+    const base = media?.fit === "contain" ? containRect(image.width, image.height, box) : coverRect(image.width, image.height, box);
+    const target = media?.motion === false ? base : kenBurnsRect(base, progress);
     ctx.save();
     ctx.beginPath();
     ctx.rect(box.x, box.y, box.w, box.h);

@@ -8,11 +8,17 @@ import type { PreviewForm, PreviewTab } from "@/client/preview/PreviewFrameBuild
 import { drawPlaceholder, PLACEHOLDER_SIZE } from "@/client/preview/placeholderImage";
 import { CanvasBackdropMaker } from "@/client/render/BackdropMaker";
 import type { Canvas2D } from "@/templates/Canvas2D";
+import type { DrawableImage } from "@/templates/VideoTemplate";
 import { useController } from "@/views/hooks/useController";
 
 const TABS: { id: PreviewTab; label: string }[] = [
   { id: "intro", label: "Thumbnail đầu" },
   { id: "body", label: "Cảnh thân bài" },
+];
+
+const UPLOAD_TABS: { id: PreviewTab; label: string }[] = [
+  { id: "intro", label: "Thumbnail đầu" },
+  { id: "body", label: "Khung video" },
 ];
 
 function canvas2d(width: number, height: number): { canvas: HTMLCanvasElement; ctx: Canvas2D } {
@@ -25,7 +31,7 @@ function canvas2d(width: number, height: number): { canvas: HTMLCanvasElement; c
 }
 
 /** Xem trước sống của bước 1: vẽ bằng đúng template video trên canvas 1080×1920 co theo khung 9:16. */
-export function PreviewPanel({ studio, form }: { studio: Studio; form: PreviewForm }) {
+export function PreviewPanel({ studio, form, image }: { studio: Studio; form: PreviewForm; image?: DrawableImage | null }) {
   const [controller] = useState(
     () =>
       new PreviewController({
@@ -65,10 +71,14 @@ export function PreviewPanel({ studio, form }: { studio: Studio; form: PreviewFo
     };
   }, [controller]);
 
-  const { text, title, sourceCredit, publishDateText, templateId } = form;
+  const { text, title, sourceCredit, publishDateText, templateId, kind } = form;
   useEffect(() => {
-    controller.setForm({ text, title, sourceCredit, publishDateText, templateId });
-  }, [controller, text, title, sourceCredit, publishDateText, templateId]);
+    controller.setForm({ text, title, sourceCredit, publishDateText, templateId, kind });
+  }, [controller, text, title, sourceCredit, publishDateText, templateId, kind]);
+  useEffect(() => {
+    controller.setImage(image ?? null);
+  }, [controller, image]);
+  const tabs = kind === "upload" ? UPLOAD_TABS : TABS;
 
   return (
     <aside aria-label="Xem trước video" className="order-1 flex flex-col gap-2 lg:order-2 lg:sticky lg:top-4 lg:self-start">
@@ -82,7 +92,7 @@ export function PreviewPanel({ studio, form }: { studio: Studio; form: PreviewFo
       </button>
       <div className={`${open ? "flex" : "hidden"} flex-col gap-2 lg:flex`}>
         <div role="tablist" aria-label="Khung xem trước" className="flex gap-1 text-sm">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button
               key={t.id}
               type="button"
@@ -101,11 +111,17 @@ export function PreviewPanel({ studio, form }: { studio: Studio; form: PreviewFo
           height={1920}
           data-testid="xem-truoc-canvas"
           data-draw-count={state.drawCount}
-          aria-label={state.tab === "intro" ? "Xem trước thumbnail đầu" : "Xem trước cảnh thân bài"}
+          aria-label={state.tab === "intro" ? "Xem trước thumbnail đầu" : kind === "upload" ? "Xem trước khung video" : "Xem trước cảnh thân bài"}
           className="mx-auto aspect-[9/16] w-full max-w-[320px] rounded-md bg-neutral-900"
         />
         {state.usingSample && <p className="text-xs text-neutral-400">Đang dùng nội dung mẫu</p>}
-        <p className="text-xs text-neutral-500">Ảnh nền là ảnh minh hoạ; cảnh trám thật chọn ở bước 3.</p>
+        <p className="text-xs text-neutral-500">
+          {kind === "upload"
+            ? image
+              ? "Khung lấy từ video của bạn."
+              : "Ảnh nền là ảnh minh hoạ; khung thật lấy từ video bạn tải lên ở bước 2."
+            : "Ảnh nền là ảnh minh hoạ; cảnh trám thật chọn ở bước 3."}
+        </p>
         {state.error && (
           <p className="text-xs text-red-400">
             {state.error}

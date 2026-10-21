@@ -15,3 +15,12 @@ describe("sourceTimeFor", () => {
     expect(sourceTimeFor({ mode: "loop", sourceDurationSec: 0 }, 5)).toBe(0);
   });
 });
+
+describe("sourceTimeFor — mốc đầu và ảnh tĩnh tại giây", () => {
+  it("startSec cộng vào mọi chế độ; stillAtSec chọn giây của ảnh tĩnh", () => {
+    expect(sourceTimeFor({ mode: "clip", sourceDurationSec: 8, startSec: 0.5 }, 2)).toBe(2.5);
+    expect(sourceTimeFor({ mode: "clip", sourceDurationSec: 8, startSec: 0.5 }, 9)).toBeCloseTo(8.499, 9);
+    expect(sourceTimeFor({ mode: "still", startSec: 0.5, stillAtSec: 1 }, 3)).toBe(1.5);
+    expect(sourceTimeFor({ mode: "still" }, 3)).toBe(0);
+  });
+});

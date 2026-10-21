@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_TIMELINE_CONFIG, Timeline } from "@/domain/Timeline";
 import { VideoOptions } from "@/domain/VideoOptions";
-import { footageSpans, planRender, timelineConfigFor } from "@/client/render/RenderPlan";
+import { footageSpans, planRender, SOURCE_CLIP_SCENE_ID, timelineConfigFor } from "@/client/render/RenderPlan";
 import type { RenderJob } from "@/client/render/RenderJob";
 
 const job = (narrations: RenderJob["narrations"]): RenderJob => ({
@@ -84,5 +84,33 @@ describe("footageSpans", () => {
     const partial = footageSpans(timeline, new Map([["b", "a"]]));
     expect(partial.get("b")).toEqual({ ownerId: "a", start: 0, end: timeline.slots[1]!.end });
     expect(partial.get("c")).toEqual({ ownerId: "c", start: timeline.slots[2]!.start, end: timeline.slots[2]!.end });
+  });
+});
+
+describe("planRender — video tải lên", () => {
+  it("thêm đoạn lặng cho video sau thẻ đầu; giọng chỉ ở thẻ đầu", () => {
+    const a = new Float32Array(3);
+    const base = job([{ sceneId: "s1", durationSec: 2, samples: a }]);
+    const withClip = {
+      ...base,
+      scenes: base.scenes.slice(0, 1),
+      sourceClip: { blob: new Blob(["v"]), durationSec: 8, hasAudio: true, gain: 1, thumbnailSec: 1 },
+    };
+    const plan = planRender(withClip, DEFAULT_TIMELINE_CONFIG);
+    expect(plan.timeline.slots.map((s) => s.sceneId)).toEqual(["s1", SOURCE_CLIP_SCENE_ID]);
+    expect(plan.voices).toEqual([{ startSec: 0.3, samples: a }]);
+    expect(plan.clipSlot).toEqual({ sceneId: SOURCE_CLIP_SCENE_ID, index: 1, start: 2.65, voiceStart: 2.65, voiceEnd: 2.65, end: 10.65 });
+    expect(plan.timeline.totalDuration).toBe(10.65);
+  });
+
+  it("job không có video: clipSlot null", () => {
+    const plan = planRender(
+      job([
+        { sceneId: "s1", durationSec: 2, samples: new Float32Array(1) },
+        { sceneId: "s2", durationSec: 1, samples: new Float32Array(1) },
+      ]),
+      DEFAULT_TIMELINE_CONFIG,
+    );
+    expect(plan.clipSlot).toBeNull();
   });
 });

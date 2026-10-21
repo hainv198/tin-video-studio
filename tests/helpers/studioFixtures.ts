@@ -5,6 +5,7 @@ import type { DraftBody } from "@/client/storage/ProjectDraft";
 import { Narration } from "@/domain/Narration";
 import { NewsProject } from "@/domain/NewsProject";
 import type { Scene } from "@/domain/Scene";
+import { SourceClip, type SourceClipProps } from "@/domain/SourceClip";
 import { SentenceSplitter } from "@/domain/SentenceSplitter";
 import { VoiceSettings } from "@/domain/VoiceSettings";
 import { sequentialIds, type IdGenerator } from "@/domain/ids";
@@ -83,3 +84,15 @@ export function memoryUploads(prefix = "u") {
 }
 
 export const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+/** Dự án kiểu Video tải lên: một cảnh mở đầu s1. */
+export function makeUploadProject(ids: IdGenerator = sequentialIds("s")): NewsProject {
+  return NewsProject.titleOnly(
+    { title: "Tiêu đề video tải lên", sourceCredit: "Nguồn thử", publishDate: new Date(2026, 9, 14), templateId: "theanh28" },
+    ids,
+  );
+}
+
+export function makeClip(over: Partial<SourceClipProps> = {}): SourceClip {
+  return SourceClip.create({ uploadId: "upload-c1", name: "clip.mp4", width: 1280, height: 720, durationSec: 8, hasAudio: true, ...over });
+}

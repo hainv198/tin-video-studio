@@ -1,4 +1,14 @@
-export const MIX_DEFAULTS = { voiceTargetDb: -16.5, gateDb: -45, fadeInSec: 1.5, fadeOutSec: 2, ceiling: 0.89 } as const;
+export const MIX_DEFAULTS = {
+  voiceTargetDb: -16.5,
+  gateDb: -45,
+  fadeInSec: 1.5,
+  fadeOutSec: 2,
+  ceiling: 0.89,
+  /** Nhạc nền thấp hơn tiếng gốc của video tải lên ít nhất ngần này (dB). */
+  sourceOverMusicDb: 12,
+  /** Vuốt vào/ra tiếng gốc chống tiếng tách ở biên thẻ đầu/cuối video. */
+  sourceEdgeFadeSec: 0.02,
+} as const;
 
 export interface MonoClip {
   startSec: number;
@@ -9,6 +19,15 @@ export interface MusicBed {
   /** 1 kênh (mono) hoặc 2 kênh (trái, phải), cùng sampleRate với bản trộn. */
   channels: Float32Array[];
   levelBelowVoiceDb: number;
+}
+
+/** Tiếng gốc của video tải lên: đặt từ `startSec`, nhân `gain`, KHÔNG chuẩn hoá. */
+export interface SourceBed {
+  /** 1 kênh (mono) hoặc 2 kênh (trái, phải), cùng sampleRate với bản trộn. */
+  channels: Float32Array[];
+  startSec: number;
+  /** 0 = tắt; 1 = giữ nguyên; tối đa 1,5. */
+  gain: number;
 }
 
 export interface MixOptions {
@@ -94,16 +113,16 @@ export function applyLimiter(left: Float32Array, right: Float32Array, sampleRate
 
   const w = Math.max(1, Math.round(LIMITER_LOOKAHEAD_SEC * sampleRate));
   const ahead = slidingMinAhead(need, w);
-  const prefix = new Float64Array(n + 1);
-  for (let i = 0; i < n; i++) prefix[i + 1] = (prefix[i] as number) + (ahead[i] as number);
   const first = ahead[0] as number;
 
+  // Trung bình trượt 5 ms bằng tổng chạy (số thực 64 bit) thay cho mảng tiền tố.
+  let running = 0;
   let minGain = 1;
   for (let i = 0; i < n; i++) {
-    const from = i - w + 1;
-    const inside = (prefix[i + 1] as number) - (prefix[Math.max(0, from)] as number);
-    const padded = from < 0 ? -from * first : 0;
-    const gain = (inside + padded) / w;
+    running += ahead[i] as number;
+    if (i >= w) running -= ahead[i - w] as number;
+    const padded = i < w - 1 ? (w - 1 - i) * first : 0;
+    const gain = (running + padded) / w;
     left[i] = (left[i] ?? 0) * gain;
     right[i] = (right[i] ?? 0) * gain;
     if (gain < minGain) minGain = gain;
@@ -111,7 +130,12 @@ export function applyLimiter(left: Float32Array, right: Float32Array, sampleRate
   return 20 * Math.log10(minGain);
 }
 
-export function mixProgram(voices: readonly MonoClip[], music: MusicBed | null, options: MixOptions): StereoMix {
+export function mixProgram(
+  voices: readonly MonoClip[],
+  music: MusicBed | null,
+  options: MixOptions,
+  source: SourceBed | null = null,
+): StereoMix {
   const sr = options.sampleRate;
   const n = Math.ceil(options.durationSec * sr);
   const target = options.voiceTargetDb ?? MIX_DEFAULTS.voiceTargetDb;
@@ -137,12 +161,32 @@ export function mixProgram(voices: readonly MonoClip[], music: MusicBed | null, 
     right[i] = v;
   }
 
+  // Tiếng gốc: mức của nó (sau hệ số) quyết định trần của nhạc nền.
+  let sourceLevelDb = -Infinity;
+  if (source && source.gain > 0 && source.channels.length > 0) {
+    const srcL = source.channels[0] as Float32Array;
+    const srcR = source.channels[1] ?? srcL;
+    const start = Math.round(source.startSec * sr);
+    const len = Math.min(srcL.length, n - start);
+    const edge = Math.max(1, Math.round(MIX_DEFAULTS.sourceEdgeFadeSec * sr));
+    for (let j = 0; j < len; j++) {
+      const g = source.gain * Math.min(1, j / edge, (len - 1 - j) / edge);
+      left[start + j] = (left[start + j] ?? 0) + (srcL[j] ?? 0) * g;
+      right[start + j] = (right[start + j] ?? 0) + (srcR[j] ?? 0) * g;
+    }
+    const level = rmsDb(srcL);
+    if (Number.isFinite(level)) sourceLevelDb = level + 20 * Math.log10(source.gain);
+  }
+
   if (music && music.channels.length > 0) {
     const srcL = music.channels[0] as Float32Array;
     const srcR = music.channels[1] ?? srcL;
     const musicLevel = rmsDb(srcL, -60);
     if (Number.isFinite(musicLevel) && srcL.length > 0) {
-      const gain = dbToGain(target - music.levelBelowVoiceDb - musicLevel);
+      const musicTargetDb = Number.isFinite(sourceLevelDb)
+        ? Math.min(target - music.levelBelowVoiceDb, sourceLevelDb - MIX_DEFAULTS.sourceOverMusicDb)
+        : target - music.levelBelowVoiceDb;
+      const gain = dbToGain(musicTargetDb - musicLevel);
       for (let i = 0; i < n; i++) {
         const f = gain * fadeGain(i, n, sr, fadeIn, fadeOut);
         left[i] = (left[i] ?? 0) + (srcL[i % srcL.length] ?? 0) * f;
