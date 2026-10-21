@@ -153,6 +153,25 @@ Trên iPhone có thể đặt sẵn **Cài đặt → Camera → Định dạng 
 
 Tạo video mẫu để thử: `npm run sample:clip -- test-results/mau.mp4 8` (cần ffmpeg; thêm `--size 1080x1920` cho video dọc, `--no-audio` cho video không tiếng). Đo hiệu năng video dài: `$env:PERF_CLIP="1"; npm run test:e2e -- e2e/08-hieu-nang-video-dai.spec.ts`.
 
+## Phong cách "Bản tin Theanh28 + banner chân"
+
+Ở bước 1, ô **Phong cách video** có thêm **Bản tin Theanh28 + banner chân** (phong cách cũ vẫn là mặc định). Phong cách này dời toàn bộ nội dung (khung ảnh/video, tiêu đề, phụ đề, dòng nguồn, tên kênh, ngày đăng) lên trên, chừa dải đáy 1080×360 (y 1560–1920) cho ảnh banner. Banner hiện suốt video, kể cả thẻ tiêu đề, ở cả "Bản tin nhiều cảnh" và "Video tải lên".
+
+- **Banner mặc định:** `public/templates/theanh28-banner/banner-chan-video.png` (2048×682, quảng cáo US Pickleball × US Recovery).
+- **Banner riêng:** phần **Thương hiệu của phong cách này → Banner chân video**: ảnh ngang PNG/JPG/WebP, tối đa 5 MB, rộng ≥ 720 px, tỉ lệ 2:1 đến 5:1 (khuyên 3:1, ví dụ 2048×682). Ảnh được phủ kín dải (cắt phần thừa, căn giữa). Nút **Dùng banner mặc định** bỏ ảnh riêng. Bấm **Lưu thương hiệu** để giữ trên máy này.
+- Lần đầu chọn phong cách này, tên kênh, màu và logo được mượn từ thương hiệu của phong cách Theanh28 (chưa tính là đã lưu).
+
+## Cách ghép "Đọc tiêu đề đè trên video" (kiểu Video tải lên)
+
+Ở bước 1 (hoặc bước **Video của bạn**), mục **Cách ghép** có hai lựa chọn:
+
+1. **Thẻ tiêu đề rồi video** (mặc định, như trước): thẻ tiêu đề có giọng đọc, rồi chạy nguyên video. Tổng = thẻ đầu + video.
+2. **Đọc tiêu đề đè trên video**: video chạy ngay từ giây 0; giọng đọc tiêu đề bắt đầu sau **Chờ trước khi đọc tiêu đề** (thanh "Nghỉ đầu video"); khối tiêu đề kiểu Theanh28 hiện ở phần dưới video, giữ thêm **Giữ tiêu đề sau khi đọc** rồi thu gọn mượt trong 0,4 giây; tiếng gốc tự nhỏ lại 12 dB trong lúc đọc (vào 0,2 s, ra 0,25 s) rồi trở lại mức đã chỉnh. **Tổng = đúng độ dài video.** Không phụ đề. Dùng được với cả hai phong cách.
+
+Nếu giọng đọc tiêu đề (cộng nghỉ đầu) dài hơn video, bước Giọng hiện cảnh báo và bước Dựng dừng với câu báo: rút gọn tiêu đề, giảm nghỉ đầu, tăng tốc độ đọc, hoặc chuyển sang "Thẻ tiêu đề rồi video".
+
+Kiểm thử: `npm run test:e2e -- e2e/09-phong-cach-banner.spec.ts e2e/10-doc-tieu-de-de-video.spec.ts` (cần ffmpeg); đo hiệu năng: `$env:PERF_CLIP="1"; npm run test:e2e -- e2e/10-doc-tieu-de-de-video.spec.ts`.
+
 ## Tạo giọng riêng
 
 Trang **/doc-giong** (liên kết **Tạo giọng** ở đầu trang studio, trên điện thoại nằm trong menu ☰): biến văn bản bất kỳ thành file âm thanh, không liên quan tới dự án video. Mọi tài khoản đã đăng nhập đều dùng được.
