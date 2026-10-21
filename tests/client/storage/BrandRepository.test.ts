@@ -47,3 +47,23 @@ describe("BrandRepository", () => {
     expect(brand?.updatedAt).toBe("");
   });
 });
+
+describe("BrandRepository — banner chân", () => {
+  it("lưu và nạp banner cạnh logo; không truyền banner thì bản lưu không có khoá banner", async () => {
+    const store = new MemoryKeyValueStore();
+    const repo = new BrandRepository(store);
+    const banner = new Blob(["banner"], { type: "image/png" });
+    await repo.save("theanh28-banner", { channelName: "A" }, null, banner);
+    expect((await repo.load("theanh28-banner"))?.banner?.size).toBe(6);
+    await repo.save("theanh28", { channelName: "A" }, null);
+    const raw = await store.get<Record<string, unknown>>("brand:theanh28");
+    expect(raw !== null && raw !== undefined && "banner" in raw).toBe(false);
+    expect((await repo.load("theanh28"))?.banner).toBeUndefined();
+  });
+
+  it("banner quá 5 MB thì ném ValidationError", async () => {
+    const repo = new BrandRepository(new MemoryKeyValueStore());
+    const big = new Blob([new Uint8Array(5 * 1024 * 1024 + 1)]);
+    await expect(repo.save("t", {}, null, big)).rejects.toThrow("Banner tối đa 5 MB");
+  });
+});

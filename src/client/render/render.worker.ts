@@ -24,6 +24,23 @@ interface WorkerScope {
 
 const scope = globalThis as unknown as WorkerScope;
 
+/** Ảnh banner chân: banner riêng trong job, không có thì tải ảnh mặc định của phong cách. */
+async function loadBanner(job: RenderJob, defaultUrl: string): Promise<ImageBitmap> {
+  let blob = job.banner ?? null;
+  if (!blob) {
+    const response = await fetch(new URL(defaultUrl, job.origin));
+    if (!response.ok) throw new Error(`Không tải được banner mặc định (${response.status})`);
+    blob = await response.blob();
+  }
+  try {
+    return await createImageBitmap(blob);
+  } catch (error) {
+    throw new Error("Không đọc được ảnh banner chân video. Hãy tải lại ảnh ở phần Thương hiệu hoặc bấm “Dùng banner mặc định”.", {
+      cause: error,
+    });
+  }
+}
+
 async function blobOf(footage: FootageInput, origin: string): Promise<Blob> {
   if (footage.blob) return footage.blob;
   if (!footage.url) throw new Error("Cảnh trám thiếu nguồn");
@@ -45,9 +62,11 @@ async function render(job: RenderJob): Promise<void> {
   const providers: FrameProvider[] = [];
   const scenes = new Map<string, RenderScene>();
   let logoBitmap: ImageBitmap | null = null;
+  let bannerBitmap: ImageBitmap | null = null;
   let encoder: Mp4Encoder | null = null;
   try {
     logoBitmap = job.logo ? await createImageBitmap(job.logo) : null;
+    bannerBitmap = template.footerBanner ? await loadBanner(job, template.footerBanner.defaultUrl) : null;
     const { timeline, voices, clipSlot } = planRender(job, timelineConfigFor(template.defaults.timeline, options));
     const owners = new Map<string, string>();
     for (const s of job.scenes) if (s.footageFrom) owners.set(s.sceneId, s.footageFrom);
@@ -150,6 +169,7 @@ async function render(job: RenderJob): Promise<void> {
         ...job.project,
         brand,
         logo: logoBitmap ? { source: logoBitmap, width: logoBitmap.width, height: logoBitmap.height } : null,
+        ...(bannerBitmap ? { banner: { source: bannerBitmap, width: bannerBitmap.width, height: bannerBitmap.height } } : {}),
         style,
       },
       timeline,
@@ -179,6 +199,7 @@ async function render(job: RenderJob): Promise<void> {
       }
     }
     logoBitmap?.close();
+    bannerBitmap?.close();
   }
 }
 

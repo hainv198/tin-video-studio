@@ -148,3 +148,98 @@ describe("BrandController", () => {
     expect(ctrl.state.saved).toBe(false);
   });
 });
+
+describe("BrandController — banner chân", () => {
+  function bannerSetup(size = { width: 2048, height: 682 }) {
+    const { session } = makeSession();
+    const brands = new BrandRepository(new MemoryKeyValueStore());
+    const measured: Blob[] = [];
+    const ctrl = new BrandController({
+      session,
+      templates: defaultTemplateRegistry(),
+      brands,
+      measureImage: async (blob) => {
+        measured.push(blob);
+        return size;
+      },
+    });
+    return { session, brands, ctrl, measured };
+  }
+  const png = (bytes = 10, name = "banner.png") => new File([new Uint8Array(bytes)], name, { type: "image/png" });
+
+  it("chưa lưu thương hiệu riêng: mượn tên kênh, màu, logo của theanh28; chưa có banner; trạng thái chưa lưu", async () => {
+    const { ctrl, brands, session } = bannerSetup();
+    const logo = new Blob(["logo"]);
+    await brands.save("theanh28", { channelName: "KÊNH GỐC", primaryColor: "#112233" }, logo);
+    await ctrl.load("theanh28-banner");
+    expect(ctrl.state.values.channelName).toBe("KÊNH GỐC");
+    expect(ctrl.state.values.primaryColor).toBe("#112233");
+    expect(ctrl.state.logo?.size).toBe(logo.size); // kho dùng structuredClone nên Blob đọc ra là bản sao, không so theo định danh
+    expect(ctrl.state.banner).toBeUndefined();
+    expect(ctrl.state.saved).toBe(false);
+    expect(session.state.brand.values.channelName).toBe("KÊNH GỐC");
+    expect(session.state.brand.logo?.size).toBe(logo.size);
+    expect("banner" in session.state.brand).toBe(false);
+  });
+
+  it("đã lưu riêng thì dùng bản riêng (kể cả banner), không mượn", async () => {
+    const { ctrl, brands, session } = bannerSetup();
+    const banner = new Blob(["b"]);
+    await brands.save("theanh28", { channelName: "KÊNH GỐC" }, null);
+    await brands.save("theanh28-banner", { channelName: "KÊNH RIÊNG" }, null, banner);
+    await ctrl.load("theanh28-banner");
+    expect(ctrl.state.values.channelName).toBe("KÊNH RIÊNG");
+    expect(ctrl.state.banner?.size).toBe(banner.size);
+    expect(ctrl.state.saved).toBe(true);
+    expect(session.state.brand.banner?.size).toBe(banner.size);
+  });
+
+  it("setBanner hợp lệ: đo kích thước, vào session; lưu thì kho có banner; clearBanner về mặc định", async () => {
+    const { ctrl, brands, session, measured } = bannerSetup();
+    await ctrl.load("theanh28-banner");
+    const file = png();
+    await ctrl.setBanner(file);
+    expect(measured).toEqual([file]);
+    expect(ctrl.state.error).toBeNull();
+    expect(ctrl.state.banner).toBe(file);
+    expect(session.state.brand.banner).toBe(file);
+    expect(await ctrl.save()).toBe(true);
+    expect((await brands.load("theanh28-banner"))?.banner?.size).toBe(10);
+    ctrl.clearBanner();
+    expect(ctrl.state.banner).toBeUndefined();
+    expect(session.state.brand.banner).toBeUndefined();
+    expect(ctrl.state.saved).toBe(false);
+  });
+
+  it("banner sai tỉ lệ, quá lớn, sai định dạng, hoặc không đọc được thì báo lỗi và giữ banner cũ", async () => {
+    const square = bannerSetup({ width: 800, height: 800 });
+    await square.ctrl.load("theanh28-banner");
+    await square.ctrl.setBanner(png());
+    expect(square.ctrl.state.error).toBe(
+      "Banner phải là ảnh ngang, tỉ lệ rộng/cao từ 2 đến 5 (ảnh này 1,00). Khuyên dùng 3:1, ví dụ 2048×682.",
+    );
+    expect(square.ctrl.state.banner).toBeUndefined();
+
+    const ok = bannerSetup();
+    await ok.ctrl.load("theanh28-banner");
+    await ok.ctrl.setBanner(png(5 * 1024 * 1024 + 1));
+    expect(ok.ctrl.state.error).toBe("Banner tối đa 5 MB");
+    await ok.ctrl.setBanner(new File(["x"], "a.mp4", { type: "video/mp4" }));
+    expect(ok.ctrl.state.error).toBe("Không nhận file video ở đây");
+    expect(ok.measured).toHaveLength(0);
+
+    const { session } = makeSession();
+    const broken = new BrandController({
+      session,
+      templates: defaultTemplateRegistry(),
+      brands: new BrandRepository(new MemoryKeyValueStore()),
+      measureImage: async () => {
+        throw new Error("decode");
+      },
+    });
+    await broken.load("theanh28-banner");
+    await broken.setBanner(png());
+    expect(broken.state.error).toBe("Không đọc được ảnh banner");
+    expect(broken.state.banner).toBeUndefined();
+  });
+});

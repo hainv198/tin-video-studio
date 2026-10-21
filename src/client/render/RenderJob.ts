@@ -40,6 +40,8 @@ export interface RenderJob {
   templateId: string;
   brandValues: Record<string, string>;
   logo: Blob | null;
+  /** Banner chân riêng (phong cách có banner); bỏ trống = worker dùng banner mặc định của phong cách. */
+  banner?: Blob;
   project: { displayTitle: string; sourceCredit: string; publishDateText: string; mediaCredit?: string };
   scenes: RenderSceneInput[];
   narrations: NarrationInput[];

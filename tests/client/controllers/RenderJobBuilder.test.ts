@@ -277,3 +277,34 @@ describe("RenderJobBuilder — kiểu Video tải lên", () => {
     expect("mediaCredit" in job.project).toBe(false);
   });
 });
+
+describe("RenderJobBuilder — banner chân", () => {
+  it("phong cách banner + banner riêng: job mang banner (cả kiểu tin và kiểu tải lên)", async () => {
+    const { builder, data, uploads } = setup();
+    const banner = new Blob(["banner"]);
+    const project = data.project!.withMeta({ templateId: "theanh28-banner" });
+    const { job } = await builder.build({ ...data, project, brand: { ...data.brand, banner } });
+    expect(job.templateId).toBe("theanh28-banner");
+    expect(job.banner).toBe(banner);
+
+    const upload = makeUploadProject().withMeta({ templateId: "theanh28-banner" });
+    const meta = await uploads.put(new Blob(["mp4"]), { name: "c.mp4", kind: "video" });
+    const built = await builder.build({
+      ...EMPTY_STUDIO,
+      kind: "upload",
+      project: upload,
+      voice: VOICE,
+      narrations: new Map([[upload.introScene.id, fakeNarration(upload.introScene)]]),
+      brand: { values: {}, logo: null, banner },
+      sourceClip: makeClip({ uploadId: meta.id }),
+    });
+    expect(built.job.banner).toBe(banner);
+  });
+
+  it("phong cách banner chưa có banner riêng, hoặc phong cách cũ: job không có khoá banner", async () => {
+    const { builder, data } = setup();
+    const project = data.project!.withMeta({ templateId: "theanh28-banner" });
+    expect("banner" in (await builder.build({ ...data, project })).job).toBe(false);
+    expect("banner" in (await builder.build({ ...data, brand: { ...data.brand, banner: new Blob(["x"]) } })).job).toBe(false);
+  });
+});

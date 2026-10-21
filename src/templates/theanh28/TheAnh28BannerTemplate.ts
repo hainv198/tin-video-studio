@@ -2,7 +2,8 @@ import type { Canvas2D } from "../Canvas2D";
 import type { DrawableImage, FooterBannerSpec, ProjectFrame, SceneFrame } from "../VideoTemplate";
 import { BANNER_LAYOUT, FOOTER_BANNER_BOX } from "./bannerLayout";
 import { coverRect } from "./layout";
-import { TheAnh28Template } from "./TheAnh28Template";
+import type { BrandFieldSpec } from "@/domain/BrandKit";
+import { THEANH28_BRAND_FIELDS, TheAnh28Template } from "./TheAnh28Template";
 
 export const THEANH28_BANNER_ID = "theanh28-banner";
 export const DEFAULT_FOOTER_BANNER_URL = "/templates/theanh28-banner/banner-chan-video.png";
@@ -11,6 +12,11 @@ export const DEFAULT_FOOTER_BANNER_URL = "/templates/theanh28-banner/banner-chan
 export class TheAnh28BannerTemplate extends TheAnh28Template {
   readonly id: string = THEANH28_BANNER_ID;
   readonly name: string = "Bản tin Theanh28 + banner chân";
+  readonly brandFields: readonly BrandFieldSpec[] = [
+    ...THEANH28_BRAND_FIELDS,
+    { key: "banner", label: "Banner chân video", type: "image", required: false },
+  ];
+  readonly brandFallbackId: string | null = "theanh28";
   readonly footerBanner: FooterBannerSpec | null = { defaultUrl: DEFAULT_FOOTER_BANNER_URL, box: FOOTER_BANNER_BOX };
 
   constructor() {

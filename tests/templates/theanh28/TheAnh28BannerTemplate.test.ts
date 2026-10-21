@@ -129,3 +129,13 @@ describe("TheAnh28BannerTemplate — vẽ banner", () => {
     expect(withBanner.ops("drawImage").some((x) => x.args[0] === banner.source)).toBe(false);
   });
 });
+
+describe("TheAnh28BannerTemplate — thương hiệu", () => {
+  it("trường thương hiệu = Theanh28 + banner (ảnh, không bắt buộc); mượn thương hiệu của theanh28", () => {
+    expect(t.brandFields.map((f) => f.key)).toEqual(["channelName", "primaryColor", "logo", "titleFontPx", "banner"]);
+    expect(t.brandFields.at(-1)).toEqual({ key: "banner", label: "Banner chân video", type: "image", required: false });
+    expect(t.brandFallbackId).toBe("theanh28");
+    expect(new TheAnh28Template().brandFallbackId).toBeNull();
+    expect(new TheAnh28Template().brandFields.map((f) => f.key)).toEqual(["channelName", "primaryColor", "logo", "titleFontPx"]);
+  });
+});

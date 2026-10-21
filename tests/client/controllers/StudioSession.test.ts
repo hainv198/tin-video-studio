@@ -326,3 +326,21 @@ describe("StudioSession — kiểu dự án và video tải lên", () => {
     expect(other.session.state.sourceClip?.volumePercent).toBe(40);
   });
 });
+
+describe("StudioSession — banner trong bộ thương hiệu", () => {
+  it("cùng giá trị, cùng logo nhưng đổi banner thì báo; cùng banner thì không", () => {
+    const { session } = makeSession();
+    let notified = 0;
+    session.subscribe(() => notified++);
+    const banner = new Blob(["b"]);
+    session.setBrand({ values: { a: "1" }, logo: null });
+    session.setBrand({ values: { a: "1" }, logo: null, banner });
+    expect(notified).toBe(2);
+    expect(session.state.brand.banner).toBe(banner);
+    session.setBrand({ values: { a: "1" }, logo: null, banner });
+    expect(notified).toBe(2);
+    session.setBrand({ values: { a: "1" }, logo: null });
+    expect(notified).toBe(3);
+    expect(session.state.brand.banner).toBeUndefined();
+  });
+});

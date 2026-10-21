@@ -16,7 +16,7 @@ import { MEDIA_CREDIT } from "@/domain/ProjectKind";
 import type { VideoOptions } from "@/domain/VideoOptions";
 import type { TemplateRegistry } from "@/templates/TemplateRegistry";
 import { footageOwners, staleSceneIds } from "./readiness";
-import type { StudioData } from "./StudioSession";
+import type { BrandData, StudioData } from "./StudioSession";
 
 export interface RenderJobBuilderDeps {
   templates: Pick<TemplateRegistry, "get">;
@@ -87,6 +87,7 @@ export class RenderJobBuilder {
       templateId: project.templateId,
       brandValues: brand.values,
       logo: brand.logo,
+      ...this.bannerOf(project.templateId, brand),
       project: {
         displayTitle: project.displayTitle,
         sourceCredit: project.sourceCredit,
@@ -142,6 +143,7 @@ export class RenderJobBuilder {
       templateId: project.templateId,
       brandValues: brand.values,
       logo: brand.logo,
+      ...this.bannerOf(project.templateId, brand),
       project: {
         displayTitle: project.displayTitle,
         sourceCredit: project.sourceCredit,
@@ -159,6 +161,11 @@ export class RenderJobBuilder {
       ...(videoBitrate ? { videoBitrate } : {}),
     };
     return { job, warnings };
+  }
+
+  /** Banner riêng chỉ gửi cho phong cách có banner chân; không có thì worker tự tải banner mặc định. */
+  private bannerOf(templateId: string, brand: BrandData): { banner?: Blob } {
+    return brand.banner && this.deps.templates.get(templateId).footerBanner ? { banner: brand.banner } : {};
   }
 
   /** Giải mã, cắt lặng (mỗi lần dựng), tinh chỉnh tốc độ/tông; độ dài gửi bộ dựng là độ dài đã xử lý. */

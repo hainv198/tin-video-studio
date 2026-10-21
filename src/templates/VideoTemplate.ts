@@ -113,6 +113,8 @@ export abstract class VideoTemplate {
   abstract readonly fonts: readonly FontFaceSpec[];
   /** Có thì worker/xem trước nạp ảnh banner (riêng của thương hiệu, không có thì `defaultUrl`) vào `ProjectFrame.banner`. */
   readonly footerBanner: FooterBannerSpec | null = null;
+  /** Chưa lưu thương hiệu riêng thì mượn thương hiệu của phong cách này (id); null = không mượn. */
+  readonly brandFallbackId: string | null = null;
 
   drawFrame(ctx: Canvas2D, project: ProjectFrame, scene: SceneFrame): void {
     ctx.save();
