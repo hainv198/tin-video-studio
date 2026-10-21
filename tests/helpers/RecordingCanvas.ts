@@ -6,6 +6,13 @@ export interface DrawCall {
   state: { fillStyle: unknown; font: string; globalAlpha: number; filter: string; imageSmoothingEnabled: boolean; imageSmoothingQuality: string };
 }
 
+class RecordedGradient {
+  readonly stops: [number, string][] = [];
+  addColorStop(o: number, c: string): void {
+    this.stops.push([o, c]);
+  }
+}
+
 /** Context 2D giả: ghi lại mọi lệnh vẽ để test trên Node. measureText = số ký tự × cỡ chữ × 0.5. */
 export class RecordingCanvas {
   readonly calls: DrawCall[] = [];
@@ -59,13 +66,9 @@ export class RecordingCanvas {
     return { width: text.length * px * 0.5 };
   }
 
-  createLinearGradient(...args: unknown[]): { stops: [number, string][]; addColorStop(o: number, c: string): void } {
-    const gradient = {
-      stops: [] as [number, string][],
-      addColorStop(o: number, c: string) {
-        gradient.stops.push([o, c]);
-      },
-    };
+  createLinearGradient(...args: unknown[]): RecordedGradient {
+    // addColorStop nằm trên prototype: hai lần vẽ giống nhau cho gradient bằng nhau khi so toEqual.
+    const gradient = new RecordedGradient();
     this.record("createLinearGradient", args);
     return gradient;
   }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_TIMELINE_CONFIG, Timeline } from "@/domain/Timeline";
 import { VideoOptions } from "@/domain/VideoOptions";
-import { footageSpans, planRender, SOURCE_CLIP_SCENE_ID, timelineConfigFor } from "@/client/render/RenderPlan";
+import { footageSpans, planRender, SOURCE_CLIP_SCENE_ID, timelineConfigFor, titleOverlayFor } from "@/client/render/RenderPlan";
 import type { RenderJob } from "@/client/render/RenderJob";
 
 const job = (narrations: RenderJob["narrations"]): RenderJob => ({
@@ -112,5 +112,41 @@ describe("planRender — video tải lên", () => {
       DEFAULT_TIMELINE_CONFIG,
     );
     expect(plan.clipSlot).toBeNull();
+  });
+});
+
+describe("planRender — đọc tiêu đề đè trên video", () => {
+  const samples = new Float32Array(5);
+  const overlayJob = (voiceSec: number, composition?: "title-over-clip"): RenderJob => ({
+    ...job([{ sceneId: "s1", durationSec: voiceSec, samples }]),
+    scenes: [{ sceneId: "s1", role: "intro", text: "T", footage: { kind: "fallback" } }],
+    sourceClip: {
+      blob: new Blob(["v"]),
+      durationSec: 8,
+      hasAudio: true,
+      gain: 1,
+      thumbnailSec: 1,
+      ...(composition ? { composition } : {}),
+    },
+  });
+
+  it("một khe video dài đúng video; giọng ở nghỉ đầu; clipSlot là khe đó", () => {
+    const plan = planRender(overlayJob(2, "title-over-clip"), DEFAULT_TIMELINE_CONFIG);
+    expect(plan.timeline.slots.map((s) => s.sceneId)).toEqual([SOURCE_CLIP_SCENE_ID]);
+    expect(plan.timeline.totalDuration).toBe(8);
+    expect(plan.voices).toEqual([{ startSec: 0.3, samples }]);
+    expect(plan.clipSlot).toEqual({ sceneId: SOURCE_CLIP_SCENE_ID, index: 0, start: 0, voiceStart: 0.3, voiceEnd: 2.3, end: 8 });
+  });
+
+  it("titleOverlayFor: thu gọn ở voiceEnd + gapSec, tính từ đầu khe", () => {
+    const config = { leadInSec: 0.5, gapSec: 0.4, tailSec: 0.6 };
+    const plan = planRender(overlayJob(2, "title-over-clip"), config);
+    expect(titleOverlayFor(plan.clipSlot!, config).collapseAtSec).toBeCloseTo(2.9, 9);
+  });
+
+  it("giọng dài hơn video thì báo lỗi; không có composition thì như cũ (thẻ đầu + video)", () => {
+    expect(() => planRender(overlayJob(9, "title-over-clip"), DEFAULT_TIMELINE_CONFIG)).toThrow(/video chỉ 8,0 giây/);
+    const plain = planRender(overlayJob(2), DEFAULT_TIMELINE_CONFIG);
+    expect(plain.timeline.slots.map((s) => s.sceneId)).toEqual(["s1", SOURCE_CLIP_SCENE_ID]);
   });
 });

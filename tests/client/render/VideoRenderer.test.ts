@@ -296,3 +296,21 @@ describe("VideoRenderer — media của cảnh", () => {
     expect(frames.asked.at(-1)).toBeCloseTo(0.2, 9); // khung cuối của video: 0,2 s sau khi bắt đầu
   });
 });
+
+describe("VideoRenderer — khối tiêu đề đè", () => {
+  it("truyền titleOverlay của cảnh vào mọi khung; cảnh không có thì undefined", async () => {
+    const template = new LogTemplate();
+    const frames = new CountingFrames();
+    const timeline = Timeline.overlay("clip", 0.5, 0.2, { leadInSec: 0.1, gapSec: 0.1, tailSec: 0 });
+    const overlay = { collapseAtSec: 0.4 };
+    const scenes = new Map<string, RenderScene>([
+      ["clip", { sceneId: "clip", role: "body", text: "", playback: { mode: "clip", sourceDurationSec: 0.5 }, frames, media: SOURCE_CLIP_MEDIA, titleOverlay: overlay }],
+    ]);
+    await new VideoRenderer({ template, ctx: new RecordingCanvas().asCanvas(), project, timeline, scenes, fps: 10, sink: new Sink() }).render();
+    expect(template.frames).toHaveLength(5);
+    expect(template.frames.every((f) => f.titleOverlay === overlay)).toBe(true);
+    expect(template.frames[0]?.voiceStart).toBeCloseTo(0.1, 9);
+    expect(template.frames[0]?.voiceDuration).toBeCloseTo(0.2, 9);
+    expect(frames.asked[0]).toBe(0); // video chạy từ giây 0, không có thẻ đầu
+  });
+});

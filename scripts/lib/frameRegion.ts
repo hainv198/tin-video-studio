@@ -37,3 +37,20 @@ export function meanAbsDiff(a: Uint8Array, b: Uint8Array): number {
   for (let i = 0; i < a.length; i++) sum += Math.abs((a[i] as number) - (b[i] as number));
   return sum / a.length;
 }
+
+/**
+ * Độ sắc của mép trong vùng RGB24 `r`: mỗi hàng lấy chênh lệch lớn nhất giữa hai điểm ảnh kề ngang (mọi kênh màu),
+ * rồi trung bình các hàng. Mép hình sắc ≈ 170–250; nền mờ (blur 48 px) ≈ 30–45; chữ trắng viền đen > 150.
+ */
+export function edgeSharpness(pixels: Uint8Array, r: Region): number {
+  let sum = 0;
+  for (let y = 0; y < r.h; y++) {
+    let max = 0;
+    for (let x = 0; x + 1 < r.w; x++) {
+      const i = (y * r.w + x) * 3;
+      for (let c = 0; c < 3; c++) max = Math.max(max, Math.abs((pixels[i + c] as number) - (pixels[i + 3 + c] as number)));
+    }
+    sum += max;
+  }
+  return sum / r.h;
+}

@@ -3,6 +3,9 @@ import { defaultTemplateRegistry } from "@/templates/registry";
 
 describe("defaultTemplateRegistry", () => {
   it("có phong cách theanh28", () => {
-    expect(defaultTemplateRegistry().list()).toEqual([{ id: "theanh28", name: "Bản tin kiểu Theanh28" }]);
+    expect(defaultTemplateRegistry().list()).toEqual([
+      { id: "theanh28", name: "Bản tin kiểu Theanh28" },
+      { id: "theanh28-banner", name: "Bản tin Theanh28 + banner chân" },
+    ]);
   });
 });

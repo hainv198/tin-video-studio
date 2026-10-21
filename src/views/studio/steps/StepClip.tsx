@@ -9,6 +9,7 @@ import { SOURCE_CLIP_VOLUME } from "@/domain/SourceClip";
 import type { DrawableImage } from "@/templates/VideoTemplate";
 import { ConfirmButton } from "@/views/components/ConfirmButton";
 import { useController } from "@/views/hooks/useController";
+import { CompositionPicker } from "../components/CompositionPicker";
 import { PreviewPanel } from "../components/PreviewPanel";
 
 const ACCEPT = "video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm";
@@ -74,6 +75,7 @@ export function StepClip({ studio }: { studio: Studio }) {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(220px,300px)]">
       <div className="order-2 flex min-w-0 flex-col gap-4 lg:order-1">
         <h2 className="text-lg font-semibold">Video của bạn</h2>
+        <CompositionPicker studio={studio} />
         <label className="flex flex-col gap-1 text-sm">
           {clip ? "Thay video khác" : "Chọn video"} (MP4, MOV, WebM; tối đa {SOURCE_CLIP_LIMITS.maxDurationSec / 60} phút,{" "}
           {SOURCE_CLIP_LIMITS.maxBytes / MB} MB)

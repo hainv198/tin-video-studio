@@ -206,3 +206,90 @@ describe("PreviewController", () => {
     expect(ctrl.state.drawCount).toBe(before + 2);
   });
 });
+
+describe("PreviewController — banner chân", () => {
+  const DEFAULT_URL = "/templates/theanh28-banner/banner-chan-video.png";
+
+  function bannerSetup(opts: { failDefault?: boolean } = {}) {
+    const { session } = makeSession();
+    const sched = manualScheduler();
+    const urls: string[] = [];
+    const decoded: Blob[] = [];
+    const disposed: string[] = [];
+    const ctrl = new PreviewController({
+      session,
+      templates: defaultTemplateRegistry(),
+      schedule: sched.schedule,
+      loadFonts: async () => {},
+      decodeImage: async (blob): Promise<DecodedImage> => {
+        decoded.push(blob);
+        return {
+          image: { source: { tag: "own", blob } as unknown as CanvasImageSource, width: 1500, height: 500 },
+          dispose: () => disposed.push("own"),
+        };
+      },
+      loadImageUrl: async (url): Promise<DecodedImage> => {
+        urls.push(url);
+        if (opts.failDefault) throw new Error("404");
+        return {
+          image: { source: { tag: "default", url } as unknown as CanvasImageSource, width: 2048, height: 682 },
+          dispose: () => disposed.push("default"),
+        };
+      },
+    });
+    return { session, sched, ctrl, canvas: new RecordingCanvas(), urls, decoded, disposed };
+  }
+  const lastImageTag = (c: RecordingCanvas) => (c.ops("drawImage").at(-1)?.args[0] as { tag?: string } | undefined)?.tag;
+
+  it("phong cách banner: tải banner mặc định một lần, vẽ sau cùng; vẽ lại không tải lại", async () => {
+    const { ctrl, sched, canvas, urls } = bannerSetup();
+    ctrl.attach({ ctx: canvas.asCanvas(), placeholder });
+    ctrl.setForm(form({ templateId: "theanh28-banner" }));
+    await settle(sched);
+    expect(urls).toEqual([DEFAULT_URL]);
+    expect(lastImageTag(canvas)).toBe("default");
+    ctrl.setForm(form({ templateId: "theanh28-banner", title: "Tiêu đề khác" }));
+    await settle(sched);
+    expect(ctrl.state.drawCount).toBe(2);
+    expect(urls).toHaveLength(1);
+    expect(lastImageTag(canvas)).toBe("default");
+  });
+
+  it("banner riêng: giải mã blob đó thay banner mặc định; bỏ banner riêng thì nhả nó và quay về mặc định", async () => {
+    const { ctrl, sched, canvas, urls, decoded, disposed, session } = bannerSetup();
+    const own = new Blob(["b"]);
+    session.setBrand({ values: {}, logo: null, banner: own });
+    ctrl.attach({ ctx: canvas.asCanvas(), placeholder });
+    ctrl.setForm(form({ templateId: "theanh28-banner" }));
+    await settle(sched);
+    expect(decoded).toEqual([own]);
+    expect(urls).toEqual([]);
+    expect(lastImageTag(canvas)).toBe("own");
+    session.setBrand({ values: {}, logo: null });
+    await settle(sched);
+    expect(urls).toEqual([DEFAULT_URL]);
+    expect(disposed).toEqual(["own"]);
+    expect(lastImageTag(canvas)).toBe("default");
+  });
+
+  it("phong cách cũ: không tải, không vẽ banner (kể cả khi thương hiệu có banner)", async () => {
+    const { ctrl, sched, canvas, urls, decoded, session } = bannerSetup();
+    session.setBrand({ values: {}, logo: null, banner: new Blob(["b"]) });
+    ctrl.attach({ ctx: canvas.asCanvas(), placeholder });
+    ctrl.setForm(form());
+    await settle(sched);
+    expect(urls).toEqual([]);
+    expect(decoded).toEqual([]);
+    expect(canvas.ops("drawImage").some((c) => (c.args[0] as { tag?: string }).tag === "default")).toBe(false);
+  });
+
+  it("tải banner mặc định lỗi: vẫn vẽ (dải đen) và báo lỗi nhẹ", async () => {
+    const { ctrl, sched, canvas } = bannerSetup({ failDefault: true });
+    ctrl.attach({ ctx: canvas.asCanvas(), placeholder });
+    ctrl.setForm(form({ templateId: "theanh28-banner" }));
+    await settle(sched);
+    expect(ctrl.state.drawCount).toBe(1);
+    expect(ctrl.state.error).toBe("Không nạp được ảnh banner, xem trước để trống dải banner");
+    expect(canvas.ops("fillRect").some((c) => c.args.join() === "0,1560,1080,360")).toBe(true);
+  });
+});

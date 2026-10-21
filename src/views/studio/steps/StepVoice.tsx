@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { Studio } from "@/client/controllers/createStudio";
-import { staleSceneIds } from "@/client/controllers/readiness";
+import { staleSceneIds, titleOverlayWarning } from "@/client/controllers/readiness";
 import { PITCH_SEMITONES_RANGE, TEMPO_RANGE } from "@/domain/VideoOptions";
 import { VoiceSettings } from "@/domain/VoiceSettings";
 import { useController } from "@/views/hooks/useController";
@@ -31,6 +31,8 @@ export function StepVoice({ studio }: { studio: Studio }) {
   const project = data.project;
   if (!project) return null;
   const upload = project.kind === "upload";
+  const overlay = upload && data.options.uploadComposition === "title-over-clip";
+  const tooLong = titleOverlayWarning(data);
   const stale = new Set(staleSceneIds(data));
   const settings = data.voice;
   const tweak = data.options.voiceTweak;
@@ -55,7 +57,16 @@ export function StepVoice({ studio }: { studio: Studio }) {
     <div className="flex flex-col gap-4">
       <h2 className="text-lg font-semibold">{upload ? "Giọng đọc tiêu đề" : "Chọn giọng đọc"}</h2>
       {upload && (
-        <p className="text-sm text-neutral-400">Kiểu Video tải lên chỉ đọc câu tiêu đề trên thẻ đầu; phần video giữ tiếng gốc.</p>
+        <p className="text-sm text-neutral-400">
+          {overlay
+            ? "Giọng đọc tiêu đề phát đè lên video (sau khoảng nghỉ đầu); tiếng gốc tự nhỏ lại trong lúc đọc."
+            : "Kiểu Video tải lên chỉ đọc câu tiêu đề trên thẻ đầu; phần video giữ tiếng gốc."}
+        </p>
+      )}
+      {tooLong && (
+        <p role="status" className="text-sm text-amber-400">
+          {tooLong}
+        </p>
       )}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">

@@ -71,6 +71,14 @@ export interface ProjectFrame {
   style?: FrameStyle;
   /** Dòng thứ hai khối nguồn tin; bỏ trống = "ẢNH: TỔNG HỢP". */
   mediaCredit?: string;
+  /** Ảnh banner chân (phong cách có banner); null/bỏ trống = phong cách tự xử lý (tô đen dải). Phong cách khác bỏ qua. */
+  banner?: DrawableImage | null;
+}
+
+/** Khối tiêu đề đè dưới video (kiểu "đọc tiêu đề đè trên video"): hiện từ đầu cảnh, thu gọn từ `collapseAtSec`. */
+export interface TitleOverlay {
+  /** Giây (tính từ đầu cảnh) bắt đầu thu gọn = hết giọng + "Giữ tiêu đề sau khi đọc". */
+  collapseAtSec: number;
 }
 
 export interface SceneFrame {
@@ -94,6 +102,14 @@ export interface SceneFrame {
   voiceDuration?: number;
   /** Bỏ trống = cover + Ken Burns (như cảnh trám). */
   media?: SceneMedia;
+  /** Có thì phong cách vẽ khối tiêu đề đè dưới video và thu gọn theo thời gian; bỏ trống = cảnh thân bài thường. */
+  titleOverlay?: TitleOverlay;
+}
+
+/** Phong cách có banner chân: ảnh mặc định (URL tương đối trong public/) và dải vẽ trên khung. */
+export interface FooterBannerSpec {
+  defaultUrl: string;
+  box: { x: number; y: number; w: number; h: number };
 }
 
 /** Một phong cách video. Hàm vẽ phải thuần theo thời gian: cùng đầu vào ra cùng hình. */
@@ -103,6 +119,10 @@ export abstract class VideoTemplate {
   abstract readonly brandFields: readonly BrandFieldSpec[];
   abstract readonly defaults: TemplateDefaults;
   abstract readonly fonts: readonly FontFaceSpec[];
+  /** Có thì worker/xem trước nạp ảnh banner (riêng của thương hiệu, không có thì `defaultUrl`) vào `ProjectFrame.banner`. */
+  readonly footerBanner: FooterBannerSpec | null = null;
+  /** Chưa lưu thương hiệu riêng thì mượn thương hiệu của phong cách này (id); null = không mượn. */
+  readonly brandFallbackId: string | null = null;
 
   drawFrame(ctx: Canvas2D, project: ProjectFrame, scene: SceneFrame): void {
     ctx.save();

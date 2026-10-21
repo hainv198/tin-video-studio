@@ -13,10 +13,11 @@ import type { Footage } from "@/domain/Footage";
 import type { MusicTrack } from "@/domain/MusicTrack";
 import type { Narration } from "@/domain/Narration";
 import { MEDIA_CREDIT } from "@/domain/ProjectKind";
+import { titleOverlayOverrunSec, titleOverlayTooLongMessage } from "@/domain/UploadComposition";
 import type { VideoOptions } from "@/domain/VideoOptions";
 import type { TemplateRegistry } from "@/templates/TemplateRegistry";
 import { footageOwners, staleSceneIds } from "./readiness";
-import type { StudioData } from "./StudioSession";
+import type { BrandData, StudioData } from "./StudioSession";
 
 export interface RenderJobBuilderDeps {
   templates: Pick<TemplateRegistry, "get">;
@@ -87,6 +88,7 @@ export class RenderJobBuilder {
       templateId: project.templateId,
       brandValues: brand.values,
       logo: brand.logo,
+      ...this.bannerOf(project.templateId, brand),
       project: {
         displayTitle: project.displayTitle,
         sourceCredit: project.sourceCredit,
@@ -122,6 +124,11 @@ export class RenderJobBuilder {
     const narration = narrations.get(intro.id);
     if (!narration) throw new ValidationError("Chưa đủ giọng đọc cho mọi cảnh");
     const introNarration = await this.narrationInput(intro.id, narration, videoOptions);
+    const overlay = videoOptions.uploadComposition === "title-over-clip";
+    if (overlay && titleOverlayOverrunSec(videoOptions.leadInSec, introNarration.durationSec, sourceClip.durationSec) > 0) {
+      // Kiểm bằng độ dài thật (đã cắt lặng, đã chỉnh tempo); bước Giọng chỉ cảnh báo theo ước lượng.
+      throw new ValidationError(titleOverlayTooLongMessage(videoOptions.leadInSec, introNarration.durationSec, sourceClip.durationSec));
+    }
 
     if (isCancelled()) throw new RenderCancelledError();
     onProgress?.("Nạp video tải lên", 1 / total);
@@ -134,6 +141,7 @@ export class RenderJobBuilder {
       hasAudio: sourceClip.hasAudio,
       gain: sourceClip.gain,
       thumbnailSec: sourceClip.thumbnailSec,
+      ...(overlay ? { composition: "title-over-clip" as const } : {}),
     };
 
     const musicBed = music ? await this.musicBed(music, 2 / total, onProgress, isCancelled, warnings) : null;
@@ -142,6 +150,7 @@ export class RenderJobBuilder {
       templateId: project.templateId,
       brandValues: brand.values,
       logo: brand.logo,
+      ...this.bannerOf(project.templateId, brand),
       project: {
         displayTitle: project.displayTitle,
         sourceCredit: project.sourceCredit,
@@ -159,6 +168,11 @@ export class RenderJobBuilder {
       ...(videoBitrate ? { videoBitrate } : {}),
     };
     return { job, warnings };
+  }
+
+  /** Banner riêng chỉ gửi cho phong cách có banner chân; không có thì worker tự tải banner mặc định. */
+  private bannerOf(templateId: string, brand: BrandData): { banner?: Blob } {
+    return brand.banner && this.deps.templates.get(templateId).footerBanner ? { banner: brand.banner } : {};
   }
 
   /** Giải mã, cắt lặng (mỗi lần dựng), tinh chỉnh tốc độ/tông; độ dài gửi bộ dựng là độ dài đã xử lý. */

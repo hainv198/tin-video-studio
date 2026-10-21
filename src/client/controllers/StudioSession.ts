@@ -13,6 +13,8 @@ import type { VoiceSettings } from "@/domain/VoiceSettings";
 export interface BrandData {
   values: Record<string, string>;
   logo: Blob | null;
+  /** Banner chân riêng; không có = phong cách dùng banner mặc định (chỉ phong cách có banner mới đọc). */
+  banner?: Blob;
 }
 
 export interface StudioData {
@@ -72,9 +74,9 @@ function prune(input: StudioData): StudioData {
     : { ...data, narrations, footage, options };
 }
 
-/** Cùng logo (tham chiếu) và cùng giá trị từng khoá. */
+/** Cùng logo, cùng banner (tham chiếu) và cùng giá trị từng khoá. */
 function sameBrand(a: BrandData, b: BrandData): boolean {
-  if (a.logo !== b.logo) return false;
+  if (a.logo !== b.logo || a.banner !== b.banner) return false;
   const keys = Object.keys(a.values);
   return keys.length === Object.keys(b.values).length && keys.every((k) => a.values[k] === b.values[k]);
 }

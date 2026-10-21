@@ -5,6 +5,47 @@ export interface Rect {
   h: number;
 }
 
+/** Toạ độ một bố cục Theanh28 (khung 1080×1920). `LAYOUT` là bố cục gốc; phong cách con truyền bố cục riêng. */
+export interface TheAnh28Layout {
+  frame: { width: number; height: number };
+  intro: {
+    image: Rect;
+    gradientTop: number;
+    gradientSolid: number;
+    chip: { x: number; y: number; h: number; padX: number; logoSize: number; gap: number; fontPx: number };
+    dateTag: { x: number; y: number };
+    title: { x: number; y: number; maxWidth: number; fontPx: number; lineHeight: number; maxLines: number };
+    pattern: Rect & { spacing: number; radius: number; alpha: number };
+  };
+  body: { band: Rect; dateTag: { x: number; y: number }; backdropScale: number; backdropShade: number };
+  credit: { x: number; y: number; lineHeight: number; fontPx: number; rightMargin: number; gapToLogo: number };
+  logo: { right: number; y: number; size: number; gap: number; fontPx: number };
+  dateTag: { h: number; padX: number; fontPx: number };
+  subtitle: {
+    centerX: number;
+    maxWidth: number;
+    fontPx: number;
+    lineHeight: number;
+    maxLines: number;
+    bodyBottom: number;
+    introBottom: number;
+    strokePx: number;
+    shadowBlurPx: number;
+    shadowOffsetPx: number;
+  };
+  /** Khối tiêu đề đè dưới video (kiểu "đọc tiêu đề đè trên video"); thu gọn = trượt xuống tới `bottom` và mờ dần. */
+  titleOverlay: {
+    gradientTop: number;
+    solidTop: number;
+    bottom: number;
+    chip: { x: number; y: number };
+    dateTag: { x: number; y: number };
+    title: { x: number; y: number; maxWidth: number; fontPx: number; lineHeight: number; maxLines: number };
+  };
+  kenBurns: { from: number; to: number };
+  blurPx: number;
+}
+
 /** Toạ độ đo từ video mẫu Theanh28 (khung 540×960, nhân đôi lên 1080×1920). */
 export const LAYOUT = {
   frame: { width: 1080, height: 1920 },
@@ -39,9 +80,18 @@ export const LAYOUT = {
     shadowBlurPx: 6,
     shadowOffsetPx: 3,
   },
+  /** Đè lên phần dưới khung thân bài (dải video 380..1300); chữ cuối ≤ 1504, trong vùng an toàn 1600. */
+  titleOverlay: {
+    gradientTop: 1060,
+    solidTop: 1140,
+    bottom: 1920,
+    chip: { x: 40, y: 1110 },
+    dateTag: { x: 96, y: 1236 },
+    title: { x: 96, y: 1300, maxWidth: 888, fontPx: 60, lineHeight: 72, maxLines: 3 },
+  },
   kenBurns: { from: 1, to: 1.08 },
   blurPx: 48,
-} as const;
+} as const satisfies TheAnh28Layout;
 
 export function coverRect(srcW: number, srcH: number, box: Rect): Rect {
   const scale = Math.max(box.w / srcW, box.h / srcH);

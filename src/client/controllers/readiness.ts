@@ -1,5 +1,6 @@
 import { resolveFootageSource } from "@/domain/footageGroups";
 import type { ProjectKind } from "@/domain/ProjectKind";
+import { titleOverlayOverrunSec, titleOverlayTooLongMessage } from "@/domain/UploadComposition";
 import type { StudioData } from "./StudioSession";
 
 export type StepId = "news" | "clip" | "voice" | "footage" | "music" | "render";
@@ -99,4 +100,19 @@ export function canEnter(step: StepId, data: StudioData): boolean {
 export function firstIncompleteStep(data: StudioData): StepId {
   const pending = stepsOf(data).find((s) => s.id !== "render" && !stepReady(s.id, data));
   return pending ? pending.id : "render";
+}
+
+/**
+ * Cảnh báo sớm ở bước Giọng (ước lượng = độ dài giọng thô ÷ tempo, chưa cắt lặng): kiểu đọc tiêu đề đè trên video
+ * mà nghỉ đầu + giọng dài hơn video. Không chặn bước; bước Dựng kiểm lại bằng độ dài thật (RenderJobBuilder).
+ */
+export function titleOverlayWarning(data: StudioData): string | null {
+  const { project, sourceClip, options } = data;
+  if (!project || project.kind !== "upload" || !sourceClip || options.uploadComposition !== "title-over-clip") return null;
+  const narration = data.narrations.get(project.introScene.id);
+  if (!narration) return null;
+  const voiceSec = narration.durationSec / options.voiceTweak.tempo;
+  return titleOverlayOverrunSec(options.leadInSec, voiceSec, sourceClip.durationSec) > 0
+    ? titleOverlayTooLongMessage(options.leadInSec, voiceSec, sourceClip.durationSec)
+    : null;
 }

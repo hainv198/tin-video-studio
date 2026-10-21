@@ -14,6 +14,10 @@ export function renderSummary(data: StudioData): string {
     if (!clip) return `Chưa có video tải lên, nhạc: ${music}.`;
     const voiceSec = data.narrations.get(project.introScene.id)?.durationSec ?? 0;
     const audio = !clip.hasAudio ? "không có tiếng gốc" : clip.volumePercent === 0 ? "tắt tiếng gốc" : `tiếng gốc ${clip.volumePercent}%`;
+    if (data.options.uploadComposition === "title-over-clip") {
+      const ducked = clip.hasAudio && clip.volumePercent > 0 ? `${audio}, tự nhỏ lại khi đọc` : audio;
+      return `Đọc tiêu đề đè trên video ${formatClock(clip.durationSec)} (giọng khoảng ${voiceSec.toFixed(1)} giây; ${ducked}), không phụ đề, nhạc: ${music}.`;
+    }
     return `Thẻ tiêu đề (giọng khoảng ${voiceSec.toFixed(1)} giây) + video ${formatClock(clip.durationSec)} (${audio}), không phụ đề, nhạc: ${music}.`;
   }
   const voiceSeconds = [...data.narrations.values()].reduce((sum, n) => sum + n.durationSec, 0);

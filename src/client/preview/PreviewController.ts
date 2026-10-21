@@ -35,12 +35,15 @@ export interface PreviewControllerDeps {
   /** Nạp các mặt font (document.fonts ở luồng chính). */
   loadFonts: (faces: readonly FontFaceSpec[]) => Promise<void>;
   decodeImage: (blob: Blob) => Promise<DecodedImage>;
+  /** Tải ảnh theo URL tương đối của trang (banner mặc định của phong cách). Bỏ trống = không vẽ banner mặc định. */
+  loadImageUrl?: (url: string) => Promise<DecodedImage>;
   debounceMs?: number;
   onAuthLost?: () => void;
 }
 
 const DEFAULT_DEBOUNCE_MS = 150;
 const FONT_ERROR = "Không nạp được font, xem trước đang dùng font thay thế";
+const BANNER_ERROR = "Không nạp được ảnh banner, xem trước để trống dải banner";
 
 /** Xem trước sống ở bước 1: vẽ một khung bằng đúng template của video xuất, chỉ khi dữ liệu đổi. */
 export class PreviewController extends StateController<PreviewState> {
@@ -52,9 +55,12 @@ export class PreviewController extends StateController<PreviewState> {
   private generation = 0;
   private lastKey: string | null = null;
   private lastLogoBlob: Blob | null = null;
+  private lastBannerBlob: Blob | null = null;
   private image: DrawableImage | null = null;
   private imageVersion = 0;
   private logo: { blob: Blob; decoded: DecodedImage } | null = null;
+  /** Banner đã giải mã, theo blob riêng hoặc URL mặc định (giữ lại giữa các lượt vẽ). */
+  private banner: { key: Blob | string; decoded: DecodedImage } | null = null;
   /** URL font đã nạp (hoặc đã thử mà lỗi): không nạp lại. */
   private readonly fontUrls = new Set<string>();
 
@@ -101,6 +107,7 @@ export class PreviewController extends StateController<PreviewState> {
     this.surface = null;
     this.logo?.decoded.dispose();
     this.logo = null;
+    this.dropBanner();
   }
 
   private cancel(): void {
@@ -124,7 +131,8 @@ export class PreviewController extends StateController<PreviewState> {
     const { brand, options } = this.deps.session.state;
     const snapshot = options.snapshot();
     const key = JSON.stringify({ tab: this.state.tab, form, brand: brand.values, options: snapshot, image: this.imageVersion });
-    if (key === this.lastKey && brand.logo === this.lastLogoBlob) return;
+    const bannerBlob = brand.banner ?? null;
+    if (key === this.lastKey && brand.logo === this.lastLogoBlob && bannerBlob === this.lastBannerBlob) return;
     const token = ++this.generation;
     const live = () => token === this.generation && this.surface === surface;
 
@@ -151,12 +159,25 @@ export class PreviewController extends StateController<PreviewState> {
     const logo = await this.logoFor(brand.logo, live);
     if (logo === undefined) return;
 
-    const frames = buildPreviewFrames({ form, template, brandValues: brand.values, options: snapshot, logo, image: this.image ?? surface.placeholder });
+    const banner = await this.bannerFor(template.footerBanner?.defaultUrl ?? null, bannerBlob, live);
+    if (banner === undefined) return;
+    if (banner.failed && error === null) error = BANNER_ERROR;
+
+    const frames = buildPreviewFrames({
+      form,
+      template,
+      brandValues: brand.values,
+      options: snapshot,
+      logo,
+      image: this.image ?? surface.placeholder,
+      ...(banner.image ? { banner: banner.image } : {}),
+    });
     const scene = this.state.tab === "intro" ? frames.intro : frames.body;
     const backdrop = scene.role === "body" && scene.image && surface.backdrop ? surface.backdrop.make(scene.image) : null;
     template.drawFrame(surface.ctx, frames.project, { ...scene, backdrop });
     this.lastKey = key;
     this.lastLogoBlob = brand.logo;
+    this.lastBannerBlob = bannerBlob;
     this.patch({ usingSample: frames.usingSample, error, drawCount: this.state.drawCount + 1 });
   }
 
@@ -178,5 +199,44 @@ export class PreviewController extends StateController<PreviewState> {
     this.logo?.decoded.dispose();
     this.logo = blob && decoded ? { blob, decoded } : null;
     return decoded?.image ?? null;
+  }
+
+  /**
+   * Banner của phong cách (null khi phong cách không có banner): ảnh riêng trong thương hiệu, không có thì ảnh mặc định.
+   * `undefined` = lượt vẽ đã bị bỏ. Lỗi nạp không giữ vào bộ đệm (lượt sau thử lại).
+   */
+  private async bannerFor(
+    defaultUrl: string | null,
+    blob: Blob | null,
+    live: () => boolean,
+  ): Promise<{ image: DrawableImage | null; failed: boolean } | undefined> {
+    if (!defaultUrl) {
+      this.dropBanner();
+      return { image: null, failed: false };
+    }
+    const key: Blob | string = blob ?? defaultUrl;
+    if (this.banner?.key === key) return { image: this.banner.decoded.image, failed: false };
+    const loadUrl = this.deps.loadImageUrl;
+    const loader = blob ? () => this.deps.decodeImage(blob) : loadUrl ? () => loadUrl(defaultUrl) : null;
+    let decoded: DecodedImage | null = null;
+    if (loader) {
+      try {
+        decoded = await loader();
+      } catch {
+        decoded = null;
+      }
+      if (!live()) {
+        decoded?.dispose();
+        return undefined;
+      }
+    }
+    this.dropBanner();
+    if (decoded) this.banner = { key, decoded };
+    return { image: decoded?.image ?? null, failed: loader !== null && decoded === null };
+  }
+
+  private dropBanner(): void {
+    this.banner?.decoded.dispose();
+    this.banner = null;
   }
 }

@@ -1,5 +1,6 @@
 import { ValidationError } from "./errors";
 import { DEFAULT_SUBTITLE_FONT_ID, DEFAULT_TEXT_FONT_ID, isFontId, type FontId } from "./fontIds";
+import { DEFAULT_UPLOAD_COMPOSITION, isUploadComposition, type UploadComposition } from "./UploadComposition";
 
 export type FootageKindPreference = "any" | "image" | "video";
 export type SceneFootageKind = "image" | "video";
@@ -19,6 +20,8 @@ export interface VideoOptionsSnapshot {
   voiceTweak: { tempo: number; pitchSemitones: number };
   /** Đoạn không có cảnh trám riêng: dùng tiếp cảnh của đoạn trước (theo id cảnh). Rỗng = mỗi đoạn một cảnh. */
   continuedSceneIds: string[];
+  /** Cách ghép của kiểu Video tải lên; chỉ có khoá khi khác mặc định "intro-then-clip" (giữ nguyên hình dạng bản nháp cũ). */
+  uploadComposition?: UploadComposition;
 }
 
 interface Fields {
@@ -34,6 +37,7 @@ interface Fields {
   leadInSec: number;
   tempo: number;
   pitchSemitones: number;
+  uploadComposition: UploadComposition;
 }
 
 export const GAP_SEC_RANGE = { min: 0.1, max: 1, step: 0.05, default: 0.35 } as const;
@@ -57,6 +61,7 @@ const DEFAULTS: Fields = {
   leadInSec: LEAD_IN_SEC_RANGE.default,
   tempo: TEMPO_RANGE.default,
   pitchSemitones: PITCH_SEMITONES_RANGE.default,
+  uploadComposition: DEFAULT_UPLOAD_COMPOSITION,
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -180,6 +185,15 @@ export class VideoOptions {
     return this.with({ tempo: TEMPO_RANGE.default, pitchSemitones: PITCH_SEMITONES_RANGE.default });
   }
 
+  get uploadComposition(): UploadComposition {
+    return this.f.uploadComposition;
+  }
+
+  withUploadComposition(value: string): VideoOptions {
+    if (!isUploadComposition(value)) throw new ValidationError("Cách ghép không hợp lệ");
+    return this.with({ uploadComposition: value });
+  }
+
   withSubtitlesEnabled(enabled: boolean): VideoOptions {
     return this.with({ subtitlesEnabled: enabled });
   }
@@ -279,6 +293,7 @@ export class VideoOptions {
       pacing: { gapSec: this.f.gapSec, leadInSec: this.f.leadInSec },
       voiceTweak: this.voiceTweak,
       continuedSceneIds: [...this.f.continued],
+      ...(this.f.uploadComposition !== DEFAULT_UPLOAD_COMPOSITION ? { uploadComposition: this.f.uploadComposition } : {}),
     };
   }
 
@@ -307,6 +322,7 @@ export class VideoOptions {
       leadInSec: restoredSeconds(pacing.leadInSec, LEAD_IN_SEC_RANGE),
       tempo: restoredSeconds(tweak.tempo, TEMPO_RANGE),
       pitchSemitones: restoredPitch(tweak.pitchSemitones),
+      uploadComposition: isUploadComposition(raw.uploadComposition) ? raw.uploadComposition : DEFAULTS.uploadComposition,
     });
   }
 

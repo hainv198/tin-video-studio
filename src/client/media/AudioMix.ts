@@ -8,6 +8,10 @@ export const MIX_DEFAULTS = {
   sourceOverMusicDb: 12,
   /** Vuốt vào/ra tiếng gốc chống tiếng tách ở biên thẻ đầu/cuối video. */
   sourceEdgeFadeSec: 0.02,
+  /** Ducking tiếng gốc trong lúc đọc tiêu đề đè trên video: sâu (dB), vào trước giọng, ra sau giọng (giây). */
+  duckDb: 12,
+  duckAttackSec: 0.2,
+  duckReleaseSec: 0.25,
 } as const;
 
 export interface MonoClip {
@@ -28,6 +32,17 @@ export interface SourceBed {
   startSec: number;
   /** 0 = tắt; 1 = giữ nguyên; tối đa 1,5. */
   gain: number;
+  /** Hạ tiếng gốc trong cửa sổ này (giọng đọc tiêu đề đè trên video); bỏ trống = không hạ. */
+  duck?: DuckWindow;
+}
+
+/** Cửa sổ hạ tiếng gốc, mốc theo giây trên toàn chương trình (không phải theo tiếng gốc). */
+export interface DuckWindow {
+  startSec: number;
+  endSec: number;
+  depthDb?: number;
+  attackSec?: number;
+  releaseSec?: number;
 }
 
 export interface MixOptions {
@@ -63,6 +78,23 @@ export function rmsDb(samples: Float32Array, gateDb: number = MIX_DEFAULTS.gateD
     }
   }
   return count === 0 ? -Infinity : 10 * Math.log10(sum / count);
+}
+
+const raisedCosine = (x: number) => 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, Math.max(0, x)));
+
+/**
+ * Hệ số biên độ tuyến tính của tiếng gốc ở giây `tSec`: 1 ngoài cửa sổ, 10^(−depth/20) trong lúc đọc; vào trong
+ * `attackSec` trước `startSec` và ra trong `releaseSec` sau `endSec` theo cosin nâng (nội suy trên biên độ).
+ */
+export function duckGain(tSec: number, duck: DuckWindow): number {
+  const attack = duck.attackSec ?? MIX_DEFAULTS.duckAttackSec;
+  const release = duck.releaseSec ?? MIX_DEFAULTS.duckReleaseSec;
+  if (tSec <= duck.startSec - attack || tSec >= duck.endSec + release) return 1;
+  const floor = dbToGain(-(duck.depthDb ?? MIX_DEFAULTS.duckDb));
+  let amount = 1;
+  if (tSec < duck.startSec) amount = attack > 0 ? raisedCosine((tSec - (duck.startSec - attack)) / attack) : 1;
+  else if (tSec > duck.endSec) amount = release > 0 ? 1 - raisedCosine((tSec - duck.endSec) / release) : 0;
+  return 1 - (1 - floor) * amount;
 }
 
 function fadeGain(i: number, n: number, sampleRate: number, fadeInSec: number, fadeOutSec: number): number {
@@ -169,8 +201,11 @@ export function mixProgram(
     const start = Math.round(source.startSec * sr);
     const len = Math.min(srcL.length, n - start);
     const edge = Math.max(1, Math.round(MIX_DEFAULTS.sourceEdgeFadeSec * sr));
+    const duck = source.duck;
     for (let j = 0; j < len; j++) {
-      const g = source.gain * Math.min(1, j / edge, (len - 1 - j) / edge);
+      // Không duck thì d = 1: nhân 1 là phép tính chính xác, mẫu trùng tuyệt đối với trước.
+      const d = duck ? duckGain((start + j) / sr, duck) : 1;
+      const g = source.gain * Math.min(1, j / edge, (len - 1 - j) / edge) * d;
       left[start + j] = (left[start + j] ?? 0) + (srcL[j] ?? 0) * g;
       right[start + j] = (right[start + j] ?? 0) + (srcR[j] ?? 0) * g;
     }

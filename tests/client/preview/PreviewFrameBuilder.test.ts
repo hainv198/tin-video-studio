@@ -3,6 +3,7 @@ import { buildPreviewFrames, PREVIEW_CHARS_PER_SEC, type PreviewForm } from "@/c
 import { SAMPLE_NEWS } from "@/client/sample/sampleNews";
 import { SentenceSplitter } from "@/domain/SentenceSplitter";
 import { VideoOptions } from "@/domain/VideoOptions";
+import { defaultTemplateRegistry } from "@/templates/registry";
 import { TheAnh28Template } from "@/templates/theanh28/TheAnh28Template";
 import type { DrawableImage } from "@/templates/VideoTemplate";
 import { RecordingCanvas } from "../../helpers/RecordingCanvas";
@@ -153,5 +154,58 @@ describe("buildPreviewFrames — kiểu Video tải lên", () => {
     const tall: DrawableImage = { ...image, width: 1080, height: 1920 };
     const f = buildPreviewFrames({ ...base, image: tall, form: uploadForm });
     expect(f.body.media).toEqual({ fit: "cover", motion: false });
+  });
+});
+
+describe("buildPreviewFrames — banner chân", () => {
+  const banner: DrawableImage = { source: { tag: "banner" } as unknown as CanvasImageSource, width: 2048, height: 682 };
+  const input = (kind: "news" | "upload", withBanner: boolean) => ({
+    form: { text: "Câu một. Câu hai.", title: "Tiêu đề", sourceCredit: "A", publishDateText: "2026-10-17", templateId: "theanh28-banner", kind },
+    template: defaultTemplateRegistry().get("theanh28-banner"),
+    brandValues: {},
+    options: VideoOptions.defaults().snapshot(),
+    logo: null,
+    image: null,
+    ...(withBanner ? { banner } : {}),
+  });
+
+  it("có banner thì project.banner là ảnh đó ở cả hai kiểu video", () => {
+    expect(buildPreviewFrames(input("news", true)).project.banner).toBe(banner);
+    expect(buildPreviewFrames(input("upload", true)).project.banner).toBe(banner);
+  });
+
+  it("không có banner thì project không có khoá banner (khung cũ y hệt)", () => {
+    expect("banner" in buildPreviewFrames(input("news", false)).project).toBe(false);
+    expect("banner" in buildPreviewFrames(input("upload", false)).project).toBe(false);
+  });
+});
+
+describe("buildPreviewFrames — đọc tiêu đề đè trên video", () => {
+  const input = (overlay: boolean) => ({
+    form: { text: "", title: "Tiêu đề thử", sourceCredit: "", publishDateText: "2026-10-17", templateId: "theanh28", kind: "upload" as const },
+    template: defaultTemplateRegistry().get("theanh28"),
+    brandValues: {},
+    options: (overlay ? VideoOptions.defaults().withUploadComposition("title-over-clip") : VideoOptions.defaults()).snapshot(),
+    logo: null,
+    image: null,
+  });
+
+  it("tab đầu = khung video đang đọc tiêu đề; tab sau = đã thu gọn; cả hai là cảnh thân bài", () => {
+    const f = buildPreviewFrames(input(true));
+    // nghỉ đầu 0,3 + giọng ước lượng max(1, 11/15) = 1 + giữ 0,35
+    expect(f.intro.titleOverlay?.collapseAtSec).toBeCloseTo(1.65, 9);
+    expect(f.intro.role).toBe("body");
+    expect(f.body.role).toBe("body");
+    expect(f.intro.sceneTime).toBeLessThan(1.65);
+    expect(f.intro.sceneTime).toBeGreaterThan(0.3);
+    expect(f.body.sceneTime).toBeGreaterThanOrEqual(1.65 + 0.4);
+    expect(f.body.titleOverlay).toEqual(f.intro.titleOverlay);
+  });
+
+  it("cách ghép mặc định: như cũ (thẻ đầu role intro, không có titleOverlay)", () => {
+    const f = buildPreviewFrames(input(false));
+    expect(f.intro.role).toBe("intro");
+    expect("titleOverlay" in f.intro).toBe(false);
+    expect("titleOverlay" in f.body).toBe(false);
   });
 });

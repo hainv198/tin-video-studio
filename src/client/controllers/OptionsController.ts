@@ -83,6 +83,11 @@ export class OptionsController extends StateController<OptionsPanelState> {
     this.apply((o) => o.withoutVoiceTweak());
   }
 
+  /** Cách ghép của kiểu Video tải lên (chọn ở bước 1 hoặc bước Video của bạn); không làm giọng thành cũ. */
+  setUploadComposition(value: string): void {
+    this.apply((o) => o.withUploadComposition(value));
+  }
+
   /** Tick/bỏ tick "Có cảnh trám riêng" của một đoạn; bỏ tick = dùng tiếp cảnh của đoạn trước. Mở đầu luôn có cảnh riêng. */
   setSceneContinued(sceneId: string, continued: boolean): void {
     this.apply((o) => {

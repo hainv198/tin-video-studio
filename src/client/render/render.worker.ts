@@ -11,7 +11,7 @@ import { CanvasBackdropMaker } from "./BackdropMaker";
 import { RENDER_AUDIO_BITRATE, RENDER_VIDEO_BITRATE } from "./encodingDefaults";
 import { Mp4Encoder } from "./Mp4Encoder";
 import { sourceClipMediaFor } from "@/templates/VideoTemplate";
-import { footageSpans, planRender, SOURCE_CLIP_SCENE_ID, timelineConfigFor } from "./RenderPlan";
+import { footageSpans, planRender, SOURCE_CLIP_SCENE_ID, timelineConfigFor, titleOverlayFor } from "./RenderPlan";
 import { probeWorkerScope, type ProbeScope } from "./workerProbe";
 import type { FootageInput, RenderJob, WorkerMessage, WorkerRequest } from "./RenderJob";
 import { VideoRenderer, type FrameProvider, type RenderScene } from "./VideoRenderer";
@@ -23,6 +23,23 @@ interface WorkerScope {
 }
 
 const scope = globalThis as unknown as WorkerScope;
+
+/** Ảnh banner chân: banner riêng trong job, không có thì tải ảnh mặc định của phong cách. */
+async function loadBanner(job: RenderJob, defaultUrl: string): Promise<ImageBitmap> {
+  let blob = job.banner ?? null;
+  if (!blob) {
+    const response = await fetch(new URL(defaultUrl, job.origin));
+    if (!response.ok) throw new Error(`Không tải được banner mặc định (${response.status})`);
+    blob = await response.blob();
+  }
+  try {
+    return await createImageBitmap(blob);
+  } catch (error) {
+    throw new Error("Không đọc được ảnh banner chân video. Hãy tải lại ảnh ở phần Thương hiệu hoặc bấm “Dùng banner mặc định”.", {
+      cause: error,
+    });
+  }
+}
 
 async function blobOf(footage: FootageInput, origin: string): Promise<Blob> {
   if (footage.blob) return footage.blob;
@@ -45,10 +62,13 @@ async function render(job: RenderJob): Promise<void> {
   const providers: FrameProvider[] = [];
   const scenes = new Map<string, RenderScene>();
   let logoBitmap: ImageBitmap | null = null;
+  let bannerBitmap: ImageBitmap | null = null;
   let encoder: Mp4Encoder | null = null;
   try {
     logoBitmap = job.logo ? await createImageBitmap(job.logo) : null;
-    const { timeline, voices, clipSlot } = planRender(job, timelineConfigFor(template.defaults.timeline, options));
+    bannerBitmap = template.footerBanner ? await loadBanner(job, template.footerBanner.defaultUrl) : null;
+    const timelineConfig = timelineConfigFor(template.defaults.timeline, options);
+    const { timeline, voices, clipSlot } = planRender(job, timelineConfig);
     const owners = new Map<string, string>();
     for (const s of job.scenes) if (s.footageFrom) owners.set(s.sceneId, s.footageFrom);
     const spans = footageSpans(timeline, owners);
@@ -89,6 +109,7 @@ async function render(job: RenderJob): Promise<void> {
       // Mở video tải lên MỘT lần: một khung làm ảnh thẻ tiêu đề, rồi phát trọn ở cảnh thân bài (không zoom).
       // Ngang: vừa khung trên nền mờ; dọc/vuông: phủ kín khung (xem sourceClipMediaFor).
       const clip = job.sourceClip;
+      const overlay = clip.composition === "title-over-clip";
       const frames = await VideoFrameProvider.open(clip.blob).catch((error: unknown) => {
         throw new Error(
           "Trình duyệt không đọc được hình của video tải lên (có thể do codec như HEVC/H.265). Hãy chuyển video sang MP4 (H.264, âm AAC) rồi tải lại.",
@@ -97,7 +118,7 @@ async function render(job: RenderJob): Promise<void> {
       });
       providers.push(frames);
       const intro = job.scenes[0];
-      if (intro && intro.role === "intro") {
+      if (!overlay && intro && intro.role === "intro") {
         scenes.set(intro.sceneId, {
           sceneId: intro.sceneId,
           role: "intro",
@@ -113,6 +134,7 @@ async function render(job: RenderJob): Promise<void> {
         playback: { mode: "clip", sourceDurationSec: clip.durationSec, startSec: frames.startSec },
         frames,
         media: sourceClipMediaFor(frames.width, frames.height),
+        ...(overlay && clipSlot ? { titleOverlay: titleOverlayFor(clipSlot, timelineConfig) } : {}),
       });
     }
 
@@ -122,7 +144,15 @@ async function render(job: RenderJob): Promise<void> {
     if (clip && clip.hasAudio && clip.gain > 0 && clipSlot) {
       // null = video không có track âm (hợp lệ); có track mà không giải mã được thì decodeSourceAudio ném lỗi → dừng dựng.
       const channels = await decodeSourceAudio(clip.blob, job.sampleRate, clip.durationSec);
-      if (channels) source = { channels, startSec: clipSlot.start, gain: clip.gain };
+      if (channels) {
+        source = {
+          channels,
+          startSec: clipSlot.start,
+          gain: clip.gain,
+          // Đọc tiêu đề đè trên video: tiếng gốc nhỏ lại đúng lúc giọng đọc (mốc trên toàn video).
+          ...(clip.composition === "title-over-clip" ? { duck: { startSec: clipSlot.voiceStart, endSec: clipSlot.voiceEnd } } : {}),
+        };
+      }
     }
     let mix: StereoMix | null = mixProgram(voices, job.music, { sampleRate: job.sampleRate, durationSec: timeline.totalDuration }, source);
     source = null; // nhả tiếng gốc đã giải mã (≈ 115 MB với video 5 phút stereo)
@@ -150,6 +180,7 @@ async function render(job: RenderJob): Promise<void> {
         ...job.project,
         brand,
         logo: logoBitmap ? { source: logoBitmap, width: logoBitmap.width, height: logoBitmap.height } : null,
+        ...(bannerBitmap ? { banner: { source: bannerBitmap, width: bannerBitmap.width, height: bannerBitmap.height } } : {}),
         style,
       },
       timeline,
@@ -179,6 +210,7 @@ async function render(job: RenderJob): Promise<void> {
       }
     }
     logoBitmap?.close();
+    bannerBitmap?.close();
   }
 }
 

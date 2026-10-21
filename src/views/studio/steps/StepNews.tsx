@@ -9,11 +9,12 @@ import type { NewsProject } from "@/domain/NewsProject";
 import { PROJECT_KIND_LABELS, PROJECT_KINDS } from "@/domain/ProjectKind";
 import { useController } from "@/views/hooks/useController";
 import { BrandPanel } from "../components/BrandPanel";
+import { CompositionPicker } from "../components/CompositionPicker";
 import { PreviewPanel } from "../components/PreviewPanel";
 
 const KIND_HINT = {
   news: "Dán cả bản tin; mỗi câu thành một cảnh có giọng đọc và cảnh trám riêng.",
-  upload: "Chỉ nhập tiêu đề; giọng đọc tiêu đề trên thẻ đầu, sau đó chạy nguyên video của bạn.",
+  upload: "Chỉ nhập tiêu đề; giọng đọc tiêu đề trên thẻ đầu rồi chạy video, hoặc đọc đè ngay trên video (chọn ở Cách ghép).",
 } as const;
 
 const LOCKED_HINT = "Muốn đổi kiểu video, bấm “Dự án mới”.";
@@ -102,6 +103,7 @@ export function StepNews({ studio }: { studio: Studio }) {
             {upload ? "Tiêu đề video" : "Tiêu đề (để trống thì lấy câu đầu tiên)"}
             <input className="rounded-md bg-neutral-800 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
+          {upload && <CompositionPicker studio={studio} />}
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm">
               Theo: nguồn tin (tối đa 80 ký tự)

@@ -12,8 +12,10 @@ import {
   type SceneFrame,
   type SceneMedia,
   type TemplateDefaults,
+  type TitleOverlay,
 } from "../VideoTemplate";
-import { containRect, coverRect, kenBurnsRect, LAYOUT, withAlpha, wrapText, type Rect } from "./layout";
+import { titleCollapseProgress } from "../titleOverlay";
+import { containRect, coverRect, kenBurnsRect, LAYOUT, withAlpha, wrapText, type Rect, type TheAnh28Layout } from "./layout";
 import { cueAt, splitSubtitle, timeCues, type SubtitleCue } from "./subtitles";
 
 export const THEANH28_FONT_FAMILY = "TVS Barlow Condensed";
@@ -22,44 +24,55 @@ const WHITE = "#FFFFFF";
 /** Font chữ khi dự án không có tuỳ chọn riêng: giữ đúng hình ảnh trước khi có tuỳ chọn video. */
 const DEFAULT_TEXT_FONT: FontStyle = { family: THEANH28_FONT_FAMILY, semiBold: 600, bold: 800 };
 
+/** Trường thương hiệu của Theanh28 (phong cách con dùng lại rồi thêm trường riêng). */
+export const THEANH28_BRAND_FIELDS: readonly BrandFieldSpec[] = [
+  { key: "channelName", label: "Tên kênh", type: "text", required: true, defaultValue: "TIN NHANH", maxLength: 24 },
+  { key: "primaryColor", label: "Màu chủ đạo", type: "color", required: true, defaultValue: DEFAULT_COLOR },
+  { key: "logo", label: "Logo", type: "image", required: false },
+  { key: "titleFontPx", label: "Cỡ chữ tiêu đề mở đầu (px, 44–80)", type: "number", required: false, defaultValue: "64", min: 44, max: 80 },
+];
+
 type Weight = "semiBold" | "bold";
 
 const upper = (s: string) => s.toLocaleUpperCase("vi");
 
 export class TheAnh28Template extends VideoTemplate {
-  readonly id = "theanh28";
-  readonly name = "Bản tin kiểu Theanh28";
-
-  readonly brandFields: readonly BrandFieldSpec[] = [
-    { key: "channelName", label: "Tên kênh", type: "text", required: true, defaultValue: "TIN NHANH", maxLength: 24 },
-    { key: "primaryColor", label: "Màu chủ đạo", type: "color", required: true, defaultValue: DEFAULT_COLOR },
-    { key: "logo", label: "Logo", type: "image", required: false },
-    { key: "titleFontPx", label: "Cỡ chữ tiêu đề mở đầu (px, 44–80)", type: "number", required: false, defaultValue: "64", min: 44, max: 80 },
-  ];
-
-  readonly defaults: TemplateDefaults = {
-    width: LAYOUT.frame.width,
-    height: LAYOUT.frame.height,
-    fps: 30,
-    timeline: DEFAULT_TIMELINE_CONFIG,
-    fallbackKeyword: "news",
-  };
+  readonly id: string = "theanh28";
+  readonly name: string = "Bản tin kiểu Theanh28";
+  readonly brandFields: readonly BrandFieldSpec[] = THEANH28_BRAND_FIELDS;
+  readonly defaults: TemplateDefaults;
 
   readonly fonts: readonly FontFaceSpec[] = [
     { family: THEANH28_FONT_FAMILY, url: "/templates/theanh28/fonts/BarlowCondensed-SemiBold.ttf", weight: "600" },
     { family: THEANH28_FONT_FAMILY, url: "/templates/theanh28/fonts/BarlowCondensed-ExtraBold.ttf", weight: "800" },
   ];
 
+  /** Toạ độ khung. Gán trong hàm dựng (không dùng tham số-thuộc-tính: trường lớp khởi tạo trước khi tham số được gán). */
+  protected readonly layout: TheAnh28Layout;
+
   /** Đoạn phụ đề đã chia, theo (font, mốc giọng, câu). Chỉ là bộ nhớ đệm: kết quả chỉ phụ thuộc đầu vào nên hàm vẽ vẫn thuần. */
   private readonly cueCache = new Map<string, SubtitleCue[]>();
+
+  /** `layout` bỏ trống = bố cục Theanh28 gốc (hình y hệt trước khi tham số hoá). */
+  constructor(layout: TheAnh28Layout = LAYOUT) {
+    super();
+    this.layout = layout;
+    this.defaults = {
+      width: layout.frame.width,
+      height: layout.frame.height,
+      fps: 30,
+      timeline: DEFAULT_TIMELINE_CONFIG,
+      fallbackKeyword: "news",
+    };
+  }
 
   protected drawIntro(ctx: Canvas2D, project: ProjectFrame, scene: SceneFrame): void {
     const color = this.color(project);
     // Màu riêng của thumbnail đầu (tuỳ chọn video); không đặt thì theo màu chủ đạo thương hiệu.
     const background = project.style?.intro.backgroundColor ?? color;
     const block = project.style?.intro.blockColor ?? color;
-    const { width, height } = LAYOUT.frame;
-    const L = LAYOUT.intro;
+    const { width, height } = this.layout.frame;
+    const L = this.layout.intro;
 
     ctx.fillStyle = background;
     ctx.fillRect(0, 0, width, height);
@@ -74,7 +87,7 @@ export class TheAnh28Template extends VideoTemplate {
     ctx.fillRect(0, L.gradientSolid, width, height - L.gradientSolid);
 
     this.drawDotPattern(ctx);
-    this.drawChip(ctx, project);
+    this.drawChip(ctx, project, L.chip.x, L.chip.y);
     this.drawDateTag(ctx, project, project.publishDateText, L.dateTag.x, L.dateTag.y);
 
     const fontPx = Number(project.brand.get("titleFontPx") ?? L.title.fontPx);
@@ -89,8 +102,8 @@ export class TheAnh28Template extends VideoTemplate {
 
   protected drawBody(ctx: Canvas2D, project: ProjectFrame, scene: SceneFrame): void {
     const color = this.color(project);
-    const { width, height } = LAYOUT.frame;
-    const B = LAYOUT.body;
+    const { width, height } = this.layout.frame;
+    const B = this.layout.body;
 
     if (scene.image) {
       if (scene.backdrop) {
@@ -101,7 +114,7 @@ export class TheAnh28Template extends VideoTemplate {
       } else {
         const full = coverRect(scene.image.width, scene.image.height, { x: 0, y: 0, w: width, h: height });
         const backdrop = kenBurnsRect(full, 1, 1, B.backdropScale);
-        ctx.filter = `blur(${LAYOUT.blurPx}px)`;
+        ctx.filter = `blur(${this.layout.blurPx}px)`;
         ctx.drawImage(scene.image.source, backdrop.x, backdrop.y, backdrop.w, backdrop.h);
         ctx.filter = "none";
       }
@@ -116,13 +129,48 @@ export class TheAnh28Template extends VideoTemplate {
       ctx.fillRect(0, 0, width, height);
     }
     this.drawDateTag(ctx, project, project.publishDateText, B.dateTag.x, B.dateTag.y);
+    if (scene.titleOverlay) this.drawTitleOverlay(ctx, project, scene.sceneTime, scene.titleOverlay);
+  }
+
+  /**
+   * Khối tiêu đề kiểu Theanh28 đè phần dưới video: dải chuyển màu + khối màu, chip tên kênh, tem ngày, tiêu đề in hoa.
+   * Thu gọn TITLE_COLLAPSE_SEC: trượt xuống tới `bottom` (bị cắt ở đó) và mờ dần; xong thì không vẽ gì (khung = thân bài thường).
+   */
+  private drawTitleOverlay(ctx: Canvas2D, project: ProjectFrame, sceneTime: number, overlay: TitleOverlay): void {
+    const p = titleCollapseProgress(sceneTime, overlay);
+    if (p >= 1) return;
+    const O = this.layout.titleOverlay;
+    const { width } = this.layout.frame;
+    const block = project.style?.intro.blockColor ?? this.color(project);
+    const shift = (O.bottom - O.gradientTop) * p;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, width, O.bottom);
+    ctx.clip();
+    ctx.globalAlpha = 1 - p;
+    const gradient = ctx.createLinearGradient(0, O.gradientTop + shift, 0, O.solidTop + shift);
+    gradient.addColorStop(0, withAlpha(block, 0));
+    gradient.addColorStop(1, block);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, O.gradientTop + shift, width, O.solidTop - O.gradientTop);
+    ctx.fillStyle = block;
+    ctx.fillRect(0, O.solidTop + shift, width, O.bottom - O.solidTop);
+    this.drawChip(ctx, project, O.chip.x, O.chip.y + shift);
+    this.drawDateTag(ctx, project, project.publishDateText, O.dateTag.x, O.dateTag.y + shift);
+    ctx.font = this.font(project, "bold", O.title.fontPx);
+    ctx.fillStyle = WHITE;
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
+    const lines = wrapText(upper(project.displayTitle), O.title.maxWidth, (s) => ctx.measureText(s).width, O.title.maxLines);
+    lines.forEach((line, i) => ctx.fillText(line, O.title.x, O.title.y + shift + i * O.title.lineHeight));
+    ctx.restore();
   }
 
   protected drawOverlay(ctx: Canvas2D, project: ProjectFrame, scene: SceneFrame): void {
-    const C = LAYOUT.credit;
+    const C = this.layout.credit;
     // vùng cho phép của dòng nguồn tin: tới mép trái huy hiệu logo (cảnh thân bài) hoặc mép phải khung (cảnh mở đầu)
     const limit =
-      (scene.role === "body" ? this.cornerLogoBox(ctx, project).badgeX - C.gapToLogo : LAYOUT.frame.width - C.rightMargin) -
+      (scene.role === "body" ? this.cornerLogoBox(ctx, project).badgeX - C.gapToLogo : this.layout.frame.width - C.rightMargin) -
       C.x;
     ctx.font = this.font(project, "semiBold", C.fontPx);
     ctx.fillStyle = WHITE;
@@ -137,7 +185,7 @@ export class TheAnh28Template extends VideoTemplate {
   }
 
   private drawSubtitle(ctx: Canvas2D, style: FrameStyle, scene: SceneFrame): void {
-    const S = LAYOUT.subtitle;
+    const S = this.layout.subtitle;
     ctx.save();
     ctx.font = cssFont(style.subtitles.font, "bold", S.fontPx);
     const voiceStart = scene.voiceStart ?? 0;
@@ -169,7 +217,7 @@ export class TheAnh28Template extends VideoTemplate {
     let cues = this.cueCache.get(key);
     if (!cues) {
       if (this.cueCache.size >= 64) this.cueCache.clear();
-      const S = LAYOUT.subtitle;
+      const S = this.layout.subtitle;
       cues = timeCues(splitSubtitle(text, S.maxWidth, (s) => ctx.measureText(s).width, S.maxLines), voiceStart, voiceDuration);
       this.cueCache.set(key, cues);
     }
@@ -197,7 +245,8 @@ export class TheAnh28Template extends VideoTemplate {
 
   private drawClipped(ctx: Canvas2D, image: DrawableImage, box: Rect, progress: number, media?: SceneMedia): void {
     const base = media?.fit === "contain" ? containRect(image.width, image.height, box) : coverRect(image.width, image.height, box);
-    const target = media?.motion === false ? base : kenBurnsRect(base, progress);
+    const K = this.layout.kenBurns;
+    const target = media?.motion === false ? base : kenBurnsRect(base, progress, K.from, K.to);
     ctx.save();
     ctx.beginPath();
     ctx.rect(box.x, box.y, box.w, box.h);
@@ -207,7 +256,7 @@ export class TheAnh28Template extends VideoTemplate {
   }
 
   private drawDotPattern(ctx: Canvas2D): void {
-    const P = LAYOUT.intro.pattern;
+    const P = this.layout.intro.pattern;
     ctx.save();
     ctx.globalAlpha = P.alpha;
     ctx.fillStyle = WHITE;
@@ -242,8 +291,8 @@ export class TheAnh28Template extends VideoTemplate {
     ctx.restore();
   }
 
-  private drawChip(ctx: Canvas2D, project: ProjectFrame): void {
-    const K = LAYOUT.intro.chip;
+  private drawChip(ctx: Canvas2D, project: ProjectFrame, x: number, y: number): void {
+    const K = this.layout.intro.chip;
     const name = this.channelName(project);
     ctx.font = this.font(project, "bold", K.fontPx);
     const textW = ctx.measureText(name).width;
@@ -252,19 +301,19 @@ export class TheAnh28Template extends VideoTemplate {
     ctx.strokeStyle = WHITE;
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.roundRect(K.x, K.y, w, K.h, K.h / 2);
+    ctx.roundRect(x, y, w, K.h, K.h / 2);
     ctx.fill();
     ctx.stroke();
-    this.drawLogoBadge(ctx, project, K.x + K.padX, K.y + (K.h - K.logoSize) / 2, K.logoSize);
+    this.drawLogoBadge(ctx, project, x + K.padX, y + (K.h - K.logoSize) / 2, K.logoSize);
     ctx.font = this.font(project, "bold", K.fontPx);
     ctx.fillStyle = WHITE;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(name, K.x + K.padX + K.logoSize + K.gap, K.y + K.h / 2);
+    ctx.fillText(name, x + K.padX + K.logoSize + K.gap, y + K.h / 2);
   }
 
   private drawDateTag(ctx: Canvas2D, project: ProjectFrame, dateText: string, x: number, y: number): void {
-    const D = LAYOUT.dateTag;
+    const D = this.layout.dateTag;
     const text = `NGÀY ĐĂNG: ${dateText}`;
     ctx.font = this.font(project, "semiBold", D.fontPx);
     const w = ctx.measureText(text).width + D.padX * 2;
@@ -278,15 +327,15 @@ export class TheAnh28Template extends VideoTemplate {
 
   /** Vị trí huy hiệu logo và chữ tên kênh ở góc trên phải (cảnh thân bài). Đặt font của ctx về font tên kênh. */
   private cornerLogoBox(ctx: Canvas2D, project: ProjectFrame): { name: string; textX: number; badgeX: number } {
-    const G = LAYOUT.logo;
+    const G = this.layout.logo;
     const name = this.channelName(project);
     ctx.font = this.font(project, "bold", G.fontPx);
-    const textX = LAYOUT.frame.width - G.right - ctx.measureText(name).width;
+    const textX = this.layout.frame.width - G.right - ctx.measureText(name).width;
     return { name, textX, badgeX: textX - G.gap - G.size };
   }
 
   private drawCornerLogo(ctx: Canvas2D, project: ProjectFrame): void {
-    const G = LAYOUT.logo;
+    const G = this.layout.logo;
     const { name, textX, badgeX } = this.cornerLogoBox(ctx, project);
     this.drawLogoBadge(ctx, project, badgeX, G.y, G.size);
     ctx.font = this.font(project, "bold", G.fontPx);

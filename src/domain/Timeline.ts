@@ -1,4 +1,5 @@
 import { ValidationError } from "./errors";
+import { titleOverlayOverrunSec, titleOverlayTooLongMessage } from "./UploadComposition";
 
 export interface TimelineConfig {
   leadInSec: number;
@@ -65,6 +66,28 @@ export class Timeline {
       voiceStart = end;
     });
     return new Timeline(slots, (slots[slots.length - 1] as SceneSlot).end);
+  }
+
+  /**
+   * Kiểu "đọc tiêu đề đè trên video": một khe dài đúng `clipSec` (video chạy từ giây 0, không thẻ đầu, không đuôi),
+   * giọng tiêu đề từ `leadInSec`. Nghỉ đầu + giọng dài hơn video thì ném ValidationError (không cắt giọng).
+   */
+  static overlay(sceneId: string, clipSec: number, voiceSec: number, config: TimelineConfig = DEFAULT_TIMELINE_CONFIG): Timeline {
+    if (!Number.isFinite(clipSec) || clipSec <= 0) throw new ValidationError(`Đoạn ${sceneId} có độ dài không hợp lệ`);
+    if (!Number.isFinite(voiceSec) || voiceSec <= 0) throw new ValidationError(`Cảnh ${sceneId} chưa có độ dài giọng`);
+    if (titleOverlayOverrunSec(config.leadInSec, voiceSec, clipSec) > 0) {
+      throw new ValidationError(titleOverlayTooLongMessage(config.leadInSec, voiceSec, clipSec));
+    }
+    const end = ms(clipSec);
+    const slot: SceneSlot = {
+      sceneId,
+      index: 0,
+      start: 0,
+      voiceStart: ms(config.leadInSec),
+      voiceEnd: Math.min(end, ms(config.leadInSec + voiceSec)),
+      end,
+    };
+    return new Timeline([slot], end);
   }
 
   slotAt(t: number): SceneSlot {

@@ -1,4 +1,5 @@
 import { ValidationError } from "@/domain/errors";
+import { FOOTER_BANNER_LIMITS } from "@/domain/FooterBanner";
 import type { KeyValueStore } from "./KeyValueStore";
 
 export const MAX_LOGO_BYTES = 5 * 1024 * 1024;
@@ -6,6 +7,8 @@ export const MAX_LOGO_BYTES = 5 * 1024 * 1024;
 export interface StoredBrand {
   values: Record<string, string>;
   logo: Blob | null;
+  /** Banner chân riêng (phong cách có banner); không có khoá = dùng banner mặc định. */
+  banner?: Blob;
   updatedAt: string;
 }
 
@@ -15,12 +18,13 @@ export class BrandRepository {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  async save(templateId: string, values: Record<string, string>, logo: Blob | null): Promise<void> {
+  async save(templateId: string, values: Record<string, string>, logo: Blob | null, banner: Blob | null = null): Promise<void> {
     if (!templateId) throw new ValidationError("Chưa chọn phong cách video");
     if (logo && logo.size > MAX_LOGO_BYTES) throw new ValidationError("Logo tối đa 5 MB");
+    if (banner && banner.size > FOOTER_BANNER_LIMITS.maxBytes) throw new ValidationError("Banner tối đa 5 MB");
     const clean: Record<string, string> = {};
     for (const [key, value] of Object.entries(values)) if (typeof value === "string") clean[key] = value;
-    const stored: StoredBrand = { values: clean, logo, updatedAt: this.now().toISOString() };
+    const stored: StoredBrand = { values: clean, logo, ...(banner ? { banner } : {}), updatedAt: this.now().toISOString() };
     await this.store.set(`brand:${templateId}`, stored);
   }
 
@@ -34,6 +38,7 @@ export class BrandRepository {
     return {
       values,
       logo: brand.logo instanceof Blob ? brand.logo : null,
+      ...(brand.banner instanceof Blob ? { banner: brand.banner } : {}),
       updatedAt: typeof brand.updatedAt === "string" ? brand.updatedAt : "",
     };
   }
