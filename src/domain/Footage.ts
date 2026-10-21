@@ -12,6 +12,10 @@ export interface FootageSource {
 export interface FootagePlayback {
   mode: "still" | "clip" | "loop" | "none";
   sourceDurationSec?: number;
+  /** Mốc (giây) của khung hình đầu trong file; bỏ trống = 0. */
+  startSec?: number;
+  /** Chế độ "still": giây (tính từ khung đầu) lấy ảnh; bỏ trống = 0. */
+  stillAtSec?: number;
 }
 
 export type FootageSnapshot =

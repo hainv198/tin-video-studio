@@ -4,7 +4,7 @@ import { DEFAULT_TIMELINE_CONFIG, Timeline } from "@/domain/Timeline";
 import type { BackdropMaker } from "@/client/render/BackdropMaker";
 import { RenderCancelledError } from "@/client/render/errors";
 import { VideoRenderer, type FrameProvider, type RenderScene, type VideoFrameSink } from "@/client/render/VideoRenderer";
-import { VideoTemplate, type DrawableImage, type ProjectFrame, type SceneFrame } from "@/templates/VideoTemplate";
+import { SOURCE_CLIP_MEDIA, VideoTemplate, type DrawableImage, type ProjectFrame, type SceneFrame } from "@/templates/VideoTemplate";
 import { RecordingCanvas } from "../../helpers/RecordingCanvas";
 
 class LogTemplate extends VideoTemplate {
@@ -273,5 +273,26 @@ describe("VideoRenderer", () => {
       expect(releasesWhenCStarted).toBe(1);
       expect(ownerFrames.releases).toBe(1);
     });
+  });
+});
+
+describe("VideoRenderer — media của cảnh", () => {
+  it("truyền media của cảnh vào khung vẽ; cảnh không có media thì undefined", async () => {
+    const template = new LogTemplate();
+    const frames = new CountingFrames();
+    const timeline = Timeline.build([{ sceneId: "a", durationSec: 0.2 }, { sceneId: "clip", durationSec: 0.3, silent: true }], {
+      leadInSec: 0,
+      gapSec: 0,
+      tailSec: 0,
+    });
+    const scenes = new Map<string, RenderScene>([
+      ["a", { sceneId: "a", role: "intro", text: "T", playback: { mode: "still", stillAtSec: 0.1 }, frames }],
+      ["clip", { sceneId: "clip", role: "body", text: "", playback: { mode: "clip", sourceDurationSec: 0.3 }, frames, media: SOURCE_CLIP_MEDIA }],
+    ]);
+    await new VideoRenderer({ template, ctx: new RecordingCanvas().asCanvas(), project, timeline, scenes, fps: 10, sink: new Sink() }).render();
+    expect(template.frames[0]?.media).toBeUndefined();
+    expect(template.frames.at(-1)?.media).toEqual(SOURCE_CLIP_MEDIA);
+    expect(frames.asked[0]).toBeCloseTo(0.1, 9); // ảnh tĩnh thẻ đầu tại stillAtSec
+    expect(frames.asked.at(-1)).toBeCloseTo(0.2, 9); // khung cuối của video: 0,2 s sau khi bắt đầu
   });
 });

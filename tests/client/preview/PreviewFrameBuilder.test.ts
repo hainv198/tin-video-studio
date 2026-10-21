@@ -148,4 +148,10 @@ describe("buildPreviewFrames — kiểu Video tải lên", () => {
     expect(f.body.media).toBeUndefined();
     expect(f.project.mediaCredit).toBeUndefined();
   });
+
+  it("khung video dọc: thân bài phủ kín khung (cover), không zoom", () => {
+    const tall: DrawableImage = { ...image, width: 1080, height: 1920 };
+    const f = buildPreviewFrames({ ...base, image: tall, form: uploadForm });
+    expect(f.body.media).toEqual({ fit: "cover", motion: false });
+  });
 });

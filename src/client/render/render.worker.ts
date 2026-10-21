@@ -9,7 +9,8 @@ import { defaultTemplateRegistry } from "@/templates/registry";
 import { CanvasBackdropMaker } from "./BackdropMaker";
 import { RENDER_AUDIO_BITRATE, RENDER_VIDEO_BITRATE } from "./encodingDefaults";
 import { Mp4Encoder } from "./Mp4Encoder";
-import { footageSpans, planRender, timelineConfigFor } from "./RenderPlan";
+import { sourceClipMediaFor } from "@/templates/VideoTemplate";
+import { footageSpans, planRender, SOURCE_CLIP_SCENE_ID, timelineConfigFor } from "./RenderPlan";
 import { probeWorkerScope, type ProbeScope } from "./workerProbe";
 import type { FootageInput, RenderJob, WorkerMessage, WorkerRequest } from "./RenderJob";
 import { VideoRenderer, type FrameProvider, type RenderScene } from "./VideoRenderer";
@@ -82,6 +83,31 @@ async function render(job: RenderJob): Promise<void> {
           frames,
         });
       }
+    }
+    if (job.sourceClip) {
+      // Mở video tải lên MỘT lần: một khung làm ảnh thẻ tiêu đề, rồi phát trọn ở cảnh thân bài (không zoom).
+      // Ngang: vừa khung trên nền mờ; dọc/vuông: phủ kín khung (xem sourceClipMediaFor).
+      const clip = job.sourceClip;
+      const frames = await VideoFrameProvider.open(clip.blob);
+      providers.push(frames);
+      const intro = job.scenes[0];
+      if (intro && intro.role === "intro") {
+        scenes.set(intro.sceneId, {
+          sceneId: intro.sceneId,
+          role: "intro",
+          text: intro.text,
+          playback: { mode: "still", startSec: frames.startSec, stillAtSec: clip.thumbnailSec },
+          frames,
+        });
+      }
+      scenes.set(SOURCE_CLIP_SCENE_ID, {
+        sceneId: SOURCE_CLIP_SCENE_ID,
+        role: "body",
+        text: "",
+        playback: { mode: "clip", sourceDurationSec: clip.durationSec, startSec: frames.startSec },
+        frames,
+        media: sourceClipMediaFor(frames.width, frames.height),
+      });
     }
 
     scope.postMessage({ type: "progress", stage: "audio" });

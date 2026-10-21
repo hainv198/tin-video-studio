@@ -6,7 +6,7 @@ import { MEDIA_CREDIT, type ProjectKind } from "@/domain/ProjectKind";
 import { SentenceSplitter } from "@/domain/SentenceSplitter";
 import type { VideoOptionsSnapshot } from "@/domain/VideoOptions";
 import { frameStyleFor } from "@/templates/fonts/FontCatalog";
-import { SOURCE_CLIP_MEDIA, type DrawableImage, type ProjectFrame, type SceneFrame, type VideoTemplate } from "@/templates/VideoTemplate";
+import { SOURCE_CLIP_MEDIA, sourceClipMediaFor, type DrawableImage, type ProjectFrame, type SceneFrame, type VideoTemplate } from "@/templates/VideoTemplate";
 
 export type PreviewTab = "intro" | "body";
 
@@ -124,7 +124,7 @@ function buildUploadFrames(input: PreviewInput, splitter: SentenceSplitter): Pre
     footageDuration: 1,
     voiceStart: 0,
     voiceDuration: 0,
-    media: SOURCE_CLIP_MEDIA,
+    media: input.image ? sourceClipMediaFor(input.image.width, input.image.height) : SOURCE_CLIP_MEDIA,
   };
   return { project, intro, body, usingSample };
 }

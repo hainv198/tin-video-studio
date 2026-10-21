@@ -1,4 +1,4 @@
-import { Timeline, type TimelineConfig } from "@/domain/Timeline";
+import { Timeline, type SceneSlot, type TimelineConfig } from "@/domain/Timeline";
 import type { MonoClip } from "@/client/media/AudioMix";
 import type { VideoOptionsSnapshot } from "@/domain/VideoOptions";
 import type { RenderJob } from "./RenderJob";
@@ -37,17 +37,30 @@ export function footageSpans(timeline: Timeline, owners: ReadonlyMap<string, str
   return spans;
 }
 
-export function planRender(job: RenderJob, timelineConfig: TimelineConfig): { timeline: Timeline; voices: MonoClip[] } {
+/** Id đoạn của video tải lên trong timeline (không trùng id cảnh vì id cảnh là UUID/“s<n>”). */
+export const SOURCE_CLIP_SCENE_ID = "source-clip";
+
+export interface RenderPlanResult {
+  timeline: Timeline;
+  voices: MonoClip[];
+  /** Khe của video tải lên (đoạn lặng cuối); null khi job không có video. */
+  clipSlot: SceneSlot | null;
+}
+
+export function planRender(job: RenderJob, timelineConfig: TimelineConfig): RenderPlanResult {
   const bySceneId = new Map(job.narrations.map((n) => [n.sceneId, n]));
   const entries = job.scenes.map((s) => {
     const narration = bySceneId.get(s.sceneId);
     if (!narration) throw new Error(`Cảnh ${s.sceneId} chưa có giọng đọc`);
     return { sceneId: s.sceneId, durationSec: narration.durationSec, samples: narration.samples };
   });
-  const timeline = Timeline.build(entries, timelineConfig);
-  const voices = timeline.slots.map((slot, i) => ({
-    startSec: slot.voiceStart,
-    samples: (entries[i] as (typeof entries)[number]).samples,
+  const timelineEntries: Array<{ sceneId: string; durationSec: number; silent?: boolean }> = entries.map((e) => ({
+    sceneId: e.sceneId,
+    durationSec: e.durationSec,
   }));
-  return { timeline, voices };
+  if (job.sourceClip) timelineEntries.push({ sceneId: SOURCE_CLIP_SCENE_ID, durationSec: job.sourceClip.durationSec, silent: true });
+  const timeline = Timeline.build(timelineEntries, timelineConfig);
+  const voices = entries.map((entry, i) => ({ startSec: (timeline.slots[i] as SceneSlot).voiceStart, samples: entry.samples }));
+  const clipSlot = job.sourceClip ? (timeline.slots[timeline.slots.length - 1] as SceneSlot) : null;
+  return { timeline, voices, clipSlot };
 }

@@ -3,7 +3,7 @@ import type { SceneRole } from "@/domain/Scene";
 import type { Timeline } from "@/domain/Timeline";
 import { sourceTimeFor } from "@/client/media/sourceTime";
 import type { Canvas2D } from "@/templates/Canvas2D";
-import type { DrawableImage, ProjectFrame, VideoTemplate } from "@/templates/VideoTemplate";
+import type { DrawableImage, ProjectFrame, SceneMedia, VideoTemplate } from "@/templates/VideoTemplate";
 import type { BackdropMaker } from "./BackdropMaker";
 import { footageSpans } from "./RenderPlan";
 import { RenderCancelledError } from "./errors";
@@ -25,6 +25,8 @@ export interface RenderScene {
   frames: FrameProvider | null;
   /** Đoạn không có cảnh trám riêng: id đoạn chủ cảnh; ảnh/video của chủ cảnh chạy tiếp, không cắt cảnh. */
   footageFrom?: string;
+  /** Cách đặt hình vào khung; bỏ trống = cover + Ken Burns. */
+  media?: SceneMedia;
 }
 
 export interface VideoFrameSink {
@@ -97,6 +99,7 @@ export class VideoRenderer {
           footageDuration: span.end - span.start,
           voiceStart: slot.voiceStart - slot.start,
           voiceDuration: slot.voiceEnd - slot.voiceStart,
+          media: scene.media,
         });
         await sink.add(t, 1 / fps);
         const frame = i + 1;

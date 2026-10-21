@@ -53,6 +53,14 @@ export interface SceneMedia {
 /** Video người dùng tải lên: không cắt mất nội dung, không zoom. */
 export const SOURCE_CLIP_MEDIA: SceneMedia = { fit: "contain", motion: false };
 
+/**
+ * Cách đặt video tải lên theo hướng khung: ngang (rộng > cao) thì vừa khung trên nền mờ lấy từ chính video;
+ * dọc hoặc vuông thì phủ kín khung (cắt gọn như cảnh trám, không để nền mờ hai bên). Cả hai đều không zoom.
+ */
+export function sourceClipMediaFor(width: number, height: number): SceneMedia {
+  return width > height ? SOURCE_CLIP_MEDIA : { fit: "cover", motion: false };
+}
+
 export interface ProjectFrame {
   displayTitle: string;
   sourceCredit: string;
