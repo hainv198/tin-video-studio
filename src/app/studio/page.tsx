@@ -23,6 +23,9 @@ export default async function StudioPage() {
         <h1 className="truncate text-lg font-semibold sm:text-xl">Tin Video Studio</h1>
         <div className="hidden items-center gap-3 text-sm sm:flex">
           <span>Xin chào, {user.displayName}</span>
+          <Link href="/doc-giong" className="underline">
+            Tạo giọng
+          </Link>
           {admin ? (
             <>
               <Link href="/cai-dat" className="underline">
@@ -45,6 +48,9 @@ export default async function StudioPage() {
           </summary>
           <div className="absolute right-0 z-40 mt-2 flex w-56 flex-col gap-1 rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm shadow-xl">
             <span className="truncate px-3 py-2 text-neutral-400">Xin chào, {user.displayName}</span>
+            <Link href="/doc-giong" className={MENU_LINK}>
+              Tạo giọng
+            </Link>
             {admin ? (
               <>
                 <Link href="/cai-dat" className={MENU_LINK}>

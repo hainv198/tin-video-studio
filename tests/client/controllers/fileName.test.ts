@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { fileNameFor } from "@/client/controllers/fileName";
+import { audioFileName, fileNameFor } from "@/client/controllers/fileName";
+
+describe("audioFileName", () => {
+  it("lấy 6 từ đầu, bỏ dấu, kebab-case, kèm ngày và đuôi", () => {
+    expect(audioFileName("Tin nhanh hôm nay: Đà Nẵng mưa lớn kéo dài", new Date(2026, 9, 21), "wav")).toBe(
+      "tin-nhanh-hom-nay-da-nang_20261021.wav",
+    );
+  });
+
+  it("văn bản trống hoặc toàn ký hiệu thì dùng 'giong-doc'", () => {
+    expect(audioFileName("  ... ", new Date(2026, 0, 2), "m4a")).toBe("giong-doc_20260102.m4a");
+  });
+});
 
 describe("fileNameFor", () => {
   it("bỏ dấu, chữ thường, nối bằng gạch, kèm ngày yyyymmdd", () => {
