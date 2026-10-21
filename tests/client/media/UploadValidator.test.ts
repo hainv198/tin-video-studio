@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyUpload, UPLOAD_LIMITS } from "@/client/media/UploadValidator";
+import { checkSourceClipDuration, classifySourceClip, classifyUpload, formatClock, SOURCE_CLIP_LIMITS, UPLOAD_LIMITS } from "@/client/media/UploadValidator";
 import { ValidationError } from "@/domain/errors";
 
 const MB = 1024 * 1024;
@@ -45,5 +45,33 @@ describe("classifyUpload", () => {
   it("chỉ nhận loại được phép", () => {
     expect(() => classifyUpload(file("a.mp3", "audio/mpeg"), ["image", "video"])).toThrow("Không nhận file nhạc ở đây");
     expect(classifyUpload(file("a.mp4", "video/mp4"), ["image", "video"])).toBe("video");
+  });
+});
+
+describe("video tải lên (kiểu Video tải lên)", () => {
+  it("nhận MP4/MOV/WebM tới 500 MB; giới hạn cảnh trám 300 MB giữ nguyên", () => {
+    expect(classifySourceClip(file("a.mp4", "video/mp4", 500 * MB))).toBe("video");
+    expect(classifySourceClip(file("a.MOV", "", 10 * MB))).toBe("video");
+    expect(() => classifySourceClip(file("a.mp4", "video/mp4", 500 * MB + 1))).toThrow("File quá lớn (tối đa 500 MB cho video)");
+    expect(() => classifyUpload(file("a.mp4", "video/mp4", 300 * MB + 1))).toThrow("File quá lớn (tối đa 300 MB cho video)");
+    expect(SOURCE_CLIP_LIMITS).toEqual({ maxBytes: 500 * MB, maxDurationSec: 300 });
+  });
+
+  it("chỉ nhận video", () => {
+    expect(() => classifySourceClip(file("a.jpg", "image/jpeg"))).toThrow("Không nhận file ảnh ở đây");
+    expect(() => classifySourceClip(file("a.mp3", "audio/mpeg"))).toThrow("Không nhận file nhạc ở đây");
+  });
+
+  it("thời lượng tối đa 5:00 (dung sai 0,5 s), báo theo phút:giây", () => {
+    expect(() => checkSourceClipDuration(300.4)).not.toThrow();
+    expect(() => checkSourceClipDuration(301)).toThrow("Video dài 5:01, tối đa 5 phút. Hãy cắt ngắn rồi tải lại.");
+    expect(() => checkSourceClipDuration(0)).toThrow("Không đọc được độ dài video");
+    expect(() => checkSourceClipDuration(Number.NaN)).toThrow("Không đọc được độ dài video");
+  });
+
+  it("formatClock", () => {
+    expect(formatClock(8)).toBe("0:08");
+    expect(formatClock(65.4)).toBe("1:05");
+    expect(formatClock(300)).toBe("5:00");
   });
 });

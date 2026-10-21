@@ -7,6 +7,7 @@ import { ConfirmButton } from "@/views/components/ConfirmButton";
 import { useController } from "@/views/hooks/useController";
 import { OptionsSidebar } from "./components/OptionsSidebar";
 import { Stepper } from "./Stepper";
+import { StepClip } from "./steps/StepClip";
 import { StepFootage } from "./steps/StepFootage";
 import { StepMusic } from "./steps/StepMusic";
 import { StepNews } from "./steps/StepNews";
@@ -27,7 +28,7 @@ function renderStep(step: StepId, studio: Studio) {
     case "news":
       return <StepNews studio={studio} />;
     case "clip":
-      return null;
+      return <StepClip studio={studio} />;
     case "voice":
       return <StepVoice studio={studio} />;
     case "footage":

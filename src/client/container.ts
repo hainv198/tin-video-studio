@@ -1,5 +1,5 @@
 import { AudioDecodeService } from "@/client/media/AudioDecodeService";
-import { BrowserMediaProbe, type MediaProbe } from "@/client/media/MediaProbe";
+import { BrowserMediaProbe, type MediaProbe, type SourceClipProbe } from "@/client/media/MediaProbe";
 import { browserSupport, type SupportReport } from "@/client/render/BrowserSupport";
 import { RenderClient } from "@/client/render/RenderClient";
 import { networkSafeFetch } from "@/client/services/apiError";
@@ -37,7 +37,7 @@ export interface ClientServices {
   brands: BrandRepository;
   uploads: UploadRepository;
   decoder: AudioDecodeService;
-  probe: MediaProbe;
+  probe: MediaProbe & SourceClipProbe;
   render: RenderClient;
   support: () => Promise<SupportReport>;
 }
