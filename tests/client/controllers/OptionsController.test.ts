@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { OptionsController } from "@/client/controllers/OptionsController";
-import { flush, makeSessionWithProject } from "../../helpers/studioFixtures";
+import { flush, makeSession, makeSessionWithProject } from "../../helpers/studioFixtures";
 
 function setup() {
   const made = makeSessionWithProject(2);
@@ -132,5 +132,17 @@ describe("OptionsController", () => {
     const { ctrl } = setup();
     expect(ctrl.fontChoices.map((f) => f.id)).toContain("phudu");
     expect(ctrl.fontChoices).toHaveLength(6);
+  });
+});
+
+describe("OptionsController — cách ghép", () => {
+  it("đổi được cả khi chưa có dự án; giá trị sai báo lỗi, không đổi", () => {
+    const { session } = makeSession();
+    const ctrl = new OptionsController({ session });
+    ctrl.setUploadComposition("title-over-clip");
+    expect(session.state.options.uploadComposition).toBe("title-over-clip");
+    ctrl.setUploadComposition("khac");
+    expect(ctrl.state.error).toBe("Cách ghép không hợp lệ");
+    expect(session.state.options.uploadComposition).toBe("title-over-clip");
   });
 });

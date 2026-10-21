@@ -33,3 +33,23 @@ describe("renderSummary", () => {
     expect(renderSummary(EMPTY_STUDIO)).toBe("");
   });
 });
+
+describe("renderSummary — đọc tiêu đề đè trên video", () => {
+  it("nêu cách ghép, độ dài video, giọng, tiếng gốc tự nhỏ lại khi đọc", () => {
+    const project = makeUploadProject();
+    const d = {
+      ...EMPTY_STUDIO,
+      kind: "upload" as const,
+      project,
+      voice: VOICE,
+      narrations: new Map([["s1", fakeNarration(project.introScene, VOICE, 2.4)]]),
+      sourceClip: makeClip({ durationSec: 65, volumePercent: 80 }),
+      options: EMPTY_STUDIO.options.withUploadComposition("title-over-clip"),
+    };
+    expect(renderSummary(d)).toBe(
+      "Đọc tiêu đề đè trên video 1:05 (giọng khoảng 2.4 giây; tiếng gốc 80%, tự nhỏ lại khi đọc), không phụ đề, nhạc: không dùng.",
+    );
+    expect(renderSummary({ ...d, sourceClip: makeClip({ hasAudio: false }) })).toContain("(giọng khoảng 2.4 giây; không có tiếng gốc)");
+    expect(renderSummary({ ...d, sourceClip: makeClip({ volumePercent: 0 }) })).toContain("; tắt tiếng gốc)");
+  });
+});

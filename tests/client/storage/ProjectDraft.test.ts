@@ -138,3 +138,16 @@ describe("bản nháp v3 — video tải lên", () => {
     );
   });
 });
+
+describe("bản nháp — cách ghép", () => {
+  it("v3 giữ cách ghép đè qua lưu/khôi phục; bản nháp không có khoá thì về mặc định", () => {
+    const project = makeUploadProject();
+    const options = VideoOptions.defaults().withUploadComposition("title-over-clip");
+    const body = buildDraftBody({ project, voice: null, narrations: [], footage: FootageBoard.empty(), music: null, options, sourceClip: makeClip() });
+    expect(body.options?.uploadComposition).toBe("title-over-clip");
+    expect(restoreDraft(body, sequentialIds("r")).options.uploadComposition).toBe("title-over-clip");
+    const old = { ...body, options: { ...body.options } as Record<string, unknown> };
+    delete old.options.uploadComposition;
+    expect(restoreDraft(old as unknown as typeof body, sequentialIds("r")).options.uploadComposition).toBe("intro-then-clip");
+  });
+});

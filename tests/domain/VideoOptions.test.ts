@@ -207,3 +207,25 @@ describe("VideoOptions", () => {
     expect(VideoOptions.restore({ pacing: { gapSec: 0.5 } }).voiceTweak).toEqual({ tempo: 1, pitchSemitones: 0 });
   });
 });
+
+describe("VideoOptions — cách ghép video tải lên", () => {
+  it("mặc định 'Thẻ tiêu đề rồi video'; snapshot mặc định KHÔNG có khoá mới", () => {
+    const o = VideoOptions.defaults();
+    expect(o.uploadComposition).toBe("intro-then-clip");
+    expect("uploadComposition" in o.snapshot()).toBe(false);
+  });
+
+  it("đổi sang đè: có trong snapshot, khôi phục được; giá trị lạ bị từ chối", () => {
+    const o = VideoOptions.defaults().withUploadComposition("title-over-clip");
+    expect(o.uploadComposition).toBe("title-over-clip");
+    expect(o.snapshot().uploadComposition).toBe("title-over-clip");
+    expect(VideoOptions.restore(o.snapshot()).uploadComposition).toBe("title-over-clip");
+    expect(() => o.withUploadComposition("khac")).toThrow("Cách ghép không hợp lệ");
+    expect("uploadComposition" in o.withUploadComposition("intro-then-clip").snapshot()).toBe(false);
+  });
+
+  it("khoan dung khi khôi phục: thiếu hoặc sai thì về mặc định", () => {
+    expect(VideoOptions.restore({}).uploadComposition).toBe("intro-then-clip");
+    expect(VideoOptions.restore({ uploadComposition: 5 }).uploadComposition).toBe("intro-then-clip");
+  });
+});

@@ -22,6 +22,7 @@ export function OptionsSidebar({ studio }: { studio: Studio }) {
   const [open, setOpen] = useState(false);
   const options = data.options;
   const upload = projectKind(data) === "upload";
+  const overlay = upload && options.uploadComposition === "title-over-clip";
   const colors = studio.options.introColors();
   const fonts = studio.options.fontChoices;
 
@@ -92,7 +93,7 @@ export function OptionsSidebar({ studio }: { studio: Studio }) {
         </fieldset>
 
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 font-medium">Thumbnail đầu</legend>
+          <legend className="mb-1 font-medium">{overlay ? "Khối tiêu đề" : "Thumbnail đầu"}</legend>
           <div className="flex items-center justify-between gap-2">
             <label htmlFor="tvs-mau-nen">Màu nền thumbnail</label>
             <input
@@ -126,7 +127,7 @@ export function OptionsSidebar({ studio }: { studio: Studio }) {
 
         <fieldset className="flex flex-col gap-2">
           <legend className="mb-1 font-medium">Nhịp đọc</legend>
-          <label htmlFor="tvs-nghi-giua-cau">{upload ? "Nghỉ sau tiêu đề" : "Nghỉ giữa các câu"}: {secText(options.gapSec)} giây</label>
+          <label htmlFor="tvs-nghi-giua-cau">{overlay ? "Giữ tiêu đề sau khi đọc" : upload ? "Nghỉ sau tiêu đề" : "Nghỉ giữa các câu"}: {secText(options.gapSec)} giây</label>
           <input
             id="tvs-nghi-giua-cau"
             type="range"
@@ -136,7 +137,7 @@ export function OptionsSidebar({ studio }: { studio: Studio }) {
             value={options.gapSec}
             onChange={(e) => studio.options.setGapSec(Number(e.target.value))}
           />
-          <label htmlFor="tvs-nghi-dau-video">Nghỉ đầu video: {secText(options.leadInSec)} giây</label>
+          <label htmlFor="tvs-nghi-dau-video">{overlay ? "Chờ trước khi đọc tiêu đề" : "Nghỉ đầu video"}: {secText(options.leadInSec)} giây</label>
           <input
             id="tvs-nghi-dau-video"
             type="range"

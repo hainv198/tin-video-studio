@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EMPTY_STUDIO } from "@/client/controllers/StudioSession";
-import { canEnter, firstIncompleteStep, footageOwners, missingFootageSceneIds, projectKind, staleSceneIds, stepReady, STEPS, stepsOf, UPLOAD_STEPS } from "@/client/controllers/readiness";
+import { canEnter, firstIncompleteStep, footageOwners, missingFootageSceneIds, projectKind, staleSceneIds, stepReady, titleOverlayWarning, STEPS, stepsOf, UPLOAD_STEPS } from "@/client/controllers/readiness";
 import { FallbackFootage } from "@/domain/Footage";
 import { VoiceSettings } from "@/domain/VoiceSettings";
 import { fakeNarration, makeClip, makeProject, makeUploadProject, VOICE } from "../../helpers/studioFixtures";
@@ -99,5 +99,40 @@ describe("readiness — kiểu Video tải lên", () => {
   it("kiểu tin không có bước clip", () => {
     const d = { ...EMPTY_STUDIO, project: makeProject(2), voice: VOICE };
     expect(canEnter("clip", d)).toBe(false);
+  });
+});
+
+describe("titleOverlayWarning", () => {
+  const upload = (voiceSec: number, composition: "intro-then-clip" | "title-over-clip", tempo = 1) => {
+    const project = makeUploadProject();
+    let options = EMPTY_STUDIO.options.withUploadComposition(composition);
+    if (tempo !== 1) options = options.withTempo(tempo);
+    return {
+      ...EMPTY_STUDIO,
+      kind: "upload" as const,
+      project,
+      voice: VOICE,
+      narrations: new Map([[project.introScene.id, fakeNarration(project.introScene, VOICE, voiceSec)]]),
+      sourceClip: makeClip({ durationSec: 8 }),
+      options,
+    };
+  };
+
+  it("chế độ đè, giọng + nghỉ đầu dài hơn video: cảnh báo có số; vừa thì không", () => {
+    expect(titleOverlayWarning(upload(9, "title-over-clip"))).toBe(
+      "Giọng đọc tiêu đề (kể cả nghỉ đầu) dài 9,3 giây, video chỉ 8,0 giây. Hãy rút gọn tiêu đề, giảm nghỉ đầu, tăng tốc độ đọc hoặc chọn “Thẻ tiêu đề rồi video”.",
+    );
+    expect(titleOverlayWarning(upload(7, "title-over-clip"))).toBeNull();
+  });
+
+  it("ước lượng theo tốc độ tinh chỉnh: 9 s ở tempo 1,25 còn 7,2 s → vừa", () => {
+    expect(titleOverlayWarning(upload(9, "title-over-clip", 1.25))).toBeNull();
+  });
+
+  it("thẻ tiêu đề rồi video, kiểu tin, chưa có giọng hoặc chưa có video: không cảnh báo", () => {
+    expect(titleOverlayWarning(upload(20, "intro-then-clip"))).toBeNull();
+    expect(titleOverlayWarning({ ...upload(20, "title-over-clip"), narrations: new Map() })).toBeNull();
+    expect(titleOverlayWarning({ ...upload(20, "title-over-clip"), sourceClip: null })).toBeNull();
+    expect(titleOverlayWarning(withProject())).toBeNull();
   });
 });
