@@ -50,6 +50,14 @@ export function coverRect(srcW: number, srcH: number, box: Rect): Rect {
   return { x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w, h };
 }
 
+/** Vừa trọn trong khung (không cắt), giữ tỉ lệ, căn giữa. */
+export function containRect(srcW: number, srcH: number, box: Rect): Rect {
+  const scale = Math.min(box.w / srcW, box.h / srcH);
+  const w = srcW * scale;
+  const h = srcH * scale;
+  return { x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w, h };
+}
+
 export function kenBurnsRect(
   base: Rect,
   progress: number,

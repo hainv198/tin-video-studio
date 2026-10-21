@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Studio } from "@/client/controllers/createStudio";
+import { projectKind } from "@/client/controllers/readiness";
 import { GAP_SEC_RANGE, LEAD_IN_SEC_RANGE } from "@/domain/VideoOptions";
 import { useController } from "@/views/hooks/useController";
 
@@ -20,6 +21,7 @@ export function OptionsSidebar({ studio }: { studio: Studio }) {
   const panel = useController(studio.options);
   const [open, setOpen] = useState(false);
   const options = data.options;
+  const upload = projectKind(data) === "upload";
   const colors = studio.options.introColors();
   const fonts = studio.options.fontChoices;
 
@@ -40,12 +42,12 @@ export function OptionsSidebar({ studio }: { studio: Studio }) {
       >
         <h2 className="hidden text-base font-semibold lg:block">Tuỳ chọn video</h2>
 
-        <fieldset className="flex flex-col gap-2">
+        <fieldset className="flex flex-col gap-2" disabled={upload}>
           <legend className="mb-1 font-medium">Phụ đề</legend>
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
-              checked={options.subtitlesEnabled}
+              checked={!upload && options.subtitlesEnabled}
               onChange={(e) => studio.options.setSubtitlesEnabled(e.target.checked)}
             />
             Hiện phụ đề
@@ -56,7 +58,7 @@ export function OptionsSidebar({ studio }: { studio: Studio }) {
           <select
             id="tvs-font-phu-de"
             className={SELECT}
-            disabled={!options.subtitlesEnabled}
+            disabled={upload || !options.subtitlesEnabled}
             value={options.subtitleFontId}
             onChange={(e) => studio.options.setSubtitleFont(e.target.value)}
           >
@@ -66,6 +68,7 @@ export function OptionsSidebar({ studio }: { studio: Studio }) {
               </option>
             ))}
           </select>
+          {upload && <p className="text-xs text-neutral-500">Kiểu Video tải lên không có phụ đề.</p>}
         </fieldset>
 
         <fieldset className="flex flex-col gap-2">
@@ -123,7 +126,7 @@ export function OptionsSidebar({ studio }: { studio: Studio }) {
 
         <fieldset className="flex flex-col gap-2">
           <legend className="mb-1 font-medium">Nhịp đọc</legend>
-          <label htmlFor="tvs-nghi-giua-cau">Nghỉ giữa các câu: {secText(options.gapSec)} giây</label>
+          <label htmlFor="tvs-nghi-giua-cau">{upload ? "Nghỉ sau tiêu đề" : "Nghỉ giữa các câu"}: {secText(options.gapSec)} giây</label>
           <input
             id="tvs-nghi-giua-cau"
             type="range"
@@ -146,21 +149,23 @@ export function OptionsSidebar({ studio }: { studio: Studio }) {
           <p className="text-xs text-neutral-500">Kéo lớn để giọng đọc thong thả hơn; video, phụ đề và thời lượng đổi theo.</p>
         </fieldset>
 
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 font-medium">Ảnh/Video khi tự tìm</legend>
-          {FOOTAGE_KINDS.map((k) => (
-            <label key={k.id} className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="footage-kind"
-                value={k.id}
-                checked={options.footageKind === k.id}
-                onChange={() => studio.options.setFootageKind(k.id)}
-              />
-              {k.label}
-            </label>
-          ))}
-        </fieldset>
+        {!upload && (
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 font-medium">Ảnh/Video khi tự tìm</legend>
+            {FOOTAGE_KINDS.map((k) => (
+              <label key={k.id} className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="footage-kind"
+                  value={k.id}
+                  checked={options.footageKind === k.id}
+                  onChange={() => studio.options.setFootageKind(k.id)}
+                />
+                {k.label}
+              </label>
+            ))}
+          </fieldset>
+        )}
 
         {panel.error && (
           <p role="alert" className="text-red-400">

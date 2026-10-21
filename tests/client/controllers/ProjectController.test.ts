@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ProjectController } from "@/client/controllers/ProjectController";
+import { KIND_LOCKED_MESSAGE, ProjectController } from "@/client/controllers/ProjectController";
 import { sequentialIds } from "@/domain/ids";
 import { FallbackFootage } from "@/domain/Footage";
 import { fakeNarration, makeSession, VOICE } from "../../helpers/studioFixtures";
@@ -100,5 +100,46 @@ describe("ProjectController", () => {
     expect(session.state.project!.formattedPublishDate()).toBe("02/01/2026");
     expect(ctrl.updateMeta({ sourceCredit: "y".repeat(81) })).toBe(false);
     expect(session.state.project!.sourceCredit).toBe("Báo mới");
+  });
+});
+
+describe("ProjectController — kiểu video", () => {
+  const form = { title: "Clip hiện trường", sourceCredit: "Báo A", publishDateText: "2026-10-21", templateId: "theanh28" };
+
+  it("setKind khi chưa có dự án thì đổi kiểu; có dự án rồi thì khoá", () => {
+    const { ctrl, session } = setup();
+    expect(ctrl.setKind("upload")).toBe(true);
+    expect(session.state.kind).toBe("upload");
+    expect(ctrl.createTitleOnlyFromForm(form)).toBe(true);
+    expect(ctrl.setKind("news")).toBe(false);
+    expect(ctrl.state.error).toBe(KIND_LOCKED_MESSAGE);
+    expect(session.state.kind).toBe("upload");
+  });
+
+  it("setKind từ chối giá trị lạ", () => {
+    const { ctrl } = setup();
+    expect(ctrl.setKind("khac" as never)).toBe(false);
+    expect(ctrl.state.error).toBe("Kiểu video không hợp lệ");
+  });
+
+  it("createTitleOnlyFromForm: dự án upload một cảnh, xoá giọng/cảnh trám/video cũ", () => {
+    const { ctrl, session } = setup();
+    session.update((d) => ({ ...d, voice: VOICE }));
+    expect(ctrl.createTitleOnlyFromForm(form)).toBe(true);
+    const p = session.state.project!;
+    expect(p.kind).toBe("upload");
+    expect(p.scenes).toHaveLength(1);
+    expect(p.title).toBe("Clip hiện trường");
+    expect(p.formattedPublishDate()).toBe("21/10/2026");
+    expect(session.state.sourceClip).toBeNull();
+    expect(session.state.voice).toBe(VOICE);
+  });
+
+  it("createTitleOnlyFromForm: thiếu tiêu đề hoặc ngày sai thì báo lỗi, không tạo", () => {
+    const { ctrl, session } = setup();
+    expect(ctrl.createTitleOnlyFromForm({ ...form, title: "" })).toBe(false);
+    expect(ctrl.state.error).toBe("Chưa có tiêu đề video");
+    expect(ctrl.createTitleOnlyFromForm({ ...form, publishDateText: "2026-13-40" })).toBe(false);
+    expect(session.state.project).toBeNull();
   });
 });

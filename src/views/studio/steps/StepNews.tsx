@@ -3,16 +3,58 @@
 import { useRef, useState } from "react";
 import type { Studio } from "@/client/controllers/createStudio";
 import { toDateInput } from "@/client/controllers/dateText";
+import { projectKind } from "@/client/controllers/readiness";
 import { SAMPLE_NEWS } from "@/client/sample/sampleNews";
+import type { NewsProject } from "@/domain/NewsProject";
+import { PROJECT_KIND_LABELS, PROJECT_KINDS } from "@/domain/ProjectKind";
 import { useController } from "@/views/hooks/useController";
 import { BrandPanel } from "../components/BrandPanel";
 import { PreviewPanel } from "../components/PreviewPanel";
+
+const KIND_HINT = {
+  news: "Dán cả bản tin; mỗi câu thành một cảnh có giọng đọc và cảnh trám riêng.",
+  upload: "Chỉ nhập tiêu đề; giọng đọc tiêu đề trên thẻ đầu, sau đó chạy nguyên video của bạn.",
+} as const;
+
+const LOCKED_HINT = "Muốn đổi kiểu video, bấm “Dự án mới”.";
+
+function MetaFields({ studio, project }: { studio: Studio; project: NewsProject }) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <label className="flex flex-col gap-1 text-sm">
+        Theo: nguồn tin
+        <input
+          className="rounded-md bg-neutral-800 px-3 py-2"
+          defaultValue={project.sourceCredit}
+          maxLength={80}
+          onBlur={(e) => {
+            if (e.target.value !== project.sourceCredit) studio.project.updateMetaFromForm({ sourceCredit: e.target.value });
+          }}
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Ngày đăng
+        <input
+          type="date"
+          className="rounded-md bg-neutral-800 px-3 py-2"
+          defaultValue={toDateInput(project.publishDate)}
+          onBlur={(e) => {
+            if (e.target.value && e.target.value !== toDateInput(project.publishDate)) {
+              studio.project.updateMetaFromForm({ publishDateText: e.target.value });
+            }
+          }}
+        />
+      </label>
+    </div>
+  );
+}
 
 export function StepNews({ studio }: { studio: Studio }) {
   const data = useController(studio.session);
   const projectState = useController(studio.project);
   const templates = studio.services.templates.list();
   const project = data.project;
+  const kind = projectKind(data);
 
   const [text, setText] = useState("");
   const [title, setTitle] = useState("");
@@ -21,22 +63,43 @@ export function StepNews({ studio }: { studio: Studio }) {
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
   const textareas = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
+  const error = projectState.error && (
+    <p role="alert" className="text-red-400">
+      {projectState.error}
+    </p>
+  );
+
   if (!project) {
+    const upload = kind === "upload";
     return (
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(220px,300px)]">
         <div className="order-2 flex min-w-0 flex-col gap-4 lg:order-1">
-          <h2 className="text-lg font-semibold">Nhập tin</h2>
+          <fieldset className="flex flex-col gap-2 rounded-lg border border-neutral-800 p-3 text-sm">
+            <legend className="px-1 font-medium">Kiểu video</legend>
+            <div className="flex flex-col gap-1 sm:flex-row sm:gap-6">
+              {PROJECT_KINDS.map((k) => (
+                <label key={k} className="flex min-h-11 items-center gap-2 sm:min-h-0">
+                  <input type="radio" name="kieu-video" value={k} checked={kind === k} onChange={() => studio.project.setKind(k)} />
+                  {PROJECT_KIND_LABELS[k]}
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-neutral-500">{KIND_HINT[kind]}</p>
+          </fieldset>
+          <h2 className="text-lg font-semibold">{upload ? "Nhập tiêu đề" : "Nhập tin"}</h2>
+          {!upload && (
+            <label className="flex flex-col gap-1 text-sm">
+              Nội dung tin (dán vào đây)
+              <textarea
+                className="min-h-48 rounded-md bg-neutral-800 px-3 py-2"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Mỗi câu sẽ thành một cảnh."
+              />
+            </label>
+          )}
           <label className="flex flex-col gap-1 text-sm">
-            Nội dung tin (dán vào đây)
-            <textarea
-              className="min-h-48 rounded-md bg-neutral-800 px-3 py-2"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Mỗi câu sẽ thành một cảnh."
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Tiêu đề (để trống thì lấy câu đầu tiên)
+            {upload ? "Tiêu đề video" : "Tiêu đề (để trống thì lấy câu đầu tiên)"}
             <input className="rounded-md bg-neutral-800 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -66,33 +129,67 @@ export function StepNews({ studio }: { studio: Studio }) {
             </select>
           </label>
           {templateId && <BrandPanel studio={studio} templateId={templateId} />}
-          {projectState.error && (
-            <p role="alert" className="text-red-400">
-              {projectState.error}
-            </p>
-          )}
+          {error}
           <div className="flex gap-3">
-            <button
-              type="button"
-              className="min-h-11 sm:min-h-0 rounded-md bg-emerald-600 px-4 py-2 font-medium"
-              onClick={() => studio.project.createFromForm({ text, title, sourceCredit: credit, publishDateText: date, templateId })}
-            >
-              Chia cảnh
-            </button>
-            <button
-              type="button"
-              className="min-h-11 sm:min-h-0 rounded-md bg-neutral-800 px-4 py-2"
-              onClick={() => {
-                setText(SAMPLE_NEWS.text);
-                setCredit(SAMPLE_NEWS.sourceCredit);
-                setDate(toDateInput(SAMPLE_NEWS.publishDate));
-              }}
-            >
-              Điền tin mẫu
-            </button>
+            {upload ? (
+              <button
+                type="button"
+                className="min-h-11 sm:min-h-0 rounded-md bg-emerald-600 px-4 py-2 font-medium"
+                onClick={() => studio.project.createTitleOnlyFromForm({ title, sourceCredit: credit, publishDateText: date, templateId })}
+              >
+                Tạo dự án
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="min-h-11 sm:min-h-0 rounded-md bg-emerald-600 px-4 py-2 font-medium"
+                  onClick={() => studio.project.createFromForm({ text, title, sourceCredit: credit, publishDateText: date, templateId })}
+                >
+                  Chia cảnh
+                </button>
+                <button
+                  type="button"
+                  className="min-h-11 sm:min-h-0 rounded-md bg-neutral-800 px-4 py-2"
+                  onClick={() => {
+                    setText(SAMPLE_NEWS.text);
+                    setCredit(SAMPLE_NEWS.sourceCredit);
+                    setDate(toDateInput(SAMPLE_NEWS.publishDate));
+                  }}
+                >
+                  Điền tin mẫu
+                </button>
+              </>
+            )}
           </div>
         </div>
-        <PreviewPanel studio={studio} form={{ text, title, sourceCredit: credit, publishDateText: date, templateId }} />
+        <PreviewPanel studio={studio} form={{ text: upload ? "" : text, title, sourceCredit: credit, publishDateText: date, templateId, kind }} />
+      </div>
+    );
+  }
+
+  if (project.kind === "upload") {
+    const intro = project.introScene;
+    return (
+      <div className="flex flex-col gap-4">
+        <h2 className="text-lg font-semibold">Tiêu đề và thông tin</h2>
+        <p className="text-sm text-neutral-400">
+          Kiểu video: {PROJECT_KIND_LABELS.upload}. {LOCKED_HINT}
+        </p>
+        <label className="flex flex-col gap-1 text-sm">
+          Tiêu đề video
+          <textarea
+            key={intro.text}
+            className="min-h-16 rounded-md bg-neutral-800 px-3 py-2"
+            defaultValue={intro.text}
+            onBlur={(e) => {
+              if (e.target.value !== intro.text) studio.project.updateSceneText(intro.id, e.target.value);
+            }}
+          />
+        </label>
+        <MetaFields studio={studio} project={project} />
+        <BrandPanel studio={studio} templateId={project.templateId} />
+        {error}
       </div>
     );
   }
@@ -100,38 +197,12 @@ export function StepNews({ studio }: { studio: Studio }) {
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-lg font-semibold">Các cảnh ({project.scenes.length})</h2>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-sm">
-          Theo: nguồn tin
-          <input
-            className="rounded-md bg-neutral-800 px-3 py-2"
-            defaultValue={project.sourceCredit}
-            maxLength={80}
-            onBlur={(e) => {
-              if (e.target.value !== project.sourceCredit) studio.project.updateMetaFromForm({ sourceCredit: e.target.value });
-            }}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Ngày đăng
-          <input
-            type="date"
-            className="rounded-md bg-neutral-800 px-3 py-2"
-            defaultValue={toDateInput(project.publishDate)}
-            onBlur={(e) => {
-              if (e.target.value && e.target.value !== toDateInput(project.publishDate)) {
-                studio.project.updateMetaFromForm({ publishDateText: e.target.value });
-              }
-            }}
-          />
-        </label>
-      </div>
+      <p className="text-sm text-neutral-400">
+        Kiểu video: {PROJECT_KIND_LABELS.news}. {LOCKED_HINT}
+      </p>
+      <MetaFields studio={studio} project={project} />
       <BrandPanel studio={studio} templateId={project.templateId} />
-      {projectState.error && (
-        <p role="alert" className="text-red-400">
-          {projectState.error}
-        </p>
-      )}
+      {error}
       <ol className="flex flex-col gap-3">
         {project.scenes.map((scene, index) => (
           <li key={scene.id} className="flex flex-col gap-2 rounded-lg border border-neutral-800 p-3">
