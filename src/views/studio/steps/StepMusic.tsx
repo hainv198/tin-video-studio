@@ -62,6 +62,11 @@ export function StepMusic({ studio }: { studio: Studio }) {
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-lg font-semibold">Nhạc nền</h2>
+      {data.project?.kind === "upload" && (
+        <p className="text-sm text-neutral-400">
+          Nhạc nền chạy suốt video và tự đặt thấp hơn tiếng gốc ít nhất 12 dB (chỉnh thêm ±6 dB bên dưới). Không dùng nhạc cũng được.
+        </p>
+      )}
       {music.loading && <p className="text-sm text-neutral-400">Đang tải kho nhạc…</p>}
       {music.error && (
         <p role="alert" className="text-red-400">

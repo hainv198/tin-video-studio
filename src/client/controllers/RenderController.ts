@@ -37,6 +37,10 @@ const STAGE_LABEL: Record<Progress["stage"], string> = {
   finalizing: "Đóng gói MP4",
 };
 
+function stageLabel(stage: Progress["stage"], upload: boolean): string {
+  return stage === "loading" && upload ? "Nạp font và video tải lên" : STAGE_LABEL[stage];
+}
+
 /** Bước 5: dựng video và trả về MP4 để xem lại, tải về. */
 export class RenderController extends StateController<RenderState> {
   private cancelRequested = false;
@@ -77,6 +81,7 @@ export class RenderController extends StateController<RenderState> {
     this.put({ status: "working", label: "Chuẩn bị", percent: 0 });
     try {
       const data = this.deps.session.state;
+      const upload = data.project?.kind === "upload";
       const { job, warnings } = await this.deps.builder.build(
         data,
         (label, ratio) => {
@@ -90,7 +95,7 @@ export class RenderController extends StateController<RenderState> {
       const result = await this.deps.render(job, (p) => {
         if (run !== this.run) return;
         if (p.frame && p.totalFrames) lastRatio = p.frame / p.totalFrames;
-        const label = p.stage === "video" ? `${STAGE_LABEL.video} ${Math.round(lastRatio * 100)}%` : STAGE_LABEL[p.stage];
+        const label = p.stage === "video" ? `${STAGE_LABEL.video} ${Math.round(lastRatio * 100)}%` : stageLabel(p.stage, upload);
         this.put({ status: "working", label, percent: 25 + lastRatio * 70 });
       });
       if (run !== this.run) return;

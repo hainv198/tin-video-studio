@@ -3,7 +3,7 @@ import { RenderController } from "@/client/controllers/RenderController";
 import { ApiError } from "@/client/services/apiError";
 import { RenderCancelledError } from "@/client/render/errors";
 import type { RenderJob } from "@/client/render/RenderJob";
-import { makeSessionWithProject } from "../../helpers/studioFixtures";
+import { makeProject, makeSession, makeSessionWithProject, makeUploadProject } from "../../helpers/studioFixtures";
 
 const job = { templateId: "theanh28" } as unknown as RenderJob;
 
@@ -281,5 +281,33 @@ describe("RenderController", () => {
     g.release();
     await run;
     expect(ctrl.state).toMatchObject({ status: "done", quality: "standard", stale: false });
+  });
+});
+describe("RenderController — nhãn theo kiểu video", () => {
+  async function labelDuringLoading(project: ReturnType<typeof makeProject>) {
+    const { session } = makeSession();
+    session.update((d) => ({ ...d, project }));
+    let seen = "";
+    const ctrl: RenderController = new RenderController({
+      session,
+      builder: { build: async () => ({ job: {} as RenderJob, warnings: [] }) },
+      render: async (_job, onProgress) => {
+        onProgress?.({ type: "progress", stage: "loading" });
+        if (ctrl.state.status === "working") seen = ctrl.state.label;
+        return { blob: new Blob(["x"]), durationSec: 9 };
+      },
+      cancelRender: () => {},
+      support: async () => ({ ok: true, missing: [] }),
+      probeWorker: async () => [],
+      createUrl: () => "blob:x",
+      revokeUrl: () => {},
+    });
+    await ctrl.start();
+    return seen;
+  }
+
+  it("kiểu tải lên: 'Nạp font và video tải lên'; kiểu tin giữ 'Nạp font và cảnh trám'", async () => {
+    expect(await labelDuringLoading(makeUploadProject())).toBe("Nạp font và video tải lên");
+    expect(await labelDuringLoading(makeProject(2))).toBe("Nạp font và cảnh trám");
   });
 });

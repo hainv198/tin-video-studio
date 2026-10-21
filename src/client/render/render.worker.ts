@@ -89,7 +89,12 @@ async function render(job: RenderJob): Promise<void> {
       // Mở video tải lên MỘT lần: một khung làm ảnh thẻ tiêu đề, rồi phát trọn ở cảnh thân bài (không zoom).
       // Ngang: vừa khung trên nền mờ; dọc/vuông: phủ kín khung (xem sourceClipMediaFor).
       const clip = job.sourceClip;
-      const frames = await VideoFrameProvider.open(clip.blob);
+      const frames = await VideoFrameProvider.open(clip.blob).catch((error: unknown) => {
+        throw new Error(
+          "Trình duyệt không đọc được hình của video tải lên (có thể do codec như HEVC/H.265). Hãy chuyển video sang MP4 (H.264, âm AAC) rồi tải lại.",
+          { cause: error },
+        );
+      });
       providers.push(frames);
       const intro = job.scenes[0];
       if (intro && intro.role === "intro") {
