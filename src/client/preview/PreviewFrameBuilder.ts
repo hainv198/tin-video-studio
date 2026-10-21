@@ -31,6 +31,8 @@ export interface PreviewInput {
   logo: DrawableImage | null;
   /** Ảnh minh hoạ thay cảnh trám (bước 1 chưa có cảnh trám). */
   image: DrawableImage | null;
+  /** Ảnh banner chân đã giải mã (phong cách có banner); bỏ trống = không có khoá banner trong khung. */
+  banner?: DrawableImage | null;
   now?: Date;
 }
 
@@ -99,6 +101,7 @@ function buildUploadFrames(input: PreviewInput, splitter: SentenceSplitter): Pre
     logo: input.logo,
     style: { ...style, subtitles: { ...style.subtitles, enabled: false } },
     mediaCredit: MEDIA_CREDIT.upload,
+    ...(input.banner ? { banner: input.banner } : {}),
   };
   const { leadInSec, gapSec } = options.pacing;
   const introVoice = voiceSecFor(introText);
@@ -147,6 +150,7 @@ export function buildPreviewFrames(input: PreviewInput, splitter = new SentenceS
     brand: brandKit(template, input.brandValues),
     logo: input.logo,
     style: frameStyleFor(options),
+    ...(input.banner ? { banner: input.banner } : {}),
   };
 
   const { leadInSec, gapSec } = options.pacing;

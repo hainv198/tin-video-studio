@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Studio } from "@/client/controllers/createStudio";
 import { loadFonts } from "@/client/media/FontLoader";
+import { loadImageUrl } from "@/client/media/loadImageUrl";
 import { PreviewController } from "@/client/preview/PreviewController";
 import type { PreviewForm, PreviewTab } from "@/client/preview/PreviewFrameBuilder";
 import { drawPlaceholder, PLACEHOLDER_SIZE } from "@/client/preview/placeholderImage";
@@ -46,6 +47,7 @@ export function PreviewPanel({ studio, form, image }: { studio: Studio; form: Pr
           const bitmap = await createImageBitmap(blob);
           return { image: { source: bitmap, width: bitmap.width, height: bitmap.height }, dispose: () => bitmap.close() };
         },
+        loadImageUrl: (url) => loadImageUrl(url, window.location.origin),
       }),
   );
   const state = useController(controller);

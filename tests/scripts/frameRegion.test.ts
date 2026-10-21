@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { meanAbsDiff, regionArgs } from "../../scripts/lib/frameRegion";
+import { edgeSharpness, meanAbsDiff, regionArgs } from "../../scripts/lib/frameRegion";
 
 describe("frameRegion", () => {
   it("meanAbsDiff: trung bình chênh lệch tuyệt đối từng byte", () => {
@@ -17,5 +17,13 @@ describe("frameRegion", () => {
       "-v", "error", "-ss", "10", "-i", "a.mp4", "-frames:v", "1",
       "-vf", "crop=820:136:130:1464", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1",
     ]);
+  });
+});
+
+describe("edgeSharpness", () => {
+  it("trung bình theo hàng của chênh lệch lớn nhất giữa hai điểm ảnh kề ngang (RGB24)", () => {
+    // 2 hàng × 3 điểm ảnh: hàng 1 có bậc 0 → 200 ở kênh đỏ, hàng 2 phẳng
+    const px = new Uint8Array([0, 0, 0, 200, 0, 0, 200, 0, 0, 50, 50, 50, 50, 50, 50, 50, 50, 50]);
+    expect(edgeSharpness(px, { x: 0, y: 0, w: 3, h: 2 })).toBe(100);
   });
 });

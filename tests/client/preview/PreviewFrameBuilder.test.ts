@@ -3,6 +3,7 @@ import { buildPreviewFrames, PREVIEW_CHARS_PER_SEC, type PreviewForm } from "@/c
 import { SAMPLE_NEWS } from "@/client/sample/sampleNews";
 import { SentenceSplitter } from "@/domain/SentenceSplitter";
 import { VideoOptions } from "@/domain/VideoOptions";
+import { defaultTemplateRegistry } from "@/templates/registry";
 import { TheAnh28Template } from "@/templates/theanh28/TheAnh28Template";
 import type { DrawableImage } from "@/templates/VideoTemplate";
 import { RecordingCanvas } from "../../helpers/RecordingCanvas";
@@ -153,5 +154,28 @@ describe("buildPreviewFrames — kiểu Video tải lên", () => {
     const tall: DrawableImage = { ...image, width: 1080, height: 1920 };
     const f = buildPreviewFrames({ ...base, image: tall, form: uploadForm });
     expect(f.body.media).toEqual({ fit: "cover", motion: false });
+  });
+});
+
+describe("buildPreviewFrames — banner chân", () => {
+  const banner: DrawableImage = { source: { tag: "banner" } as unknown as CanvasImageSource, width: 2048, height: 682 };
+  const input = (kind: "news" | "upload", withBanner: boolean) => ({
+    form: { text: "Câu một. Câu hai.", title: "Tiêu đề", sourceCredit: "A", publishDateText: "2026-10-17", templateId: "theanh28-banner", kind },
+    template: defaultTemplateRegistry().get("theanh28-banner"),
+    brandValues: {},
+    options: VideoOptions.defaults().snapshot(),
+    logo: null,
+    image: null,
+    ...(withBanner ? { banner } : {}),
+  });
+
+  it("có banner thì project.banner là ảnh đó ở cả hai kiểu video", () => {
+    expect(buildPreviewFrames(input("news", true)).project.banner).toBe(banner);
+    expect(buildPreviewFrames(input("upload", true)).project.banner).toBe(banner);
+  });
+
+  it("không có banner thì project không có khoá banner (khung cũ y hệt)", () => {
+    expect("banner" in buildPreviewFrames(input("news", false)).project).toBe(false);
+    expect("banner" in buildPreviewFrames(input("upload", false)).project).toBe(false);
   });
 });
