@@ -54,3 +54,41 @@ export function audioMetrics(channels: Float32Array[], sampleRate: number, optio
     p90Db,
   };
 }
+
+/** Trộn mono mẫu thứ i (trung bình các kênh). */
+const monoAt = (channels: Float32Array[], i: number): number => {
+  let x = 0;
+  for (const ch of channels) x += ch[i] ?? 0;
+  return x / Math.max(1, channels.length);
+};
+
+/** RMS (dB, trung bình năng lượng, không cổng) của đoạn [fromSec, toSec); NaN nếu đoạn rỗng. */
+export function rmsDbBetween(channels: Float32Array[], sampleRate: number, fromSec: number, toSec: number): number {
+  const n = channels[0]?.length ?? 0;
+  const from = Math.max(0, Math.round(fromSec * sampleRate));
+  const to = Math.min(n, Math.round(toSec * sampleRate));
+  if (to <= from) return Number.NaN;
+  let energy = 0;
+  for (let i = from; i < to; i++) energy += monoAt(channels, i) ** 2;
+  return 10 * Math.log10(energy / (to - from) + 1e-12);
+}
+
+/** RMS (dB) của riêng thành phần tần số `frequency` trong đoạn (Goertzel): tách tiếng gốc 440 Hz khỏi giọng giả, nhạc. */
+export function toneRmsDb(channels: Float32Array[], sampleRate: number, fromSec: number, toSec: number, frequency: number): number {
+  const n = channels[0]?.length ?? 0;
+  const from = Math.max(0, Math.round(fromSec * sampleRate));
+  const to = Math.min(n, Math.round(toSec * sampleRate));
+  const count = to - from;
+  if (count <= 0) return Number.NaN;
+  const coeff = 2 * Math.cos((2 * Math.PI * frequency) / sampleRate);
+  let s1 = 0;
+  let s2 = 0;
+  for (let i = from; i < to; i++) {
+    const s0 = monoAt(channels, i) + coeff * s1 - s2;
+    s2 = s1;
+    s1 = s0;
+  }
+  const power = Math.max(0, s1 * s1 + s2 * s2 - coeff * s1 * s2);
+  const amplitude = (2 * Math.sqrt(power)) / count;
+  return 20 * Math.log10(amplitude / Math.SQRT2 + 1e-12);
+}

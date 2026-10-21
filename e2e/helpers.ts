@@ -156,3 +156,19 @@ export async function expectDraftSaved(page: Page, predicate: (d: DraftState) =>
 export async function expectDraftStored(page: Page, expected: 0 | 1): Promise<void> {
   await expectDraftSaved(page, (d) => d.count === expected);
 }
+
+/** Bước 1 kiểu Video tải lên: chọn kiểu, nhập tiêu đề, tạo dự án, sang bước Video của bạn. */
+export async function startUploadProject(page: Page, title: string): Promise<void> {
+  await page.getByRole("radio", { name: "Video tải lên" }).check();
+  await expect(page.getByRole("button", { name: "1. Nhập tiêu đề" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Cảnh trám/ })).toHaveCount(0);
+  await page.getByLabel("Tiêu đề video").fill(title);
+  await page.getByRole("button", { name: "Tạo dự án" }).click();
+  await goNext(page, "Video của bạn");
+}
+
+/** Chọn file video ở bước Video của bạn và chờ đọc xong. */
+export async function uploadClip(page: Page, file: string, clockText: string): Promise<void> {
+  await page.locator('input[type="file"]').setInputFiles(file);
+  await expect(page.getByTestId("video-tai-len")).toContainText(clockText, { timeout: 30_000 });
+}
