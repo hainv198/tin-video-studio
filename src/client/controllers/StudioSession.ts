@@ -5,6 +5,8 @@ import type { IdGenerator } from "@/domain/ids";
 import type { MusicTrack } from "@/domain/MusicTrack";
 import type { Narration } from "@/domain/Narration";
 import type { NewsProject } from "@/domain/NewsProject";
+import type { ProjectKind } from "@/domain/ProjectKind";
+import type { SourceClip } from "@/domain/SourceClip";
 import { VideoOptions } from "@/domain/VideoOptions";
 import type { VoiceSettings } from "@/domain/VoiceSettings";
 
@@ -22,6 +24,10 @@ export interface StudioData {
   brand: BrandData;
   /** Tuỳ chọn riêng của video đang làm (vào bản nháp, về mặc định khi dự án mới). */
   options: VideoOptions;
+  /** Kiểu video: khi có dự án luôn bằng `project.kind`; khi chưa có là lựa chọn ở bước 1. */
+  kind: ProjectKind;
+  /** Video tải lên (chỉ kiểu "upload"). */
+  sourceClip: SourceClip | null;
 }
 
 export const EMPTY_STUDIO: StudioData = {
@@ -32,6 +38,8 @@ export const EMPTY_STUDIO: StudioData = {
   music: null,
   brand: { values: {}, logo: null },
   options: VideoOptions.defaults(),
+  kind: "news",
+  sourceClip: null,
 };
 
 export interface SessionDeps {
@@ -43,10 +51,15 @@ export interface SessionDeps {
   onSaveError?: (error: unknown) => void;
 }
 
-/** Bỏ giọng, cảnh trám và lựa chọn Ảnh/Video của cảnh không còn trong dự án. */
-function prune(data: StudioData): StudioData {
-  if (!data.project) return data;
-  const ids = new Set(data.project.scenes.map((s) => s.id));
+/** Đồng bộ kiểu theo dự án; bỏ giọng, cảnh trám, lựa chọn Ảnh/Video của cảnh không còn; dự án tin không giữ video tải lên. */
+function prune(input: StudioData): StudioData {
+  const project = input.project;
+  if (!project) return input;
+  let data = input;
+  if (data.kind !== project.kind || (project.kind !== "upload" && data.sourceClip !== null)) {
+    data = { ...data, kind: project.kind, sourceClip: project.kind === "upload" ? data.sourceClip : null };
+  }
+  const ids = new Set(project.scenes.map((s) => s.id));
   let narrations = data.narrations;
   if ([...narrations.keys()].some((id) => !ids.has(id))) {
     narrations = new Map([...narrations].filter(([id]) => ids.has(id)));
@@ -112,6 +125,8 @@ export class StudioSession {
       footage: parts.footage,
       music: parts.music,
       options: parts.options,
+      kind: parts.project.kind,
+      sourceClip: parts.sourceClip,
     });
     this.notify();
   }
@@ -155,11 +170,11 @@ export class StudioSession {
 
   private async doSave(generation: number): Promise<void> {
     if (generation !== this.generation) return;
-    const { project, voice, narrations, footage, music, options } = this.current;
+    const { project, voice, narrations, footage, music, options, sourceClip } = this.current;
     if (!project) return;
     try {
       await this.deps.drafts.save(
-        buildDraftBody({ project, voice, narrations: [...narrations.values()], footage, music, options }),
+        buildDraftBody({ project, voice, narrations: [...narrations.values()], footage, music, options, sourceClip }),
       );
     } catch (error) {
       this.notifySaveError(error);

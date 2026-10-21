@@ -10,6 +10,7 @@ import { VideoOptions } from "@/domain/VideoOptions";
 import { VoiceSettings } from "@/domain/VoiceSettings";
 import { ValidationError } from "@/domain/errors";
 import { buildDraftBody, restoreDraft, type DraftParts } from "@/client/storage/ProjectDraft";
+import { makeClip, makeUploadProject } from "../../helpers/studioFixtures";
 
 function parts(): DraftParts {
   const project = NewsProject.fromText(
@@ -108,5 +109,32 @@ describe("buildDraftBody / restoreDraft — tuỳ chọn video", () => {
     delete body.options;
     const back = restoreDraft(structuredClone(body), sequentialIds("n"));
     expect(back.options.snapshot()).toEqual(VideoOptions.defaults().snapshot());
+  });
+});
+
+describe("bản nháp v3 — video tải lên", () => {
+  it("khứ hồi dự án upload kèm video và âm lượng", () => {
+    const project = makeUploadProject();
+    const clip = makeClip({ volumePercent: 60 });
+    const body = buildDraftBody({ project, voice: null, narrations: [], footage: FootageBoard.empty(), music: null, sourceClip: clip });
+    expect(body.sourceClip).toEqual(clip.snapshot());
+    const back = restoreDraft(JSON.parse(JSON.stringify(body)), sequentialIds("x"));
+    expect(back.project.kind).toBe("upload");
+    expect(back.sourceClip?.snapshot()).toEqual(clip.snapshot());
+  });
+
+  it("dự án tin không ghi khoá sourceClip; bản nháp cũ thiếu khoá = null", () => {
+    const body = buildDraftBody(parts());
+    expect("sourceClip" in body).toBe(false);
+    expect(restoreDraft(body, sequentialIds("x")).sourceClip).toBeNull();
+  });
+
+  it("dự án tin mà bản nháp lỡ có sourceClip thì bỏ qua; sourceClip hỏng của dự án upload thì ném", () => {
+    const body = { ...buildDraftBody(parts()), sourceClip: makeClip().snapshot() };
+    expect(restoreDraft(body, sequentialIds("x")).sourceClip).toBeNull();
+    const up = buildDraftBody({ project: makeUploadProject(), voice: null, narrations: [], footage: FootageBoard.empty(), music: null });
+    expect(() => restoreDraft({ ...up, sourceClip: 5 as never }, sequentialIds("x"))).toThrow(
+      "Bản nháp hỏng: dữ liệu video tải lên không hợp lệ",
+    );
   });
 });

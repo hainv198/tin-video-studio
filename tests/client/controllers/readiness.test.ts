@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { EMPTY_STUDIO } from "@/client/controllers/StudioSession";
-import { canEnter, firstIncompleteStep, footageOwners, missingFootageSceneIds, staleSceneIds, stepReady, STEPS } from "@/client/controllers/readiness";
+import { canEnter, firstIncompleteStep, footageOwners, missingFootageSceneIds, projectKind, staleSceneIds, stepReady, STEPS, stepsOf, UPLOAD_STEPS } from "@/client/controllers/readiness";
 import { FallbackFootage } from "@/domain/Footage";
 import { VoiceSettings } from "@/domain/VoiceSettings";
-import { fakeNarration, makeProject, VOICE } from "../../helpers/studioFixtures";
+import { fakeNarration, makeClip, makeProject, makeUploadProject, VOICE } from "../../helpers/studioFixtures";
 
 const withProject = () => ({ ...EMPTY_STUDIO, project: makeProject(2), voice: VOICE });
 
@@ -54,5 +54,50 @@ describe("readiness", () => {
     expect(missingFootageSceneIds(d)).toEqual(["s1"]);
     expect(footageOwners(d).get("s3")).toBe("s2");
     expect(missingFootageSceneIds(EMPTY_STUDIO)).toEqual([]);
+  });
+});
+
+describe("readiness — kiểu Video tải lên", () => {
+  const upload = () => ({ ...EMPTY_STUDIO, kind: "upload" as const });
+
+  it("chưa có dự án: bước theo kiểu đang chọn; nhãn bước 1 đổi theo kiểu", () => {
+    expect(stepsOf(EMPTY_STUDIO)).toBe(STEPS);
+    expect(stepsOf(upload())).toBe(UPLOAD_STEPS);
+    expect(UPLOAD_STEPS.map((s) => [s.id, s.label])).toEqual([
+      ["news", "Nhập tiêu đề"],
+      ["clip", "Video của bạn"],
+      ["voice", "Giọng tiêu đề"],
+      ["music", "Nhạc nền"],
+      ["render", "Dựng video"],
+    ]);
+    expect(canEnter("clip", upload())).toBe(false);
+    expect(canEnter("clip", EMPTY_STUDIO)).toBe(false);
+    expect(canEnter("footage", { ...upload(), project: makeUploadProject() })).toBe(false);
+  });
+
+  it("có dự án mà chưa có video: dừng ở bước Video của bạn", () => {
+    const d = { ...upload(), project: makeUploadProject(), voice: VOICE };
+    expect(projectKind(d)).toBe("upload");
+    expect(canEnter("clip", d)).toBe(true);
+    expect(stepReady("clip", d)).toBe(false);
+    expect(canEnter("voice", d)).toBe(false);
+    expect(firstIncompleteStep(d)).toBe("clip");
+  });
+
+  it("có video mà chưa giọng tiêu đề: dừng ở bước giọng; đủ giọng thì vào được Dựng", () => {
+    const project = makeUploadProject();
+    const d = { ...upload(), project, voice: VOICE, sourceClip: makeClip() };
+    expect(canEnter("voice", d)).toBe(true);
+    expect(staleSceneIds(d)).toEqual(["s1"]);
+    expect(firstIncompleteStep(d)).toBe("voice");
+    const ready = { ...d, narrations: new Map([["s1", fakeNarration(project.introScene)]]) };
+    expect(canEnter("music", ready)).toBe(true);
+    expect(canEnter("render", ready)).toBe(true);
+    expect(firstIncompleteStep(ready)).toBe("render");
+  });
+
+  it("kiểu tin không có bước clip", () => {
+    const d = { ...EMPTY_STUDIO, project: makeProject(2), voice: VOICE };
+    expect(canEnter("clip", d)).toBe(false);
   });
 });

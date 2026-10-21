@@ -1,11 +1,20 @@
 import { NotFoundError, ValidationError } from "./errors";
 import type { IdGenerator } from "./ids";
+import { isProjectKind, type ProjectKind } from "./ProjectKind";
 import { Scene, type SceneRole } from "./Scene";
 import type { SentenceSplitter } from "./SentenceSplitter";
 
 export interface NewsProjectInput {
   text: string;
   title?: string;
+  sourceCredit: string;
+  publishDate: Date;
+  templateId: string;
+}
+
+/** Đầu vào kiểu "Video tải lên": chỉ có tiêu đề (cũng là câu giọng đọc). */
+export interface TitleOnlyInput {
+  title: string;
   sourceCredit: string;
   publishDate: Date;
   templateId: string;
@@ -60,6 +69,8 @@ export interface NewsProjectSnapshot {
   publishDate: string;
   templateId: string;
   scenes: Array<{ id: string; text: string; role: SceneRole }>;
+  /** Chỉ có khi "upload"; bản nháp cũ không có khoá này = "news". */
+  kind?: ProjectKind;
 }
 
 const comparable = (s: string) =>
@@ -79,6 +90,7 @@ export class NewsProject {
     readonly templateId: string,
     readonly scenes: readonly Scene[],
     private readonly nextId: IdGenerator,
+    readonly kind: ProjectKind,
   ) {}
 
   static fromText(input: NewsProjectInput, splitter: SentenceSplitter, nextId: IdGenerator): NewsProject {
@@ -96,7 +108,16 @@ export class NewsProject {
     if (body.length === 0) throw new ValidationError("Tin cần ít nhất một câu ngoài tiêu đề");
 
     const scenes = [Scene.create(nextId(), title, "intro"), ...body.map((s) => Scene.create(nextId(), s, "body"))];
-    return new NewsProject(title, credit, publishDate, input.templateId, scenes, nextId);
+    return new NewsProject(title, credit, publishDate, input.templateId, scenes, nextId, "news");
+  }
+
+  static titleOnly(input: TitleOnlyInput, nextId: IdGenerator): NewsProject {
+    if (!input.templateId) throw new ValidationError("Chưa chọn phong cách video");
+    const credit = checkedCredit(input.sourceCredit);
+    const publishDate = checkedDate(input.publishDate);
+    const title = input.title.replace(/\s+/g, " ").trim();
+    if (!title) throw new ValidationError("Chưa có tiêu đề video");
+    return new NewsProject(title, credit, publishDate, input.templateId, [Scene.create(nextId(), title, "intro")], nextId, "upload");
   }
 
   get introScene(): Scene {
@@ -170,6 +191,7 @@ export class NewsProject {
       meta.templateId ?? this.templateId,
       this.scenes,
       this.nextId,
+      this.kind,
     );
   }
 
@@ -180,12 +202,16 @@ export class NewsProject {
       publishDate: toLocalDateString(this.publishDate),
       templateId: this.templateId,
       scenes: this.scenes.map((s) => ({ id: s.id, text: s.text, role: s.role })),
+      // Kiểu tin giữ đúng hình dạng snapshot cũ (không có khoá kind).
+      ...(this.kind === "upload" ? { kind: "upload" as const } : {}),
     };
   }
 
   static restore(snapshot: NewsProjectSnapshot, nextId: IdGenerator): NewsProject {
     const raw = snapshot as unknown;
     if (!isRecord(raw)) throw new ValidationError("Bản nháp hỏng: dữ liệu không hợp lệ");
+    const kind: unknown = raw.kind ?? "news";
+    if (!isProjectKind(kind)) throw new ValidationError("Bản nháp hỏng: kiểu video không hợp lệ");
     if (typeof raw.title !== "string" || !raw.title.trim()) throw new ValidationError("Bản nháp hỏng: thiếu tiêu đề");
     if (typeof raw.templateId !== "string" || !raw.templateId) throw new ValidationError("Chưa chọn phong cách video");
     if (raw.sourceCredit !== undefined && typeof raw.sourceCredit !== "string") {
@@ -207,7 +233,9 @@ export class NewsProject {
       throw new ValidationError("Bản nháp hỏng: id cảnh bị trùng");
     }
     const structureOk =
-      scenes.length >= 2 && scenes[0]?.role === "intro" && scenes.slice(1).every((s) => s.role === "body");
+      kind === "upload"
+        ? scenes.length === 1 && scenes[0]?.role === "intro"
+        : scenes.length >= 2 && scenes[0]?.role === "intro" && scenes.slice(1).every((s) => s.role === "body");
     if (!structureOk) throw new ValidationError("Bản nháp hỏng: cấu trúc cảnh không hợp lệ");
     const taken = new Set(scenes.map((s) => s.id));
     const freshId: IdGenerator = () => {
@@ -216,7 +244,7 @@ export class NewsProject {
       taken.add(id);
       return id;
     };
-    return new NewsProject(raw.title, credit, publishDate, raw.templateId, scenes, freshId);
+    return new NewsProject(raw.title, credit, publishDate, raw.templateId, scenes, freshId, kind);
   }
 
   private indexOf(id: string): number {
@@ -233,6 +261,7 @@ export class NewsProject {
       this.templateId,
       change.scenes,
       this.nextId,
+      this.kind,
     );
   }
 }

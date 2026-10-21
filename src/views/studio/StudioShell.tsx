@@ -1,7 +1,8 @@
 "use client";
 
 import type { Studio } from "@/client/controllers/createStudio";
-import { STEPS, canEnter, type StepId } from "@/client/controllers/readiness";
+import { canEnter, projectKind, stepsOf, type StepId } from "@/client/controllers/readiness";
+import type { ProjectKind } from "@/domain/ProjectKind";
 import { ConfirmButton } from "@/views/components/ConfirmButton";
 import { useController } from "@/views/hooks/useController";
 import { OptionsSidebar } from "./components/OptionsSidebar";
@@ -12,15 +13,21 @@ import { StepNews } from "./steps/StepNews";
 import { StepRender } from "./steps/StepRender";
 import { StepVoice } from "./steps/StepVoice";
 
-const BLOCKED_HINT: Partial<Record<StepId, string>> = {
-  news: "Hãy chia cảnh từ tin của bạn trước.",
-  voice: "Hãy tạo giọng cho mọi câu trước khi tiếp tục.",
-};
+function blockedHint(step: StepId, kind: ProjectKind): string | undefined {
+  if (step === "news") return kind === "upload" ? "Hãy tạo dự án từ tiêu đề trước." : "Hãy chia cảnh từ tin của bạn trước.";
+  if (step === "clip") return "Hãy tải video lên trước khi tiếp tục.";
+  if (step === "voice") {
+    return kind === "upload" ? "Hãy tạo giọng cho câu tiêu đề trước khi tiếp tục." : "Hãy tạo giọng cho mọi câu trước khi tiếp tục.";
+  }
+  return undefined;
+}
 
 function renderStep(step: StepId, studio: Studio) {
   switch (step) {
     case "news":
       return <StepNews studio={studio} />;
+    case "clip":
+      return null;
     case "voice":
       return <StepVoice studio={studio} />;
     case "footage":
@@ -47,9 +54,11 @@ function newProjectButton(studio: Studio) {
 export function StudioShell({ studio }: { studio: Studio }) {
   const wizard = useController(studio.wizard);
   const data = useController(studio.session);
-  const index = STEPS.findIndex((s) => s.id === wizard.step);
-  const nextStep = STEPS[index + 1];
+  const steps = stepsOf(data);
+  const index = steps.findIndex((s) => s.id === wizard.step);
+  const nextStep = steps[index + 1];
   const nextEnabled = nextStep ? canEnter(nextStep.id, data) : false;
+  const hint = blockedHint(wizard.step, projectKind(data));
 
   return (
     <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -101,8 +110,8 @@ export function StudioShell({ studio }: { studio: Studio }) {
               </button>
             )}
           </div>
-          {nextStep && !nextEnabled && BLOCKED_HINT[wizard.step] && (
-            <span className="order-first text-sm text-neutral-400 lg:order-none">{BLOCKED_HINT[wizard.step]}</span>
+          {nextStep && !nextEnabled && hint && (
+            <span className="order-first text-sm text-neutral-400 lg:order-none">{hint}</span>
           )}
           <span className="ml-auto hidden lg:inline">{newProjectButton(studio)}</span>
         </nav>

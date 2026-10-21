@@ -7,7 +7,7 @@ import { MemoryKeyValueStore } from "@/client/storage/KeyValueStore";
 import { UploadRepository } from "@/client/storage/UploadRepository";
 import { MusicTrack } from "@/domain/MusicTrack";
 import { sequentialIds } from "@/domain/ids";
-import { fakeNarration, makeProject, manualScheduler, VOICE } from "../../helpers/studioFixtures";
+import { fakeNarration, makeClip, makeProject, makeUploadProject, manualScheduler, VOICE } from "../../helpers/studioFixtures";
 
 function setup() {
   const store = new MemoryKeyValueStore();
@@ -209,5 +209,30 @@ describe("WizardController", () => {
     await first;
     expect(wizard.state.resume).toBeNull();
     expect(wizard.state.booting).toBe(false);
+  });
+
+  it("kiểu Video tải lên: next/back đi theo 5 bước của kiểu này", () => {
+    const { wizard, session } = setup();
+    const project = makeUploadProject();
+    session.update((d) => ({ ...d, project, voice: VOICE }));
+    expect(wizard.next()).toBe(true);
+    expect(wizard.state.step).toBe("clip");
+    expect(wizard.next()).toBe(false); // chưa có video
+    session.update((d) => ({ ...d, sourceClip: makeClip() }));
+    expect(wizard.next()).toBe(true);
+    expect(wizard.state.step).toBe("voice");
+    expect(wizard.goTo("footage")).toBe(false);
+    wizard.back();
+    expect(wizard.state.step).toBe("clip");
+  });
+
+  it("dọn file tải lên giữ blob video của dự án", async () => {
+    const { wizard, session, uploads } = setup();
+    const kept = await uploads.put(new Blob(["mp4"]), { name: "c.mp4", kind: "video" });
+    const orphan = await uploads.put(new Blob(["x"]), { name: "x.mp4", kind: "video" });
+    session.update((d) => ({ ...d, project: makeUploadProject(), sourceClip: makeClip({ uploadId: kept.id }) }));
+    await wizard.cleanupUploads();
+    expect((await uploads.list()).map((m) => m.id)).toEqual([kept.id]);
+    expect(orphan.id).not.toBe(kept.id);
   });
 });

@@ -4,7 +4,7 @@ import type { DraftBody } from "@/client/storage/ProjectDraft";
 import { FallbackFootage } from "@/domain/Footage";
 import { sequentialIds } from "@/domain/ids";
 import { VideoOptions } from "@/domain/VideoOptions";
-import { fakeNarration, flush, makeProject, makeSession, makeSessionWithProject, manualScheduler, VOICE } from "../../helpers/studioFixtures";
+import { fakeNarration, flush, makeClip, makeProject, makeSession, makeSessionWithProject, makeUploadProject, manualScheduler, VOICE } from "../../helpers/studioFixtures";
 
 describe("StudioSession", () => {
   it("update thay state và báo cho người nghe", () => {
@@ -290,5 +290,39 @@ describe("StudioSession — tuỳ chọn video", () => {
     session.update((d) => ({ ...d, options: d.options.withSubtitlesEnabled(false) }));
     session.reset();
     expect(session.state.options.subtitlesEnabled).toBe(true);
+  });
+});
+
+describe("StudioSession — kiểu dự án và video tải lên", () => {
+  it("mặc định kiểu tin, chưa có video; reset về mặc định", () => {
+    const { session } = makeSession();
+    expect(session.state.kind).toBe("news");
+    expect(session.state.sourceClip).toBeNull();
+    session.update((d) => ({ ...d, kind: "upload" }));
+    expect(session.state.kind).toBe("upload");
+    session.reset();
+    expect(session.state.kind).toBe("news");
+  });
+
+  it("kind luôn theo dự án; dự án tin thì bỏ sourceClip", () => {
+    const { session } = makeSession();
+    session.update((d) => ({ ...d, project: makeUploadProject(), sourceClip: makeClip() }));
+    expect(session.state.kind).toBe("upload");
+    expect(session.state.sourceClip?.uploadId).toBe("upload-c1");
+    session.update((d) => ({ ...d, project: makeProject(2) }));
+    expect(session.state.kind).toBe("news");
+    expect(session.state.sourceClip).toBeNull();
+  });
+
+  it("tự lưu kèm sourceClip và restore dựng lại kind + sourceClip", async () => {
+    const { session, saves, sched } = makeSession();
+    session.update((d) => ({ ...d, project: makeUploadProject(), sourceClip: makeClip({ volumePercent: 40 }) }));
+    sched.runAll();
+    await flush();
+    expect(saves.at(-1)?.sourceClip?.volumePercent).toBe(40);
+    const other = makeSession();
+    other.session.restore(saves.at(-1)!);
+    expect(other.session.state.kind).toBe("upload");
+    expect(other.session.state.sourceClip?.volumePercent).toBe(40);
   });
 });
