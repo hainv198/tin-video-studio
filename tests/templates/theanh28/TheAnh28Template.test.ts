@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { BrandKit } from "@/domain/BrandKit";
 import { TheAnh28Template } from "@/templates/theanh28/TheAnh28Template";
 import { LAYOUT } from "@/templates/theanh28/layout";
-import { SOURCE_CLIP_MEDIA, type DrawableImage, type ProjectFrame, type SceneFrame } from "@/templates/VideoTemplate";
+import { NATIVE_PORTRAIT_MEDIA, SOURCE_CLIP_MEDIA, type DrawableImage, type ProjectFrame, type SceneFrame } from "@/templates/VideoTemplate";
 import { RecordingCanvas } from "../../helpers/RecordingCanvas";
 
 const t = new TheAnh28Template();
@@ -321,9 +321,100 @@ describe("TheAnh28Template — video tải lên", () => {
     expect(w).toBeGreaterThan(1080);
   });
 
+  it("khổ khác 9:16 (ngang): nền mờ + vừa khung, chữ không đổ bóng, không dải tối trên đầu", () => {
+    const backdrop: DrawableImage = { source: { tag: "backdrop" } as unknown as CanvasImageSource, width: 135, height: 240 };
+    const c = draw(project({ mediaCredit: "VIDEO: TỔNG HỢP" }), scene({ media: SOURCE_CLIP_MEDIA, backdrop }));
+    const images = c.ops("drawImage");
+    expect(images[0]?.args.slice(0, 5)).toEqual([backdrop.source, 0, 0, 1080, 1920]);
+    expect(images.filter((x) => x.args[0] === image.source).map((x) => x.args.slice(1))).toEqual([[0, 536.25, 1080, 607.5]]);
+    expect(c.ops("createLinearGradient")).toHaveLength(0);
+    expect(c.ops("fillText").every((x) => x.state.shadowColor === "rgba(0, 0, 0, 0)")).toBe(true);
+  });
+
   it("mediaCredit thay dòng 'ẢNH: TỔNG HỢP'; bỏ trống giữ như cũ", () => {
     expect(draw(project({ mediaCredit: "VIDEO: TỔNG HỢP" }), scene()).texts()).toContain("VIDEO: TỔNG HỢP");
     expect(draw(project({ mediaCredit: "VIDEO: TỔNG HỢP" }), scene()).texts()).not.toContain("ẢNH: TỔNG HỢP");
     expect(draw(project(), scene()).texts()).toContain("ẢNH: TỔNG HỢP");
+  });
+});
+
+describe("TheAnh28Template — video 9:16 gốc phủ toàn khung", () => {
+  const tall: DrawableImage = { source: { tag: "tall" } as unknown as CanvasImageSource, width: 1080, height: 1920 };
+  const backdrop: DrawableImage = { source: { tag: "backdrop" } as unknown as CanvasImageSource, width: 135, height: 240 };
+  const full = (over: Partial<SceneFrame> = {}) => scene({ text: "", image: tall, media: NATIVE_PORTRAIT_MEDIA, backdrop, ...over });
+  const NO_SHADOW = "rgba(0, 0, 0, 0)";
+
+  it("vẽ video phủ toàn khung 1080×1920, không nền mờ (không backdrop, không blur), không lớp tối toàn khung", () => {
+    const c = draw(project({ mediaCredit: "VIDEO: TỔNG HỢP" }), full());
+    const images = c.ops("drawImage").filter((x) => x.args[0] !== backdrop.source);
+    expect(c.ops("drawImage").some((x) => x.args[0] === backdrop.source)).toBe(false);
+    expect(images.filter((x) => x.args[0] === tall.source).map((x) => x.args.slice(1))).toEqual([[0, 0, 1080, 1920]]);
+    expect(c.calls.every((x) => !x.state.filter.startsWith("blur"))).toBe(true);
+    expect(c.ops("fillRect").some((x) => x.args.join() === "0,0,1080,1920")).toBe(false);
+    // không cắt theo dải thân bài
+    expect(c.ops("rect").some((x) => x.args.join() === "0,380,1080,920")).toBe(false);
+  });
+
+  it("không zoom theo thời gian; 9:16 lệch 5% vẫn phủ kín khung (cover, cắt rất ít)", () => {
+    const at = (s: SceneFrame) => draw(project(), s).ops("drawImage").find((x) => x.args[0] === s.image?.source)?.args.slice(1);
+    expect(at(full({ sceneTime: 3.9 }))).toEqual([0, 0, 1080, 1920]);
+    const wide: DrawableImage = { ...tall, width: 1134, height: 1920 };
+    expect(at(full({ image: wide }))).toEqual([-27, 0, 1134, 1920]);
+  });
+
+  it("đọc được chữ: dải tối mờ dần ở đầu khung dưới dòng nguồn tin/huy hiệu; nguồn tin và tên kênh có bóng; tem ngày có nền", () => {
+    const c = draw(project({ mediaCredit: "VIDEO: TỔNG HỢP" }), full());
+    const gradients = c.ops("createLinearGradient");
+    expect(gradients).toHaveLength(1);
+    const [x0, y0, x1, y1] = gradients[0]!.args as number[];
+    expect([x0, y0, x1]).toEqual([0, 0, 0]);
+    expect(y1).toBeGreaterThan(LAYOUT.logo.y + LAYOUT.logo.size);
+    expect(y1).toBeGreaterThan(LAYOUT.credit.y + 2 * LAYOUT.credit.lineHeight);
+    const scrimAt = c.calls.findIndex((x) => x.op === "fillRect" && x.args[0] === 0 && x.args[1] === 0 && x.args[3] === y1);
+    const videoAt = c.calls.findIndex((x) => x.op === "drawImage" && x.args[0] === tall.source);
+    expect(scrimAt).toBeGreaterThan(videoAt);
+    const shadowOf = (text: string) => c.ops("fillText").find((x) => x.args[0] === text)?.state.shadowColor;
+    for (const text of ["THEO: ĐỨC PHONG - VIETNAMNET", "VIDEO: TỔNG HỢP", "28 NEWS"]) expect(shadowOf(text)).not.toBe(NO_SHADOW);
+    const dateAt = c.calls.findIndex((x) => x.op === "fillText" && x.args[0] === "NGÀY ĐĂNG: 14/10/2026");
+    expect(c.calls[dateAt - 1]?.op).toBe("fillRect");
+    expect(c.calls[dateAt - 1]?.state.fillStyle).toBe("rgba(0,0,0,0.45)");
+  });
+
+  it("bóng chữ không lan sang lần vẽ sau (huy hiệu logo, phụ đề)", () => {
+    const logo: DrawableImage = { source: { tag: "logo" } as unknown as CanvasImageSource, width: 200, height: 200 };
+    const c = draw(project({ logo }), full());
+    expect(c.ops("drawImage").find((x) => x.args[0] === logo.source)?.state.shadowColor).toBe(NO_SHADOW);
+    const after = new RecordingCanvas();
+    t.drawFrame(after.asCanvas(), project(), full());
+    expect(after.shadowColor).toBe(NO_SHADOW);
+  });
+
+  it("phụ đề (nếu bật) và khối tiêu đề đọc đè vẽ đè lên video", () => {
+    const style = frameStyleFor(VideoOptions.defaults().withSubtitlesEnabled(true).snapshot());
+    const sub = draw(project({ style }), full({ text: "Câu tin.", voiceStart: 0, voiceDuration: 2 }));
+    const videoAt = sub.calls.findIndex((x) => x.op === "drawImage" && x.args[0] === tall.source);
+    expect(sub.calls.findIndex((x) => x.op === "strokeText")).toBeGreaterThan(videoAt);
+    const over = draw(project(), full({ titleOverlay: { collapseAtSec: 5 }, sceneTime: 1 }));
+    const titleAt = over.calls.findIndex((x) => x.op === "fillText" && String(x.args[0]).startsWith("PHÚ THỌ"));
+    expect(titleAt).toBeGreaterThan(over.calls.findIndex((x) => x.op === "drawImage" && x.args[0] === tall.source));
+  });
+
+  it("cảnh mở đầu không đổi: media 9:16 gốc không ảnh hưởng thẻ tiêu đề", () => {
+    const plain = draw(project(), scene({ role: "intro", image: tall }));
+    const withMedia = draw(project(), scene({ role: "intro", image: tall, media: NATIVE_PORTRAIT_MEDIA }));
+    expect(JSON.stringify(withMedia.calls)).toBe(JSON.stringify(plain.calls));
+  });
+});
+
+describe("TheAnh28Template — kiểu tin (cảnh trám) không đổi", () => {
+  it("không media: nền mờ + dải cover/Ken Burns, chữ không bóng, không dải tối đầu khung", () => {
+    const c = draw(project(), scene({ sceneTime: 1 }));
+    const images = c.ops("drawImage").filter((x) => x.args[0] === image.source);
+    expect(images).toHaveLength(2);
+    expect(images[0]?.state.filter).toBe("blur(48px)");
+    expect(c.ops("fillRect").some((x) => x.args.join() === "0,0,1080,1920" && x.state.fillStyle === "rgba(0,0,0,0.18)")).toBe(true);
+    expect(c.ops("rect").some((x) => x.args.join() === "0,380,1080,920")).toBe(true);
+    expect(c.ops("createLinearGradient")).toHaveLength(0);
+    expect(c.ops("fillText").every((x) => x.state.shadowColor === "rgba(0, 0, 0, 0)")).toBe(true);
   });
 });

@@ -89,7 +89,9 @@ export class VideoRenderer {
         const footageTime = t - span.start;
         const sourceTime = sourceTimeFor(owner.playback, footageTime);
         const image = sourceTime === null || !owner.frames ? null : await owner.frames.frameAt(sourceTime);
-        const backdropImage = image && scene.role === "body" && backdrop ? backdrop.make(image) : null;
+        // Video 9:16 gốc phủ toàn khung: không có nền mờ nên không tạo (đỡ một lần vẽ mỗi khung).
+        const needsBackdrop = image && scene.role === "body" && scene.media?.fit !== "fullFrame";
+        const backdropImage = needsBackdrop && backdrop ? backdrop.make(image) : null;
         template.drawFrame(ctx, project, {
           role: scene.role,
           text: scene.text,

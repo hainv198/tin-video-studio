@@ -4,7 +4,15 @@ import { DEFAULT_TIMELINE_CONFIG, Timeline } from "@/domain/Timeline";
 import type { BackdropMaker } from "@/client/render/BackdropMaker";
 import { RenderCancelledError } from "@/client/render/errors";
 import { VideoRenderer, type FrameProvider, type RenderScene, type VideoFrameSink } from "@/client/render/VideoRenderer";
-import { SOURCE_CLIP_MEDIA, VideoTemplate, type DrawableImage, type ProjectFrame, type SceneFrame } from "@/templates/VideoTemplate";
+import {
+  NATIVE_PORTRAIT_MEDIA,
+  SOURCE_CLIP_MEDIA,
+  VideoTemplate,
+  type DrawableImage,
+  type ProjectFrame,
+  type SceneFrame,
+  type SceneMedia,
+} from "@/templates/VideoTemplate";
 import { RecordingCanvas } from "../../helpers/RecordingCanvas";
 
 class LogTemplate extends VideoTemplate {
@@ -294,6 +302,36 @@ describe("VideoRenderer — media của cảnh", () => {
     expect(template.frames.at(-1)?.media).toEqual(SOURCE_CLIP_MEDIA);
     expect(frames.asked[0]).toBeCloseTo(0.1, 9); // ảnh tĩnh thẻ đầu tại stillAtSec
     expect(frames.asked.at(-1)).toBeCloseTo(0.2, 9); // khung cuối của video: 0,2 s sau khi bắt đầu
+  });
+
+  it("video 9:16 gốc (phủ toàn khung): không tạo nền mờ mỗi khung; video khổ khác vẫn tạo", async () => {
+    const renderWith = async (media: SceneMedia) => {
+      let made = 0;
+      const template = new LogTemplate();
+      const timeline = Timeline.build([{ sceneId: "clip", durationSec: 0.3, silent: true }], { leadInSec: 0, gapSec: 0, tailSec: 0 });
+      await new VideoRenderer({
+        template,
+        ctx: new RecordingCanvas().asCanvas(),
+        project,
+        timeline,
+        scenes: new Map<string, RenderScene>([
+          ["clip", { sceneId: "clip", role: "body", text: "", playback: { mode: "clip", sourceDurationSec: 0.3 }, frames: new CountingFrames(), media }],
+        ]),
+        fps: 10,
+        sink: new Sink(),
+        backdrop: {
+          make() {
+            made++;
+            return { source: {} as CanvasImageSource, width: 1, height: 1 };
+          },
+        },
+      }).render();
+      return { made, backdrops: template.frames.map((f) => f.backdrop ?? null) };
+    };
+    const full = await renderWith(NATIVE_PORTRAIT_MEDIA);
+    expect(full.made).toBe(0);
+    expect(full.backdrops.every((b) => b === null)).toBe(true);
+    expect((await renderWith(SOURCE_CLIP_MEDIA)).made).toBe(3);
   });
 });
 

@@ -150,10 +150,26 @@ describe("buildPreviewFrames — kiểu Video tải lên", () => {
     expect(f.project.mediaCredit).toBeUndefined();
   });
 
-  it("khung video dọc: thân bài phủ kín khung (cover), không zoom", () => {
+  it("khung video 9:16 gốc: thân bài phủ toàn khung (fullFrame), không zoom; cả hai cách ghép", () => {
     const tall: DrawableImage = { ...image, width: 1080, height: 1920 };
     const f = buildPreviewFrames({ ...base, image: tall, form: uploadForm });
-    expect(f.body.media).toEqual({ fit: "cover", motion: false });
+    expect(f.body.media).toEqual({ fit: "fullFrame", motion: false });
+    expect(f.intro.media).toBeUndefined(); // thẻ tiêu đề đầu giữ nguyên
+    const over = buildPreviewFrames({
+      ...base,
+      image: tall,
+      options: VideoOptions.defaults().withUploadComposition("title-over-clip").snapshot(),
+      form: uploadForm,
+    });
+    expect(over.intro.media).toEqual({ fit: "fullFrame", motion: false });
+    expect(over.body.media).toEqual({ fit: "fullFrame", motion: false });
+  });
+
+  it("khung video dọc không phải 9:16 (3:4) hoặc vuông: vừa khung (contain) trên nền mờ", () => {
+    for (const [width, height] of [[1080, 1440], [1080, 1080]] as const) {
+      const f = buildPreviewFrames({ ...base, image: { ...image, width, height }, form: uploadForm });
+      expect(f.body.media).toEqual({ fit: "contain", motion: false });
+    }
   });
 });
 

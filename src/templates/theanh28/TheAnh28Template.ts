@@ -23,6 +23,9 @@ const DEFAULT_COLOR = "#1F9D55";
 const WHITE = "#FFFFFF";
 /** Font chữ khi dự án không có tuỳ chọn riêng: giữ đúng hình ảnh trước khi có tuỳ chọn video. */
 const DEFAULT_TEXT_FONT: FontStyle = { family: THEANH28_FONT_FAMILY, semiBold: 600, bold: 800 };
+const NO_SHADOW = "rgba(0, 0, 0, 0)";
+/** Bóng chữ trên video 9:16 phủ toàn khung. */
+const TEXT_SHADOW = { color: "rgba(0,0,0,0.75)", blurPx: 8, offsetPx: 2 };
 
 /** Trường thương hiệu của Theanh28 (phong cách con dùng lại rồi thêm trường riêng). */
 export const THEANH28_BRAND_FIELDS: readonly BrandFieldSpec[] = [
@@ -105,7 +108,9 @@ export class TheAnh28Template extends VideoTemplate {
     const { width, height } = this.layout.frame;
     const B = this.layout.body;
 
-    if (scene.image) {
+    if (scene.image && this.isFullFrame(scene)) {
+      this.drawFullFrame(ctx, scene.image);
+    } else if (scene.image) {
       if (scene.backdrop) {
         // nền mờ đã được thu nhỏ sẵn: phóng ra toàn khung bằng nội suy
         ctx.imageSmoothingEnabled = true;
@@ -130,6 +135,36 @@ export class TheAnh28Template extends VideoTemplate {
     }
     this.drawDateTag(ctx, project, project.publishDateText, B.dateTag.x, B.dateTag.y);
     if (scene.titleOverlay) this.drawTitleOverlay(ctx, project, scene.sceneTime, scene.titleOverlay);
+  }
+
+  /** Video tải lên đã là 9:16: cảnh thân bài có hình và media "fullFrame" (chỉ cảnh thân bài; thẻ tiêu đề đầu giữ nguyên). */
+  private isFullFrame(scene: SceneFrame): boolean {
+    return scene.role === "body" && scene.image !== null && scene.media?.fit === "fullFrame";
+  }
+
+  /**
+   * Video 9:16 gốc phủ toàn khung (cover, thực tế gần như không cắt), không nền mờ, không lớp tối toàn khung.
+   * Một dải tối mờ dần ở đỉnh khung lót dòng nguồn tin và huy hiệu tên kênh để đọc được trên mọi cảnh quay.
+   */
+  private drawFullFrame(ctx: Canvas2D, image: DrawableImage): void {
+    const { width, height } = this.layout.frame;
+    const r = coverRect(image.width, image.height, { x: 0, y: 0, w: width, h: height });
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(image.source, r.x, r.y, r.w, r.h);
+    const S = this.layout.body.topScrim;
+    const scrim = ctx.createLinearGradient(0, 0, 0, S.height);
+    scrim.addColorStop(0, `rgba(0,0,0,${S.alpha})`);
+    scrim.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = scrim;
+    ctx.fillRect(0, 0, width, S.height);
+  }
+
+  /** Bóng nhẹ cho chữ trắng không có nền (dòng nguồn tin, tên kênh) khi vẽ thẳng lên video toàn khung. */
+  private setTextShadow(ctx: Canvas2D, on: boolean): void {
+    ctx.shadowColor = on ? TEXT_SHADOW.color : NO_SHADOW;
+    ctx.shadowBlur = on ? TEXT_SHADOW.blurPx : 0;
+    ctx.shadowOffsetY = on ? TEXT_SHADOW.offsetPx : 0;
   }
 
   /**
@@ -179,8 +214,11 @@ export class TheAnh28Template extends VideoTemplate {
     const measure = (s: string) => ctx.measureText(s).width;
     const mediaCredit = project.mediaCredit ?? "ẢNH: TỔNG HỢP";
     const lines = project.sourceCredit ? [`THEO: ${upper(project.sourceCredit)}`, mediaCredit] : [mediaCredit];
+    const fullFrame = this.isFullFrame(scene);
+    if (fullFrame) this.setTextShadow(ctx, true);
     lines.forEach((line, i) => ctx.fillText(wrapText(line, limit, measure, 1)[0] ?? "", C.x, C.y + i * C.lineHeight));
-    if (scene.role === "body") this.drawCornerLogo(ctx, project);
+    if (fullFrame) this.setTextShadow(ctx, false);
+    if (scene.role === "body") this.drawCornerLogo(ctx, project, fullFrame);
     if (project.style?.subtitles.enabled) this.drawSubtitle(ctx, project.style, scene);
   }
 
@@ -334,7 +372,7 @@ export class TheAnh28Template extends VideoTemplate {
     return { name, textX, badgeX: textX - G.gap - G.size };
   }
 
-  private drawCornerLogo(ctx: Canvas2D, project: ProjectFrame): void {
+  private drawCornerLogo(ctx: Canvas2D, project: ProjectFrame, shadow: boolean): void {
     const G = this.layout.logo;
     const { name, textX, badgeX } = this.cornerLogoBox(ctx, project);
     this.drawLogoBadge(ctx, project, badgeX, G.y, G.size);
@@ -342,6 +380,8 @@ export class TheAnh28Template extends VideoTemplate {
     ctx.fillStyle = WHITE;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
+    if (shadow) this.setTextShadow(ctx, true);
     ctx.fillText(name, textX, G.y + G.size / 2);
+    if (shadow) this.setTextShadow(ctx, false);
   }
 }

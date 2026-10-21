@@ -44,21 +44,37 @@ export interface TemplateDefaults {
   fallbackKeyword: string;
 }
 
-/** Cách đặt ảnh/video vào khung: cắt cho đầy (cover) hay vừa trọn (contain); có zoom Ken Burns hay đứng yên. */
+/**
+ * Cách đặt ảnh/video vào khung: cắt cho đầy dải thân bài (cover), vừa trọn dải trên nền mờ (contain), hay phủ toàn khung
+ * video không nền mờ (fullFrame); có zoom Ken Burns hay đứng yên.
+ */
 export interface SceneMedia {
-  fit: "cover" | "contain";
+  fit: "cover" | "contain" | "fullFrame";
   motion: boolean;
 }
 
-/** Video người dùng tải lên: không cắt mất nội dung, không zoom. */
+/** Video người dùng tải lên (khổ khác 9:16): vừa khung trên nền mờ, không cắt mất nội dung, không zoom. */
 export const SOURCE_CLIP_MEDIA: SceneMedia = { fit: "contain", motion: false };
 
+/** Video tải lên đã là 9:16: phủ toàn khung 1080×1920, không nền mờ, không zoom. */
+export const NATIVE_PORTRAIT_MEDIA: SceneMedia = { fit: "fullFrame", motion: false };
+
+/** Tỉ lệ rộng/cao của khung video dọc 9:16 và dung sai tương đối để coi một hình là "9:16 gốc". */
+export const PORTRAIT_RATIO = 9 / 16;
+export const PORTRAIT_TOLERANCE = 0.06;
+
+/** Hình có tỉ lệ rộng/cao lệch không quá ±6% so với 9:16 (1080×1920, 720×1280, 1079×1920…). */
+export function isNativePortrait(width: number, height: number): boolean {
+  if (!(width > 0 && height > 0)) return false;
+  return Math.abs(width / height / PORTRAIT_RATIO - 1) <= PORTRAIT_TOLERANCE;
+}
+
 /**
- * Cách đặt video tải lên theo hướng khung: ngang (rộng > cao) thì vừa khung trên nền mờ lấy từ chính video;
- * dọc hoặc vuông thì phủ kín khung (cắt gọn như cảnh trám, không để nền mờ hai bên). Cả hai đều không zoom.
+ * Cách đặt video tải lên vào cảnh thân bài: 9:16 gốc thì phủ toàn khung (không cắt đáng kể, không nền mờ);
+ * mọi khổ khác (ngang, vuông, 4:3, dọc 3:4/4:5, ảnh rất thon) thì vừa khung trên nền mờ lấy từ chính video. Không zoom.
  */
 export function sourceClipMediaFor(width: number, height: number): SceneMedia {
-  return width > height ? SOURCE_CLIP_MEDIA : { fit: "cover", motion: false };
+  return isNativePortrait(width, height) ? NATIVE_PORTRAIT_MEDIA : SOURCE_CLIP_MEDIA;
 }
 
 export interface ProjectFrame {

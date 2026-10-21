@@ -139,7 +139,7 @@ So khung có/không phụ đề: `npm run contact:sheet -- co-phu-de.mp4 khong-p
 2. **Video của bạn** — chọn đúng một video MP4/MOV/WebM, tối đa **5 phút** và **500 MB**. Chỉnh **Âm thanh gốc** 0–150 % (100 % = giữ nguyên, 0 = tắt).
 3. **Giọng tiêu đề** — chỉ đọc câu tiêu đề.
 4. **Nhạc nền** — tuỳ chọn; tự đặt thấp hơn tiếng gốc ít nhất 12 dB.
-5. **Dựng video** — thẻ tiêu đề kiểu Theanh28 (ảnh lấy từ giây 1 của video) rồi video chạy trọn trong khung thân bài: video ngang vừa khung trên nền mờ lấy từ chính video; video dọc hoặc vuông phủ kín khung (cắt gọn hai mép). Không phụ đề. Video dài hơn 1 phút: nên chọn chất lượng **Nhẹ** (file nhỏ, đỡ tốn bộ nhớ) và giữ tab mở khi dựng.
+5. **Dựng video** — thẻ tiêu đề kiểu Theanh28 (ảnh lấy từ giây 1 của video) rồi video chạy trọn: video **9:16 gốc** (rộng/cao ≈ 9/16, lệch tối đa ±6%, ví dụ 1080×1920, 720×1280) phủ toàn khung 1080×1920, không cắt, không nền mờ — tem ngày, tên kênh/logo, dòng nguồn tin (có dải tối mờ ở đỉnh khung + bóng chữ để đọc được), khối tiêu đề đọc đè và banner chân (phong cách banner, che 360 px dưới cùng) vẽ đè lên video; **mọi khổ khác** (ngang, vuông, 4:3, dọc 3:4/4:5…) thu nhỏ vừa khung thân bài trên nền mờ lấy từ chính video, không cắt. Không phụ đề. Video dài hơn 1 phút: nên chọn chất lượng **Nhẹ** (file nhỏ, đỡ tốn bộ nhớ) và giữ tab mở khi dựng.
 
 Đã có dự án thì không đổi kiểu được; bấm **Dự án mới** để làm kiểu khác. Track âm của video không giải mã được khi dựng thì việc dựng dừng và báo lỗi (không âm thầm bỏ tiếng gốc): kéo **Âm thanh gốc** về 0 % để dựng không có tiếng gốc, hoặc chuyển video sang MP4 (âm AAC).
 

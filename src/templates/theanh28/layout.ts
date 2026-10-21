@@ -17,7 +17,14 @@ export interface TheAnh28Layout {
     title: { x: number; y: number; maxWidth: number; fontPx: number; lineHeight: number; maxLines: number };
     pattern: Rect & { spacing: number; radius: number; alpha: number };
   };
-  body: { band: Rect; dateTag: { x: number; y: number }; backdropScale: number; backdropShade: number };
+  body: {
+    band: Rect;
+    dateTag: { x: number; y: number };
+    backdropScale: number;
+    backdropShade: number;
+    /** Video 9:16 gốc phủ toàn khung: dải tối mờ dần từ đỉnh khung (độ đậm `alpha`) tới `height`, lót dòng nguồn tin + huy hiệu. */
+    topScrim: { height: number; alpha: number };
+  };
   credit: { x: number; y: number; lineHeight: number; fontPx: number; rightMargin: number; gapToLogo: number };
   logo: { right: number; y: number; size: number; gap: number; fontPx: number };
   dateTag: { h: number; padX: number; fontPx: number };
@@ -63,6 +70,7 @@ export const LAYOUT = {
     dateTag: { x: 96, y: 1236 },
     backdropScale: 1.1,
     backdropShade: 0.18,
+    topScrim: { height: 440, alpha: 0.55 },
   },
   credit: { x: 110, y: 240, lineHeight: 40, fontPx: 26, rightMargin: 40, gapToLogo: 24 },
   logo: { right: 96, y: 250, size: 64, gap: 14, fontPx: 46 },

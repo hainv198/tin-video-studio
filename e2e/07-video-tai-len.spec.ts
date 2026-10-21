@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { FfmpegMissingError, decodeFileAudio } from "../scripts/measure-mp4";
@@ -15,6 +16,7 @@ let withAudio = "";
 let silent = "";
 let portrait = "";
 let landscape = "";
+let square = "";
 let ffmpeg = true;
 
 test.beforeAll(() => {
@@ -23,6 +25,7 @@ test.beforeAll(() => {
     silent = makeSampleClip({ out: join(DIR, "clip-im.mp4"), seconds: CLIP_SEC, width: 720, height: 1280, audio: false });
     portrait = makeSampleClip({ out: join(DIR, "clip-doc-1080x1920.mp4"), seconds: CLIP_SEC, width: 1080, height: 1920, audio: true });
     landscape = makeSampleClip({ out: join(DIR, "clip-ngang-1920x1080.mp4"), seconds: CLIP_SEC, width: 1920, height: 1080, audio: true });
+    square = makeSampleClip({ out: join(DIR, "clip-vuong-1080x1080.mp4"), seconds: CLIP_SEC, width: 1080, height: 1080, audio: false });
   } catch (error) {
     if (!(error instanceof FfmpegMissingError)) throw error;
     ffmpeg = false;
@@ -85,6 +88,16 @@ const BAND_TOP: Region = { x: 40, y: 392, w: 1000, h: 120 };
 const BAND_MIDDLE: Region = { x: 40, y: 760, w: 1000, h: 160 };
 /** Vùng phụ đề thân bài (đáy 1600, 2 dòng × 68 px). */
 const SUBTITLE_ZONE: Region = { x: 130, y: 1460, w: 820, h: 140 };
+/** Nửa dưới khung (dưới dải thân bài cũ khi video phủ toàn khung): 9:16 gốc là hình video; khổ khác là nền mờ. */
+const LOWER_FRAME: Region = { x: 40, y: 900, w: 1000, h: 600 };
+/** Dưới dải thân bài 380..1300 (tránh tem ngày 1236..1280): nền mờ khi video vừa khung. */
+const BELOW_BAND: Region = { x: 40, y: 1320, w: 1000, h: 130 };
+const SHOT_DIR = join(".superpowers", "sample");
+
+function saveShot(file: string, t: number, name: string): void {
+  mkdirSync(SHOT_DIR, { recursive: true });
+  execFileSync("ffmpeg", ["-v", "error", "-y", "-ss", String(t), "-i", file, "-frames:v", "1", "-vf", "scale=540:960", join(SHOT_DIR, name)]);
+}
 
 test("Video tải lên: thẻ tiêu đề rồi video 8 s, tiếng gốc 100 %, không phụ đề", async ({ page }) => {
   test.skip(!ffmpeg, "cần ffmpeg để tạo video mẫu");
@@ -186,11 +199,11 @@ test("Video tải lên trên điện thoại 390 px: không cuộn ngang", async
   await noHorizontalScroll("giọng tiêu đề");
 });
 
-test("Video tải lên dọc 1080×1920: phủ kín khung thân bài, không phụ đề, tiếng gốc đúng mức", async ({ page }) => {
+test("Video tải lên 9:16 gốc 1080×1920: phủ toàn khung, không nền mờ, không phụ đề, tiếng gốc đúng mức", async ({ page }) => {
   test.skip(!ffmpeg, "cần ffmpeg để tạo video mẫu");
   await login(page);
   await discardDraftIfOffered(page);
-  await startUploadProject(page, "Clip dọc phủ kín");
+  await startUploadProject(page, "Clip dọc phủ toàn khung");
   await uploadClip(page, portrait, "0:08");
   await expect(page.getByTestId("video-tai-len")).toContainText("1080×1920");
   await toRender(page, "none");
@@ -200,23 +213,42 @@ test("Video tải lên dọc 1080×1920: phủ kín khung thân bài, không ph�
   expect(Math.abs(videoDurationSec(file) - total)).toBeLessThan(0.15);
 
   const t = intro + CLIP_SEC / 2;
-  const top = grabRegion(file, t, BAND_TOP);
-  const middle = grabRegion(file, t, BAND_MIDDLE);
-  const subtitle = grabRegion(file, t, SUBTITLE_ZONE);
-  const topSharp = sharpness(top, BAND_TOP);
-  const middleSharp = sharpness(middle, BAND_MIDDLE);
-  const subtitleSharp = sharpness(subtitle, SUBTITLE_ZONE);
-  // Phủ kín: mép trên khung thân bài cũng là hình video sắc nét, không phải nền mờ.
+  const topSharp = sharpness(grabRegion(file, t, BAND_TOP), BAND_TOP);
+  const middleSharp = sharpness(grabRegion(file, t, BAND_MIDDLE), BAND_MIDDLE);
+  const lowerSharp = sharpness(grabRegion(file, t, LOWER_FRAME), LOWER_FRAME);
+  // Phủ toàn khung: cả nửa dưới (trước đây là nền mờ) cũng là hình video sắc như phía trên.
   expect(topSharp).toBeGreaterThan(SHARP_MIN);
   expect(middleSharp).toBeGreaterThan(SHARP_MIN);
-  // Không phụ đề: vùng phụ đề là nền mờ (chữ trắng viền đen sẽ cho độ sắc cao).
-  expect(subtitleSharp).toBeLessThan(BLURRED_MAX);
+  expect(lowerSharp).toBeGreaterThan(SHARP_MIN);
+  expect(lowerSharp).toBeGreaterThan(middleSharp * 0.7);
+  saveShot(file, t, "916-theanh28-video.png");
 
   const audio = decodeFileAudio(file);
   const clipDb = toneRmsDb(audio.channels, audio.sampleRate, intro + 0.5, total - 0.5, 440);
   expect(clipDb).toBeGreaterThan(SINE_DB - 1.5);
   expect(clipDb).toBeLessThan(SINE_DB + 1.5);
-  console.log(`[e2e upload dọc] tổng ${total} s (thẻ ${intro.toFixed(2)} s); sắc nét mép trên ${topSharp.toFixed(1)}, giữa ${middleSharp.toFixed(1)}, vùng phụ đề ${subtitleSharp.toFixed(2)}; tiếng gốc ${clipDb.toFixed(2)} dB`);
+  console.log(`[e2e upload 9:16] tổng ${total} s (thẻ ${intro.toFixed(2)} s); sắc nét trên ${topSharp.toFixed(1)}, giữa ${middleSharp.toFixed(1)}, nửa dưới ${lowerSharp.toFixed(1)}; tiếng gốc ${clipDb.toFixed(2)} dB`);
+});
+
+test("Video tải lên vuông 1080×1080: vừa khung trên nền mờ (không phủ kín)", async ({ page }) => {
+  test.skip(!ffmpeg, "cần ffmpeg để tạo video mẫu");
+  await login(page);
+  await discardDraftIfOffered(page);
+  await startUploadProject(page, "Clip vuông nền mờ");
+  await uploadClip(page, square, "0:08");
+  await expect(page.getByTestId("video-tai-len")).toContainText("1080×1080");
+  await toRender(page, "none");
+  const file = await renderAndDownload(page, "test-results", "tai-len-vuong-");
+  const total = await shownDuration(page);
+  const t = total - CLIP_SEC / 2;
+  const middleSharp = sharpness(grabRegion(file, t, BAND_MIDDLE), BAND_MIDDLE);
+  const below = grabRegion(file, t, BELOW_BAND);
+  const belowSharp = sharpness(below, BELOW_BAND);
+  expect(middleSharp).toBeGreaterThan(SHARP_MIN);
+  expect(belowSharp).toBeLessThan(BLURRED_MAX);
+  expect(meanLevel(below)).toBeGreaterThan(15);
+  saveShot(file, t, "916-vuong-nen-mo.png");
+  console.log(`[e2e upload vuông] giữa ${middleSharp.toFixed(1)}, dưới dải ${belowSharp.toFixed(2)} (sáng ${meanLevel(below).toFixed(0)})`);
 });
 
 test("Video tải lên ngang 1920×1080: vừa khung trên nền mờ, tiếng gốc kéo về 0 thì im", async ({ page }) => {
@@ -247,6 +279,9 @@ test("Video tải lên ngang 1920×1080: vừa khung trên nền mờ, tiếng g
   expect(meanLevel(top)).toBeGreaterThan(15);
   expect(middleSharp).toBeGreaterThan(SHARP_MIN);
   expect(subtitleSharp).toBeLessThan(BLURRED_MAX);
+  // Khổ khác 9:16: nửa dưới khung vẫn là nền mờ.
+  expect(sharpness(grabRegion(file, t, BELOW_BAND), BELOW_BAND)).toBeLessThan(BLURRED_MAX);
+  saveShot(file, t, "916-ngang-nen-mo.png");
 
   const audio = decodeFileAudio(file);
   const clipDb = toneRmsDb(audio.channels, audio.sampleRate, intro + 0.5, total - 0.5, 440);
