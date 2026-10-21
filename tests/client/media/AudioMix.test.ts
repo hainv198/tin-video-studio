@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyLimiter, dbToGain, MIX_DEFAULTS, mixProgram, rmsDb } from "@/client/media/AudioMix";
+import { applyLimiter, dbToGain, duckGain, MIX_DEFAULTS, mixProgram, rmsDb } from "@/client/media/AudioMix";
 
 const SR = 1000;
 const sine = (seconds: number, amp: number, freq = 50) =>
@@ -199,5 +199,84 @@ describe("mixProgram — tiếng gốc của video tải lên", () => {
     const old = mixProgram([], music, opts);
     const muted = mixProgram([], music, opts, { channels: [sine(2, 0.2)], startSec: 0, gain: 0 });
     expect(Array.from(muted.left)).toEqual(Array.from(old.left));
+  });
+});
+
+describe("duckGain — tiếng gốc nhỏ lại khi đọc tiêu đề", () => {
+  const duck = { startSec: 1, endSec: 2 };
+  const floor = dbToGain(-12);
+
+  it("mặc định −12 dB, vào 0,2 s trước giọng, ra 0,25 s sau giọng", () => {
+    expect([MIX_DEFAULTS.duckDb, MIX_DEFAULTS.duckAttackSec, MIX_DEFAULTS.duckReleaseSec]).toEqual([12, 0.2, 0.25]);
+    expect(duckGain(0, duck)).toBe(1);
+    expect(duckGain(0.8, duck)).toBe(1);
+    expect(duckGain(0.9, duck)).toBeCloseTo(1 - (1 - floor) * 0.5, 9); // giữa pha vào (cosin nâng = 0,5)
+    expect(duckGain(1, duck)).toBeCloseTo(floor, 9); // giọng bắt đầu: đã hạ đủ
+    expect(duckGain(1.5, duck)).toBeCloseTo(floor, 9);
+    expect(duckGain(2, duck)).toBeCloseTo(floor, 9);
+    expect(duckGain(2.125, duck)).toBeCloseTo(1 - (1 - floor) * 0.5, 9); // giữa pha ra
+    expect(duckGain(2.25, duck)).toBe(1);
+    expect(duckGain(9, duck)).toBe(1);
+  });
+
+  it("đường cong mượt: giảm đều trong pha vào, tăng đều trong pha ra", () => {
+    for (let t = 0.8; t < 1; t += 0.01) expect(duckGain(t + 0.01, duck)).toBeLessThanOrEqual(duckGain(t, duck) + 1e-12);
+    for (let t = 2; t < 2.25; t += 0.01) expect(duckGain(t + 0.01, duck)).toBeGreaterThanOrEqual(duckGain(t, duck) - 1e-12);
+  });
+
+  it("tham số riêng: sâu 18 dB, vào/ra 0,1 s", () => {
+    const d = { startSec: 1, endSec: 2, depthDb: 18, attackSec: 0.1, releaseSec: 0.1 };
+    expect(duckGain(1.5, d)).toBeCloseTo(dbToGain(-18), 9);
+    expect(duckGain(0.9, d)).toBe(1);
+    expect(duckGain(2.1, d)).toBe(1);
+  });
+});
+
+describe("mixProgram — ducking tiếng gốc", () => {
+  const src = sine(4, 0.2, 47);
+  const opts = { sampleRate: SR, durationSec: 4 };
+
+  it("trong lúc đọc tiếng gốc thấp đúng 12 dB; ngoài cửa sổ vào/ra trùng từng mẫu với bản không duck", () => {
+    const plain = mixProgram([], null, opts, { channels: [src], startSec: 0, gain: 1 });
+    const ducked = mixProgram([], null, opts, { channels: [src], startSec: 0, gain: 1, duck: { startSec: 1.5, endSec: 2.5 } });
+    const drop = rmsDb(slice(ducked.left, 1.5, 2.5), -120) - rmsDb(slice(plain.left, 1.5, 2.5), -120);
+    expect(drop).toBeCloseTo(-12, 1);
+    expect(Array.from(slice(ducked.left, 0, 1.3))).toEqual(Array.from(slice(plain.left, 0, 1.3)));
+    expect(Array.from(slice(ducked.left, 2.75, 4))).toEqual(Array.from(slice(plain.left, 2.75, 4)));
+    expect(Array.from(slice(ducked.right, 1.5, 2.5))).toEqual(Array.from(slice(ducked.left, 1.5, 2.5)));
+  });
+
+  it("mốc duck tính trên thời gian chương trình (tiếng gốc bắt đầu ở giây 1)", () => {
+    const bed = { channels: [sine(3, 0.2, 47)], startSec: 1, gain: 1 };
+    const plain = mixProgram([], null, opts, bed);
+    const ducked = mixProgram([], null, opts, { ...bed, duck: { startSec: 2, endSec: 3 } });
+    expect(rmsDb(slice(ducked.left, 2, 3), -120) - rmsDb(slice(plain.left, 2, 3), -120)).toBeCloseTo(-12, 1);
+    expect(Array.from(slice(ducked.left, 0, 1.8))).toEqual(Array.from(slice(plain.left, 0, 1.8)));
+  });
+
+  it("giọng giữ −16,5 dB; nhạc nền giữ mức cố định theo tiếng gốc chưa duck", () => {
+    const voice = { startSec: 1.5, samples: sine(1, 0.3, 230) };
+    const music = { channels: [sine(4, 0.5, 30)], levelBelowVoiceDb: 15 };
+    const o = { ...opts, fadeInSec: 0, fadeOutSec: 0 };
+    const bed = { channels: [src], startSec: 0, gain: 1 };
+    const duck = { startSec: 1.5, endSec: 2.5 };
+    const musicOf = (withDuck: boolean) => {
+      const b = withDuck ? { ...bed, duck } : bed;
+      const all = mixProgram([voice], music, o, b);
+      const none = mixProgram([voice], null, o, b);
+      return all.left.map((v, i) => v - (none.left[i] ?? 0));
+    };
+    expect(rmsDb(musicOf(true), -120)).toBeCloseTo(rmsDb(musicOf(false), -120), 6);
+    // Giọng không bị duck: lấy bản trộn có duck trừ phần tiếng gốc đã duck → còn đúng giọng ở −16,5 dB (cùng cổng −45 dB như chuẩn hoá).
+    const full = mixProgram([voice], null, o, { ...bed, duck });
+    const srcOnly = mixProgram([], null, o, { ...bed, duck });
+    const voiceOnly = full.left.map((v, i) => v - (srcOnly.left[i] ?? 0));
+    expect(rmsDb(slice(voiceOnly, 1.5, 2.5))).toBeCloseTo(MIX_DEFAULTS.voiceTargetDb, 1);
+  });
+
+  it("không có duck: trùng từng mẫu với lời gọi cũ (bảo vệ hồi quy — test này không đỏ)", () => {
+    const a = mixProgram([], null, opts, { channels: [src], startSec: 0.5, gain: 0.8 });
+    const b = mixProgram([], null, opts, { channels: [src], startSec: 0.5, gain: 0.8, duck: undefined });
+    expect(Array.from(a.left)).toEqual(Array.from(b.left));
   });
 });

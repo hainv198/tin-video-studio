@@ -144,7 +144,15 @@ async function render(job: RenderJob): Promise<void> {
     if (clip && clip.hasAudio && clip.gain > 0 && clipSlot) {
       // null = video không có track âm (hợp lệ); có track mà không giải mã được thì decodeSourceAudio ném lỗi → dừng dựng.
       const channels = await decodeSourceAudio(clip.blob, job.sampleRate, clip.durationSec);
-      if (channels) source = { channels, startSec: clipSlot.start, gain: clip.gain };
+      if (channels) {
+        source = {
+          channels,
+          startSec: clipSlot.start,
+          gain: clip.gain,
+          // Đọc tiêu đề đè trên video: tiếng gốc nhỏ lại đúng lúc giọng đọc (mốc trên toàn video).
+          ...(clip.composition === "title-over-clip" ? { duck: { startSec: clipSlot.voiceStart, endSec: clipSlot.voiceEnd } } : {}),
+        };
+      }
     }
     let mix: StereoMix | null = mixProgram(voices, job.music, { sampleRate: job.sampleRate, durationSec: timeline.totalDuration }, source);
     source = null; // nhả tiếng gốc đã giải mã (≈ 115 MB với video 5 phút stereo)
