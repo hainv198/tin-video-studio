@@ -1,7 +1,8 @@
 import { BrandKit } from "@/domain/BrandKit";
 import { VideoFootage } from "@/domain/Footage";
 import { VideoOptions } from "@/domain/VideoOptions";
-import { mixProgram } from "@/client/media/AudioMix";
+import { mixProgram, type SourceBed, type StereoMix } from "@/client/media/AudioMix";
+import { decodeSourceAudio } from "@/client/media/decodeSourceAudio";
 import { loadFonts, type FontSink } from "@/client/media/FontLoader";
 import { ImageFrameProvider, VideoFrameProvider } from "@/client/media/MediaFrameProvider";
 import { fontFacesFor, frameStyleFor } from "@/templates/fonts/FontCatalog";
@@ -47,7 +48,7 @@ async function render(job: RenderJob): Promise<void> {
   let encoder: Mp4Encoder | null = null;
   try {
     logoBitmap = job.logo ? await createImageBitmap(job.logo) : null;
-    const { timeline, voices } = planRender(job, timelineConfigFor(template.defaults.timeline, options));
+    const { timeline, voices, clipSlot } = planRender(job, timelineConfigFor(template.defaults.timeline, options));
     const owners = new Map<string, string>();
     for (const s of job.scenes) if (s.footageFrom) owners.set(s.sceneId, s.footageFrom);
     const spans = footageSpans(timeline, owners);
@@ -111,7 +112,15 @@ async function render(job: RenderJob): Promise<void> {
     }
 
     scope.postMessage({ type: "progress", stage: "audio" });
-    const mix = mixProgram(voices, job.music, { sampleRate: job.sampleRate, durationSec: timeline.totalDuration });
+    let source: SourceBed | null = null;
+    const clip = job.sourceClip;
+    if (clip && clip.hasAudio && clip.gain > 0 && clipSlot) {
+      // null = video không có track âm (hợp lệ); có track mà không giải mã được thì decodeSourceAudio ném lỗi → dừng dựng.
+      const channels = await decodeSourceAudio(clip.blob, job.sampleRate, clip.durationSec);
+      if (channels) source = { channels, startSec: clipSlot.start, gain: clip.gain };
+    }
+    let mix: StereoMix | null = mixProgram(voices, job.music, { sampleRate: job.sampleRate, durationSec: timeline.totalDuration }, source);
+    source = null; // nhả tiếng gốc đã giải mã (≈ 115 MB với video 5 phút stereo)
 
     const { width, height, fps } = template.defaults;
     const canvas = new OffscreenCanvas(width, height);
@@ -127,6 +136,7 @@ async function render(job: RenderJob): Promise<void> {
     encoder = enc;
     await enc.start();
     await enc.addAudio(mix);
+    mix = null; // âm đã mã hoá AAC; nhả hai kênh Float32 trước khi dựng hình
 
     await new VideoRenderer({
       template,
