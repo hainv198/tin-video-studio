@@ -153,6 +153,17 @@ Trên iPhone có thể đặt sẵn **Cài đặt → Camera → Định dạng 
 
 Tạo video mẫu để thử: `npm run sample:clip -- test-results/mau.mp4 8` (cần ffmpeg; thêm `--size 1080x1920` cho video dọc, `--no-audio` cho video không tiếng). Đo hiệu năng video dài: `$env:PERF_CLIP="1"; npm run test:e2e -- e2e/08-hieu-nang-video-dai.spec.ts`.
 
+## Tạo giọng riêng
+
+Trang **/doc-giong** (liên kết **Tạo giọng** ở đầu trang studio, trên điện thoại nằm trong menu ☰): biến văn bản bất kỳ thành file âm thanh, không liên quan tới dự án video. Mọi tài khoản đã đăng nhập đều dùng được.
+
+1. Dán nội dung (tối đa **10.000 ký tự** mỗi lần), chọn giọng (cùng danh sách bước Giọng, nhóm theo nguồn) và tốc độ lúc tạo.
+2. **Tạo giọng**: văn bản được tách theo đoạn (xuống dòng) rồi theo câu, mỗi mẩu 1–3 câu và ≤ 4.500 ký tự (máy chủ nhận tối đa 5.000), gọi `/api/tts` lần lượt từng mẩu, có tiến độ và nút **Dừng** (dừng ngay, mẩu đã xong giữ lại). Mẩu lỗi hiện rõ kèm **Thử lại mẩu này**; hết hạn mức thì dừng cả lượt và báo.
+3. **Tinh chỉnh sau khi tạo** (không tốn lượt): tốc độ ×0,80–1,40, tông −4…+4 nửa cung, khoảng nghỉ giữa các mẩu 0,10–1,00 giây (mặc định 0,35). Mỗi mẩu được cắt lặng đầu/cuối rồi ghép liền với khoảng nghỉ đã chọn.
+4. **Nghe thử**, **Tải WAV** (PCM 16-bit, mono, 48 kHz) hoặc **Tải M4A** (AAC 128 kbps, chỉ hiện khi trình duyệt mã hoá được AAC — cùng bộ mã hoá dùng khi dựng video). Tên file lấy 6 từ đầu, ví dụ `tin-nhanh-hom-nay_20261021.wav`.
+
+Vì sao giới hạn 10.000 ký tự: giọng Google TTS tính hạn mức theo **số ký tự gửi đi** và cả nhóm dùng chung một hạn mức tháng; một lần dán nhầm cả bài dài có thể ăn hết hạn mức của mọi người. Sửa văn bản rồi bấm Tạo giọng lại thì chỉ những mẩu đã đổi mới gửi lại (mẩu không đổi dùng lại trong bộ nhớ trình duyệt). Âm thanh chỉ nằm trong trình duyệt, không lưu lên máy chủ; đóng tab là mất.
+
 ## Deploy lên Vercel (từng bước)
 
 Chỉ Hải chạy các lệnh git và thao tác trên GitHub/Vercel.
