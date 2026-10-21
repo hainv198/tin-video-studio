@@ -23,4 +23,13 @@ export const BANNER_LAYOUT: TheAnh28Layout = {
   credit: { ...LAYOUT.credit, y: 200 },
   logo: { ...LAYOUT.logo, y: 210 },
   subtitle: { ...LAYOUT.subtitle, fontPx: 52, lineHeight: 64, bodyBottom: 1520, introBottom: 890 },
+  /** Đè lên phần dưới khung video (300..1180), dừng ở mép banner; tiêu đề 3 dòng đáy 1398. */
+  titleOverlay: {
+    gradientTop: 980,
+    solidTop: 1060,
+    bottom: 1560,
+    chip: { x: 40, y: 1030 },
+    dateTag: { x: 96, y: 1146 },
+    title: { x: 96, y: 1206, maxWidth: 888, fontPx: 56, lineHeight: 68, maxLines: 3 },
+  },
 };

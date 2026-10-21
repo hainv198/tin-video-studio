@@ -78,3 +78,27 @@ describe("Timeline — đoạn lặng (video tải lên)", () => {
     expect(() => Timeline.build([{ sceneId: "clip", durationSec: 0, silent: true }], cfg)).toThrow("Đoạn clip có độ dài không hợp lệ");
   });
 });
+
+describe("Timeline.overlay — đọc tiêu đề đè trên video", () => {
+  const config = { leadInSec: 0.3, gapSec: 0.35, tailSec: 0.6 };
+
+  it("một khe dài đúng video, giọng từ nghỉ đầu; tổng = độ dài video", () => {
+    const t = Timeline.overlay("source-clip", 8, 2.5, config);
+    expect(t.slots).toEqual([{ sceneId: "source-clip", index: 0, start: 0, voiceStart: 0.3, voiceEnd: 2.8, end: 8 }]);
+    expect(t.totalDuration).toBe(8);
+    expect(t.frameCount(30)).toBe(240);
+    expect(t.slotAt(7.99).sceneId).toBe("source-clip");
+  });
+
+  it("vừa khít (nghỉ đầu + giọng = video) vẫn được; dài hơn thì báo lỗi tiếng Việt", () => {
+    expect(Timeline.overlay("c", 8, 7.7, config).slots[0]?.voiceEnd).toBe(8);
+    expect(() => Timeline.overlay("c", 8, 9, config)).toThrow(
+      "Giọng đọc tiêu đề (kể cả nghỉ đầu) dài 9,3 giây, video chỉ 8,0 giây. Hãy rút gọn tiêu đề, giảm nghỉ đầu, tăng tốc độ đọc hoặc chọn “Thẻ tiêu đề rồi video”.",
+    );
+  });
+
+  it("độ dài video hoặc giọng không hợp lệ", () => {
+    expect(() => Timeline.overlay("c", 0, 1, config)).toThrow("Đoạn c có độ dài không hợp lệ");
+    expect(() => Timeline.overlay("c", 8, Number.NaN, config)).toThrow("Cảnh c chưa có độ dài giọng");
+  });
+});

@@ -308,3 +308,43 @@ describe("RenderJobBuilder — banner chân", () => {
     expect("banner" in (await builder.build({ ...data, brand: { ...data.brand, banner: new Blob(["x"]) } })).job).toBe(false);
   });
 });
+
+describe("RenderJobBuilder — đọc tiêu đề đè trên video", () => {
+  async function overlaySetup(clipSec = 8) {
+    const base = setup();
+    const project = makeUploadProject();
+    const meta = await base.uploads.put(new Blob(["mp4"]), { name: "c.mp4", kind: "video" });
+    const data: StudioData = {
+      ...EMPTY_STUDIO,
+      kind: "upload",
+      project,
+      voice: VOICE,
+      narrations: new Map([[project.introScene.id, fakeNarration(project.introScene)]]),
+      brand: base.data.brand,
+      sourceClip: makeClip({ uploadId: meta.id, durationSec: clipSec }),
+      options: EMPTY_STUDIO.options.withUploadComposition("title-over-clip"),
+    };
+    return { ...base, data };
+  }
+
+  it("job mang composition 'title-over-clip'; vẫn một cảnh tiêu đề + giọng; không phụ đề", async () => {
+    const { builder, data } = await overlaySetup();
+    const { job } = await builder.build(data);
+    expect(job.sourceClip?.composition).toBe("title-over-clip");
+    expect(job.options.uploadComposition).toBe("title-over-clip");
+    expect(job.scenes.map((s) => s.role)).toEqual(["intro"]);
+    expect(job.narrations).toHaveLength(1);
+    expect(job.options.subtitles.enabled).toBe(false);
+  });
+
+  it("cách ghép mặc định: sourceClip không có khoá composition (job như cũ)", async () => {
+    const { builder, data } = await overlaySetup();
+    const { job } = await builder.build({ ...data, options: EMPTY_STUDIO.options });
+    expect("composition" in (job.sourceClip ?? {})).toBe(false);
+  });
+
+  it("giọng (đã cắt lặng ≈ 1,08 s) + nghỉ đầu 0,3 s dài hơn video 1 s: báo lỗi tiếng Việt ở bước Dựng", async () => {
+    const { builder, data } = await overlaySetup(1);
+    await expect(builder.build(data)).rejects.toThrow(/^Giọng đọc tiêu đề \(kể cả nghỉ đầu\) dài 1,4 giây, video chỉ 1,0 giây\./);
+  });
+});

@@ -33,6 +33,15 @@ export interface TheAnh28Layout {
     shadowBlurPx: number;
     shadowOffsetPx: number;
   };
+  /** Khối tiêu đề đè dưới video (kiểu "đọc tiêu đề đè trên video"); thu gọn = trượt xuống tới `bottom` và mờ dần. */
+  titleOverlay: {
+    gradientTop: number;
+    solidTop: number;
+    bottom: number;
+    chip: { x: number; y: number };
+    dateTag: { x: number; y: number };
+    title: { x: number; y: number; maxWidth: number; fontPx: number; lineHeight: number; maxLines: number };
+  };
   kenBurns: { from: number; to: number };
   blurPx: number;
 }
@@ -70,6 +79,15 @@ export const LAYOUT = {
     strokePx: 10,
     shadowBlurPx: 6,
     shadowOffsetPx: 3,
+  },
+  /** Đè lên phần dưới khung thân bài (dải video 380..1300); chữ cuối ≤ 1504, trong vùng an toàn 1600. */
+  titleOverlay: {
+    gradientTop: 1060,
+    solidTop: 1140,
+    bottom: 1920,
+    chip: { x: 40, y: 1110 },
+    dateTag: { x: 96, y: 1236 },
+    title: { x: 96, y: 1300, maxWidth: 888, fontPx: 60, lineHeight: 72, maxLines: 3 },
   },
   kenBurns: { from: 1, to: 1.08 },
   blurPx: 48,

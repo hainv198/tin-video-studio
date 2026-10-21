@@ -22,6 +22,11 @@ const UPLOAD_TABS: { id: PreviewTab; label: string }[] = [
   { id: "body", label: "Khung video" },
 ];
 
+const OVERLAY_TABS: { id: PreviewTab; label: string }[] = [
+  { id: "intro", label: "Đang đọc tiêu đề" },
+  { id: "body", label: "Sau khi đọc" },
+];
+
 function canvas2d(width: number, height: number): { canvas: HTMLCanvasElement; ctx: Canvas2D } {
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -51,6 +56,8 @@ export function PreviewPanel({ studio, form, image }: { studio: Studio; form: Pr
       }),
   );
   const state = useController(controller);
+  const data = useController(studio.session);
+  const overlay = form.kind === "upload" && data.options.uploadComposition === "title-over-clip";
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -80,7 +87,7 @@ export function PreviewPanel({ studio, form, image }: { studio: Studio; form: Pr
   useEffect(() => {
     controller.setImage(image ?? null);
   }, [controller, image]);
-  const tabs = kind === "upload" ? UPLOAD_TABS : TABS;
+  const tabs = overlay ? OVERLAY_TABS : kind === "upload" ? UPLOAD_TABS : TABS;
 
   return (
     <aside aria-label="Xem trước video" className="order-1 flex flex-col gap-2 lg:order-2 lg:sticky lg:top-4 lg:self-start">
@@ -113,7 +120,17 @@ export function PreviewPanel({ studio, form, image }: { studio: Studio; form: Pr
           height={1920}
           data-testid="xem-truoc-canvas"
           data-draw-count={state.drawCount}
-          aria-label={state.tab === "intro" ? "Xem trước thumbnail đầu" : kind === "upload" ? "Xem trước khung video" : "Xem trước cảnh thân bài"}
+          aria-label={
+            overlay
+              ? state.tab === "intro"
+                ? "Xem trước lúc đọc tiêu đề"
+                : "Xem trước sau khi đọc"
+              : state.tab === "intro"
+                ? "Xem trước thumbnail đầu"
+                : kind === "upload"
+                  ? "Xem trước khung video"
+                  : "Xem trước cảnh thân bài"
+          }
           className="mx-auto aspect-[9/16] w-full max-w-[320px] rounded-md bg-neutral-900"
         />
         {state.usingSample && <p className="text-xs text-neutral-400">Đang dùng nội dung mẫu</p>}

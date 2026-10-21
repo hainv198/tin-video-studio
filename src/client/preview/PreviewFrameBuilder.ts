@@ -6,6 +6,7 @@ import { MEDIA_CREDIT, type ProjectKind } from "@/domain/ProjectKind";
 import { SentenceSplitter } from "@/domain/SentenceSplitter";
 import type { VideoOptionsSnapshot } from "@/domain/VideoOptions";
 import { frameStyleFor } from "@/templates/fonts/FontCatalog";
+import { TITLE_COLLAPSE_SEC } from "@/templates/titleOverlay";
 import { SOURCE_CLIP_MEDIA, sourceClipMediaFor, type DrawableImage, type ProjectFrame, type SceneFrame, type VideoTemplate } from "@/templates/VideoTemplate";
 
 export type PreviewTab = "intro" | "body";
@@ -129,6 +130,22 @@ function buildUploadFrames(input: PreviewInput, splitter: SentenceSplitter): Pre
     voiceDuration: 0,
     media: input.image ? sourceClipMediaFor(input.image.width, input.image.height) : SOURCE_CLIP_MEDIA,
   };
+  if (options.uploadComposition === "title-over-clip") {
+    // Không có thẻ đầu: tab đầu = khung video lúc đang đọc tiêu đề, tab sau = sau khi khối tiêu đề thu gọn.
+    const collapseAtSec = leadInSec + introVoice + gapSec;
+    const span = collapseAtSec + TITLE_COLLAPSE_SEC + 1;
+    const overlayFrame = (sceneTime: number): SceneFrame => ({
+      ...body,
+      sceneTime,
+      sceneDuration: span,
+      footageTime: sceneTime,
+      footageDuration: span,
+      voiceStart: leadInSec,
+      voiceDuration: introVoice,
+      titleOverlay: { collapseAtSec },
+    });
+    return { project, intro: overlayFrame(leadInSec + introVoice / 2), body: overlayFrame(collapseAtSec + TITLE_COLLAPSE_SEC + 0.1), usingSample };
+  }
   return { project, intro, body, usingSample };
 }
 

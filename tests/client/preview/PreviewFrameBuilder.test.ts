@@ -179,3 +179,33 @@ describe("buildPreviewFrames — banner chân", () => {
     expect("banner" in buildPreviewFrames(input("upload", false)).project).toBe(false);
   });
 });
+
+describe("buildPreviewFrames — đọc tiêu đề đè trên video", () => {
+  const input = (overlay: boolean) => ({
+    form: { text: "", title: "Tiêu đề thử", sourceCredit: "", publishDateText: "2026-10-17", templateId: "theanh28", kind: "upload" as const },
+    template: defaultTemplateRegistry().get("theanh28"),
+    brandValues: {},
+    options: (overlay ? VideoOptions.defaults().withUploadComposition("title-over-clip") : VideoOptions.defaults()).snapshot(),
+    logo: null,
+    image: null,
+  });
+
+  it("tab đầu = khung video đang đọc tiêu đề; tab sau = đã thu gọn; cả hai là cảnh thân bài", () => {
+    const f = buildPreviewFrames(input(true));
+    // nghỉ đầu 0,3 + giọng ước lượng max(1, 11/15) = 1 + giữ 0,35
+    expect(f.intro.titleOverlay?.collapseAtSec).toBeCloseTo(1.65, 9);
+    expect(f.intro.role).toBe("body");
+    expect(f.body.role).toBe("body");
+    expect(f.intro.sceneTime).toBeLessThan(1.65);
+    expect(f.intro.sceneTime).toBeGreaterThan(0.3);
+    expect(f.body.sceneTime).toBeGreaterThanOrEqual(1.65 + 0.4);
+    expect(f.body.titleOverlay).toEqual(f.intro.titleOverlay);
+  });
+
+  it("cách ghép mặc định: như cũ (thẻ đầu role intro, không có titleOverlay)", () => {
+    const f = buildPreviewFrames(input(false));
+    expect(f.intro.role).toBe("intro");
+    expect("titleOverlay" in f.intro).toBe(false);
+    expect("titleOverlay" in f.body).toBe(false);
+  });
+});

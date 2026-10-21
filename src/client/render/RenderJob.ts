@@ -1,5 +1,6 @@
 import type { SceneRole } from "@/domain/Scene";
 import type { MusicBed } from "@/client/media/AudioMix";
+import type { UploadComposition } from "@/domain/UploadComposition";
 import type { VideoOptionsSnapshot } from "@/domain/VideoOptions";
 
 export interface FootageInput {
@@ -34,6 +35,8 @@ export interface SourceClipInput {
   gain: number;
   /** Giây (tính từ khung đầu) lấy ảnh cho thẻ tiêu đề. */
   thumbnailSec: number;
+  /** "title-over-clip": đọc tiêu đề đè trên video (không thẻ đầu); bỏ trống = thẻ tiêu đề rồi video. */
+  composition?: UploadComposition;
 }
 
 export interface RenderJob {

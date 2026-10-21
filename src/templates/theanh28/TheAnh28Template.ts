@@ -12,7 +12,9 @@ import {
   type SceneFrame,
   type SceneMedia,
   type TemplateDefaults,
+  type TitleOverlay,
 } from "../VideoTemplate";
+import { titleCollapseProgress } from "../titleOverlay";
 import { containRect, coverRect, kenBurnsRect, LAYOUT, withAlpha, wrapText, type Rect, type TheAnh28Layout } from "./layout";
 import { cueAt, splitSubtitle, timeCues, type SubtitleCue } from "./subtitles";
 
@@ -85,7 +87,7 @@ export class TheAnh28Template extends VideoTemplate {
     ctx.fillRect(0, L.gradientSolid, width, height - L.gradientSolid);
 
     this.drawDotPattern(ctx);
-    this.drawChip(ctx, project);
+    this.drawChip(ctx, project, L.chip.x, L.chip.y);
     this.drawDateTag(ctx, project, project.publishDateText, L.dateTag.x, L.dateTag.y);
 
     const fontPx = Number(project.brand.get("titleFontPx") ?? L.title.fontPx);
@@ -127,6 +129,41 @@ export class TheAnh28Template extends VideoTemplate {
       ctx.fillRect(0, 0, width, height);
     }
     this.drawDateTag(ctx, project, project.publishDateText, B.dateTag.x, B.dateTag.y);
+    if (scene.titleOverlay) this.drawTitleOverlay(ctx, project, scene.sceneTime, scene.titleOverlay);
+  }
+
+  /**
+   * Khối tiêu đề kiểu Theanh28 đè phần dưới video: dải chuyển màu + khối màu, chip tên kênh, tem ngày, tiêu đề in hoa.
+   * Thu gọn TITLE_COLLAPSE_SEC: trượt xuống tới `bottom` (bị cắt ở đó) và mờ dần; xong thì không vẽ gì (khung = thân bài thường).
+   */
+  private drawTitleOverlay(ctx: Canvas2D, project: ProjectFrame, sceneTime: number, overlay: TitleOverlay): void {
+    const p = titleCollapseProgress(sceneTime, overlay);
+    if (p >= 1) return;
+    const O = this.layout.titleOverlay;
+    const { width } = this.layout.frame;
+    const block = project.style?.intro.blockColor ?? this.color(project);
+    const shift = (O.bottom - O.gradientTop) * p;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, width, O.bottom);
+    ctx.clip();
+    ctx.globalAlpha = 1 - p;
+    const gradient = ctx.createLinearGradient(0, O.gradientTop + shift, 0, O.solidTop + shift);
+    gradient.addColorStop(0, withAlpha(block, 0));
+    gradient.addColorStop(1, block);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, O.gradientTop + shift, width, O.solidTop - O.gradientTop);
+    ctx.fillStyle = block;
+    ctx.fillRect(0, O.solidTop + shift, width, O.bottom - O.solidTop);
+    this.drawChip(ctx, project, O.chip.x, O.chip.y + shift);
+    this.drawDateTag(ctx, project, project.publishDateText, O.dateTag.x, O.dateTag.y + shift);
+    ctx.font = this.font(project, "bold", O.title.fontPx);
+    ctx.fillStyle = WHITE;
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
+    const lines = wrapText(upper(project.displayTitle), O.title.maxWidth, (s) => ctx.measureText(s).width, O.title.maxLines);
+    lines.forEach((line, i) => ctx.fillText(line, O.title.x, O.title.y + shift + i * O.title.lineHeight));
+    ctx.restore();
   }
 
   protected drawOverlay(ctx: Canvas2D, project: ProjectFrame, scene: SceneFrame): void {
@@ -254,7 +291,7 @@ export class TheAnh28Template extends VideoTemplate {
     ctx.restore();
   }
 
-  private drawChip(ctx: Canvas2D, project: ProjectFrame): void {
+  private drawChip(ctx: Canvas2D, project: ProjectFrame, x: number, y: number): void {
     const K = this.layout.intro.chip;
     const name = this.channelName(project);
     ctx.font = this.font(project, "bold", K.fontPx);
@@ -264,15 +301,15 @@ export class TheAnh28Template extends VideoTemplate {
     ctx.strokeStyle = WHITE;
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.roundRect(K.x, K.y, w, K.h, K.h / 2);
+    ctx.roundRect(x, y, w, K.h, K.h / 2);
     ctx.fill();
     ctx.stroke();
-    this.drawLogoBadge(ctx, project, K.x + K.padX, K.y + (K.h - K.logoSize) / 2, K.logoSize);
+    this.drawLogoBadge(ctx, project, x + K.padX, y + (K.h - K.logoSize) / 2, K.logoSize);
     ctx.font = this.font(project, "bold", K.fontPx);
     ctx.fillStyle = WHITE;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(name, K.x + K.padX + K.logoSize + K.gap, K.y + K.h / 2);
+    ctx.fillText(name, x + K.padX + K.logoSize + K.gap, y + K.h / 2);
   }
 
   private drawDateTag(ctx: Canvas2D, project: ProjectFrame, dateText: string, x: number, y: number): void {

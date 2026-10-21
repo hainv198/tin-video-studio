@@ -75,6 +75,12 @@ export interface ProjectFrame {
   banner?: DrawableImage | null;
 }
 
+/** Khối tiêu đề đè dưới video (kiểu "đọc tiêu đề đè trên video"): hiện từ đầu cảnh, thu gọn từ `collapseAtSec`. */
+export interface TitleOverlay {
+  /** Giây (tính từ đầu cảnh) bắt đầu thu gọn = hết giọng + "Giữ tiêu đề sau khi đọc". */
+  collapseAtSec: number;
+}
+
 export interface SceneFrame {
   role: SceneRole;
   text: string;
@@ -96,6 +102,8 @@ export interface SceneFrame {
   voiceDuration?: number;
   /** Bỏ trống = cover + Ken Burns (như cảnh trám). */
   media?: SceneMedia;
+  /** Có thì phong cách vẽ khối tiêu đề đè dưới video và thu gọn theo thời gian; bỏ trống = cảnh thân bài thường. */
+  titleOverlay?: TitleOverlay;
 }
 
 /** Phong cách có banner chân: ảnh mặc định (URL tương đối trong public/) và dải vẽ trên khung. */

@@ -11,7 +11,7 @@ import { CanvasBackdropMaker } from "./BackdropMaker";
 import { RENDER_AUDIO_BITRATE, RENDER_VIDEO_BITRATE } from "./encodingDefaults";
 import { Mp4Encoder } from "./Mp4Encoder";
 import { sourceClipMediaFor } from "@/templates/VideoTemplate";
-import { footageSpans, planRender, SOURCE_CLIP_SCENE_ID, timelineConfigFor } from "./RenderPlan";
+import { footageSpans, planRender, SOURCE_CLIP_SCENE_ID, timelineConfigFor, titleOverlayFor } from "./RenderPlan";
 import { probeWorkerScope, type ProbeScope } from "./workerProbe";
 import type { FootageInput, RenderJob, WorkerMessage, WorkerRequest } from "./RenderJob";
 import { VideoRenderer, type FrameProvider, type RenderScene } from "./VideoRenderer";
@@ -67,7 +67,8 @@ async function render(job: RenderJob): Promise<void> {
   try {
     logoBitmap = job.logo ? await createImageBitmap(job.logo) : null;
     bannerBitmap = template.footerBanner ? await loadBanner(job, template.footerBanner.defaultUrl) : null;
-    const { timeline, voices, clipSlot } = planRender(job, timelineConfigFor(template.defaults.timeline, options));
+    const timelineConfig = timelineConfigFor(template.defaults.timeline, options);
+    const { timeline, voices, clipSlot } = planRender(job, timelineConfig);
     const owners = new Map<string, string>();
     for (const s of job.scenes) if (s.footageFrom) owners.set(s.sceneId, s.footageFrom);
     const spans = footageSpans(timeline, owners);
@@ -108,6 +109,7 @@ async function render(job: RenderJob): Promise<void> {
       // Mở video tải lên MỘT lần: một khung làm ảnh thẻ tiêu đề, rồi phát trọn ở cảnh thân bài (không zoom).
       // Ngang: vừa khung trên nền mờ; dọc/vuông: phủ kín khung (xem sourceClipMediaFor).
       const clip = job.sourceClip;
+      const overlay = clip.composition === "title-over-clip";
       const frames = await VideoFrameProvider.open(clip.blob).catch((error: unknown) => {
         throw new Error(
           "Trình duyệt không đọc được hình của video tải lên (có thể do codec như HEVC/H.265). Hãy chuyển video sang MP4 (H.264, âm AAC) rồi tải lại.",
@@ -116,7 +118,7 @@ async function render(job: RenderJob): Promise<void> {
       });
       providers.push(frames);
       const intro = job.scenes[0];
-      if (intro && intro.role === "intro") {
+      if (!overlay && intro && intro.role === "intro") {
         scenes.set(intro.sceneId, {
           sceneId: intro.sceneId,
           role: "intro",
@@ -132,6 +134,7 @@ async function render(job: RenderJob): Promise<void> {
         playback: { mode: "clip", sourceDurationSec: clip.durationSec, startSec: frames.startSec },
         frames,
         media: sourceClipMediaFor(frames.width, frames.height),
+        ...(overlay && clipSlot ? { titleOverlay: titleOverlayFor(clipSlot, timelineConfig) } : {}),
       });
     }
 
